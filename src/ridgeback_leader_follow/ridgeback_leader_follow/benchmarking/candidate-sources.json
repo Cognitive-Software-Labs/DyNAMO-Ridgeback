@@ -1,0 +1,26 @@
+{
+  "drow": {
+    "url": "https://github.com/RWTHVision/2D_lidar_person_detection.git",
+    "revision": "d12e90225d52ba6c85d20061f1e7286d6a64aade"
+  },
+  "deim": {
+    "url": "https://github.com/Intellindust-AI-Lab/DEIM.git",
+    "revision": "09d35d53d39ee3145a1e61e3a989b28b9468d1dd"
+  },
+  "samurai": {
+    "url": "https://github.com/yangchris11/samurai.git",
+    "revision": "76ba195984892b0d1e3db5d9c9f90bb62175680a"
+  },
+  "lfe": {
+    "url": "https://github.com/robotics-upo/upo_laser_people_detector.git",
+    "revision": "cb416eebc9bf1dbafd3255f9d7c0fe08a895ef39"
+  },
+  "leg": {
+    "url": "https://github.com/mowito/ros2_leg_detector.git",
+    "revision": "b4be35a2f540c0e72cb8718e99fd9a23dc31f501"
+  },
+  "petra": {
+    "url": "https://github.com/ClaudiaAlvarezAparicio/petra.git",
+    "revision": "ffb7cc49e1c1196bc1b73f8bace54dc1121d7547"
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "source": "sofa_03.gltf",
+  "blender": "4.2.9 LTS",
+  "floor_center_translation": [
+    0.0,
+    0.0013414472341537476,
+    0.0006283945986069739
+  ],
+  "dimensions_m": [
+    2.73117733001709,
+    0.9250842332839966,
+    1.118264079093933
+  ],
+  "vertices": 5655,
+  "triangles": 8003,
+  "sha256": {
+    "mesh.npz": "318397f26333fc23f5eaa74e5a28d9154316a1a49b1572382afd8d5a4cc76216",
+    "model.dae": "4dc308606365558bd19c4d5b4f29d7ef69c7720ab2c0c3053fcd6df0f2b89c43",
+    "materials.json": "ce958c9ac2c9c16356d9098b9f36030e225b48a1f89381c24cd6e4c74cd6f4fc"
+  }
+}

@@ -1,0 +1,632 @@
+[
+  {
+    "candidate": "dinov2",
+    "selected": {
+      "threshold": 0.95,
+      "margin": 0.15,
+      "train": {
+        "eligible": 3186,
+        "correct": 8,
+        "wrong": 8,
+        "rejected": 3170,
+        "absent_false_accepts": 0,
+        "accuracy": 0.0025109855618330196
+      }
+    },
+    "isaac_check": {
+      "eligible": 3194,
+      "correct": 8,
+      "wrong": 15,
+      "rejected": 3171,
+      "absent_false_accepts": 0,
+      "accuracy": 0.002504696305572949
+    },
+    "grid": [
+      {
+        "threshold": 0.65,
+        "margin": 0.02,
+        "train": {
+          "eligible": 3186,
+          "correct": 437,
+          "wrong": 1068,
+          "rejected": 1681,
+          "absent_false_accepts": 0,
+          "accuracy": 0.13716258631512868
+        }
+      },
+      {
+        "threshold": 0.65,
+        "margin": 0.05,
+        "train": {
+          "eligible": 3186,
+          "correct": 336,
+          "wrong": 806,
+          "rejected": 2044,
+          "absent_false_accepts": 0,
+          "accuracy": 0.10546139359698682
+        }
+      },
+      {
+        "threshold": 0.65,
+        "margin": 0.1,
+        "train": {
+          "eligible": 3186,
+          "correct": 222,
+          "wrong": 323,
+          "rejected": 2641,
+          "absent_false_accepts": 0,
+          "accuracy": 0.0696798493408663
+        }
+      },
+      {
+        "threshold": 0.65,
+        "margin": 0.15,
+        "train": {
+          "eligible": 3186,
+          "correct": 154,
+          "wrong": 219,
+          "rejected": 2813,
+          "absent_false_accepts": 0,
+          "accuracy": 0.04833647206528562
+        }
+      },
+      {
+        "threshold": 0.72,
+        "margin": 0.02,
+        "train": {
+          "eligible": 3186,
+          "correct": 378,
+          "wrong": 965,
+          "rejected": 1843,
+          "absent_false_accepts": 0,
+          "accuracy": 0.11864406779661017
+        }
+      },
+      {
+        "threshold": 0.72,
+        "margin": 0.05,
+        "train": {
+          "eligible": 3186,
+          "correct": 285,
+          "wrong": 734,
+          "rejected": 2167,
+          "absent_false_accepts": 0,
+          "accuracy": 0.08945386064030132
+        }
+      },
+      {
+        "threshold": 0.72,
+        "margin": 0.1,
+        "train": {
+          "eligible": 3186,
+          "correct": 184,
+          "wrong": 293,
+          "rejected": 2709,
+          "absent_false_accepts": 0,
+          "accuracy": 0.05775266792215945
+        }
+      },
+      {
+        "threshold": 0.72,
+        "margin": 0.15,
+        "train": {
+          "eligible": 3186,
+          "correct": 126,
+          "wrong": 206,
+          "rejected": 2854,
+          "absent_false_accepts": 0,
+          "accuracy": 0.03954802259887006
+        }
+      },
+      {
+        "threshold": 0.8,
+        "margin": 0.02,
+        "train": {
+          "eligible": 3186,
+          "correct": 183,
+          "wrong": 641,
+          "rejected": 2362,
+          "absent_false_accepts": 0,
+          "accuracy": 0.05743879472693032
+        }
+      },
+      {
+        "threshold": 0.8,
+        "margin": 0.05,
+        "train": {
+          "eligible": 3186,
+          "correct": 131,
+          "wrong": 499,
+          "rejected": 2556,
+          "absent_false_accepts": 0,
+          "accuracy": 0.04111738857501569
+        }
+      },
+      {
+        "threshold": 0.8,
+        "margin": 0.1,
+        "train": {
+          "eligible": 3186,
+          "correct": 73,
+          "wrong": 110,
+          "rejected": 3003,
+          "absent_false_accepts": 0,
+          "accuracy": 0.022912743251726302
+        }
+      },
+      {
+        "threshold": 0.8,
+        "margin": 0.15,
+        "train": {
+          "eligible": 3186,
+          "correct": 52,
+          "wrong": 42,
+          "rejected": 3092,
+          "absent_false_accepts": 0,
+          "accuracy": 0.016321406151914627
+        }
+      },
+      {
+        "threshold": 0.85,
+        "margin": 0.02,
+        "train": {
+          "eligible": 3186,
+          "correct": 102,
+          "wrong": 460,
+          "rejected": 2624,
+          "absent_false_accepts": 0,
+          "accuracy": 0.032015065913371
+        }
+      },
+      {
+        "threshold": 0.85,
+        "margin": 0.05,
+        "train": {
+          "eligible": 3186,
+          "correct": 67,
+          "wrong": 409,
+          "rejected": 2710,
+          "absent_false_accepts": 0,
+          "accuracy": 0.02102950408035154
+        }
+      },
+      {
+        "threshold": 0.85,
+        "margin": 0.1,
+        "train": {
+          "eligible": 3186,
+          "correct": 33,
+          "wrong": 86,
+          "rejected": 3067,
+          "absent_false_accepts": 0,
+          "accuracy": 0.010357815442561206
+        }
+      },
+      {
+        "threshold": 0.85,
+        "margin": 0.15,
+        "train": {
+          "eligible": 3186,
+          "correct": 25,
+          "wrong": 21,
+          "rejected": 3140,
+          "absent_false_accepts": 0,
+          "accuracy": 0.007846829880728186
+        }
+      },
+      {
+        "threshold": 0.9,
+        "margin": 0.02,
+        "train": {
+          "eligible": 3186,
+          "correct": 43,
+          "wrong": 355,
+          "rejected": 2788,
+          "absent_false_accepts": 0,
+          "accuracy": 0.01349654739485248
+        }
+      },
+      {
+        "threshold": 0.9,
+        "margin": 0.05,
+        "train": {
+          "eligible": 3186,
+          "correct": 31,
+          "wrong": 355,
+          "rejected": 2800,
+          "absent_false_accepts": 0,
+          "accuracy": 0.00973006905210295
+        }
+      },
+      {
+        "threshold": 0.9,
+        "margin": 0.1,
+        "train": {
+          "eligible": 3186,
+          "correct": 14,
+          "wrong": 68,
+          "rejected": 3104,
+          "absent_false_accepts": 0,
+          "accuracy": 0.004394224733207784
+        }
+      },
+      {
+        "threshold": 0.9,
+        "margin": 0.15,
+        "train": {
+          "eligible": 3186,
+          "correct": 11,
+          "wrong": 9,
+          "rejected": 3166,
+          "absent_false_accepts": 0,
+          "accuracy": 0.003452605147520402
+        }
+      },
+      {
+        "threshold": 0.95,
+        "margin": 0.02,
+        "train": {
+          "eligible": 3186,
+          "correct": 12,
+          "wrong": 297,
+          "rejected": 2877,
+          "absent_false_accepts": 0,
+          "accuracy": 0.003766478342749529
+        }
+      },
+      {
+        "threshold": 0.95,
+        "margin": 0.05,
+        "train": {
+          "eligible": 3186,
+          "correct": 12,
+          "wrong": 297,
+          "rejected": 2877,
+          "absent_false_accepts": 0,
+          "accuracy": 0.003766478342749529
+        }
+      },
+      {
+        "threshold": 0.95,
+        "margin": 0.1,
+        "train": {
+          "eligible": 3186,
+          "correct": 11,
+          "wrong": 42,
+          "rejected": 3133,
+          "absent_false_accepts": 0,
+          "accuracy": 0.003452605147520402
+        }
+      },
+      {
+        "threshold": 0.95,
+        "margin": 0.15,
+        "train": {
+          "eligible": 3186,
+          "correct": 8,
+          "wrong": 8,
+          "rejected": 3170,
+          "absent_false_accepts": 0,
+          "accuracy": 0.0025109855618330196
+        }
+      }
+    ],
+    "objective": "correct - 5*(wrong + absent false accepts)",
+    "scope": "conditional cross-backend check of already chosen finalists; not independent generalization"
+  },
+  {
+    "candidate": "transreid",
+    "selected": {
+      "threshold": 0.95,
+      "margin": 0.1,
+      "train": {
+        "eligible": 3186,
+        "correct": 16,
+        "wrong": 3,
+        "rejected": 3167,
+        "absent_false_accepts": 0,
+        "accuracy": 0.005021971123666039
+      }
+    },
+    "isaac_check": {
+      "eligible": 3194,
+      "correct": 11,
+      "wrong": 111,
+      "rejected": 3072,
+      "absent_false_accepts": 0,
+      "accuracy": 0.0034439574201628053
+    },
+    "grid": [
+      {
+        "threshold": 0.65,
+        "margin": 0.02,
+        "train": {
+          "eligible": 3186,
+          "correct": 532,
+          "wrong": 815,
+          "rejected": 1839,
+          "absent_false_accepts": 0,
+          "accuracy": 0.1669805398618958
+        }
+      },
+      {
+        "threshold": 0.65,
+        "margin": 0.05,
+        "train": {
+          "eligible": 3186,
+          "correct": 324,
+          "wrong": 471,
+          "rejected": 2391,
+          "absent_false_accepts": 0,
+          "accuracy": 0.1016949152542373
+        }
+      },
+      {
+        "threshold": 0.65,
+        "margin": 0.1,
+        "train": {
+          "eligible": 3186,
+          "correct": 241,
+          "wrong": 98,
+          "rejected": 2847,
+          "absent_false_accepts": 0,
+          "accuracy": 0.07564344005021971
+        }
+      },
+      {
+        "threshold": 0.65,
+        "margin": 0.15,
+        "train": {
+          "eligible": 3186,
+          "correct": 213,
+          "wrong": 97,
+          "rejected": 2876,
+          "absent_false_accepts": 0,
+          "accuracy": 0.06685499058380415
+        }
+      },
+      {
+        "threshold": 0.72,
+        "margin": 0.02,
+        "train": {
+          "eligible": 3186,
+          "correct": 532,
+          "wrong": 811,
+          "rejected": 1843,
+          "absent_false_accepts": 0,
+          "accuracy": 0.1669805398618958
+        }
+      },
+      {
+        "threshold": 0.72,
+        "margin": 0.05,
+        "train": {
+          "eligible": 3186,
+          "correct": 324,
+          "wrong": 467,
+          "rejected": 2395,
+          "absent_false_accepts": 0,
+          "accuracy": 0.1016949152542373
+        }
+      },
+      {
+        "threshold": 0.72,
+        "margin": 0.1,
+        "train": {
+          "eligible": 3186,
+          "correct": 241,
+          "wrong": 94,
+          "rejected": 2851,
+          "absent_false_accepts": 0,
+          "accuracy": 0.07564344005021971
+        }
+      },
+      {
+        "threshold": 0.72,
+        "margin": 0.15,
+        "train": {
+          "eligible": 3186,
+          "correct": 213,
+          "wrong": 93,
+          "rejected": 2880,
+          "absent_false_accepts": 0,
+          "accuracy": 0.06685499058380415
+        }
+      },
+      {
+        "threshold": 0.8,
+        "margin": 0.02,
+        "train": {
+          "eligible": 3186,
+          "correct": 350,
+          "wrong": 755,
+          "rejected": 2081,
+          "absent_false_accepts": 0,
+          "accuracy": 0.1098556183301946
+        }
+      },
+      {
+        "threshold": 0.8,
+        "margin": 0.05,
+        "train": {
+          "eligible": 3186,
+          "correct": 230,
+          "wrong": 436,
+          "rejected": 2520,
+          "absent_false_accepts": 0,
+          "accuracy": 0.07219083490269931
+        }
+      },
+      {
+        "threshold": 0.8,
+        "margin": 0.1,
+        "train": {
+          "eligible": 3186,
+          "correct": 147,
+          "wrong": 65,
+          "rejected": 2974,
+          "absent_false_accepts": 0,
+          "accuracy": 0.046139359698681735
+        }
+      },
+      {
+        "threshold": 0.8,
+        "margin": 0.15,
+        "train": {
+          "eligible": 3186,
+          "correct": 119,
+          "wrong": 64,
+          "rejected": 3003,
+          "absent_false_accepts": 0,
+          "accuracy": 0.037350910232266166
+        }
+      },
+      {
+        "threshold": 0.85,
+        "margin": 0.02,
+        "train": {
+          "eligible": 3186,
+          "correct": 303,
+          "wrong": 670,
+          "rejected": 2213,
+          "absent_false_accepts": 0,
+          "accuracy": 0.0951035781544256
+        }
+      },
+      {
+        "threshold": 0.85,
+        "margin": 0.05,
+        "train": {
+          "eligible": 3186,
+          "correct": 197,
+          "wrong": 407,
+          "rejected": 2582,
+          "absent_false_accepts": 0,
+          "accuracy": 0.061833019460138104
+        }
+      },
+      {
+        "threshold": 0.85,
+        "margin": 0.1,
+        "train": {
+          "eligible": 3186,
+          "correct": 114,
+          "wrong": 43,
+          "rejected": 3029,
+          "absent_false_accepts": 0,
+          "accuracy": 0.035781544256120526
+        }
+      },
+      {
+        "threshold": 0.85,
+        "margin": 0.15,
+        "train": {
+          "eligible": 3186,
+          "correct": 86,
+          "wrong": 43,
+          "rejected": 3057,
+          "absent_false_accepts": 0,
+          "accuracy": 0.02699309478970496
+        }
+      },
+      {
+        "threshold": 0.9,
+        "margin": 0.02,
+        "train": {
+          "eligible": 3186,
+          "correct": 144,
+          "wrong": 473,
+          "rejected": 2569,
+          "absent_false_accepts": 0,
+          "accuracy": 0.04519774011299435
+        }
+      },
+      {
+        "threshold": 0.9,
+        "margin": 0.05,
+        "train": {
+          "eligible": 3186,
+          "correct": 104,
+          "wrong": 357,
+          "rejected": 2725,
+          "absent_false_accepts": 0,
+          "accuracy": 0.032642812303829254
+        }
+      },
+      {
+        "threshold": 0.9,
+        "margin": 0.1,
+        "train": {
+          "eligible": 3186,
+          "correct": 55,
+          "wrong": 13,
+          "rejected": 3118,
+          "absent_false_accepts": 0,
+          "accuracy": 0.01726302573760201
+        }
+      },
+      {
+        "threshold": 0.9,
+        "margin": 0.15,
+        "train": {
+          "eligible": 3186,
+          "correct": 41,
+          "wrong": 13,
+          "rejected": 3132,
+          "absent_false_accepts": 0,
+          "accuracy": 0.012868801004394225
+        }
+      },
+      {
+        "threshold": 0.95,
+        "margin": 0.02,
+        "train": {
+          "eligible": 3186,
+          "correct": 36,
+          "wrong": 348,
+          "rejected": 2802,
+          "absent_false_accepts": 0,
+          "accuracy": 0.011299435028248588
+        }
+      },
+      {
+        "threshold": 0.95,
+        "margin": 0.05,
+        "train": {
+          "eligible": 3186,
+          "correct": 36,
+          "wrong": 323,
+          "rejected": 2827,
+          "absent_false_accepts": 0,
+          "accuracy": 0.011299435028248588
+        }
+      },
+      {
+        "threshold": 0.95,
+        "margin": 0.1,
+        "train": {
+          "eligible": 3186,
+          "correct": 16,
+          "wrong": 3,
+          "rejected": 3167,
+          "absent_false_accepts": 0,
+          "accuracy": 0.005021971123666039
+        }
+      },
+      {
+        "threshold": 0.95,
+        "margin": 0.15,
+        "train": {
+          "eligible": 3186,
+          "correct": 13,
+          "wrong": 3,
+          "rejected": 3170,
+          "absent_false_accepts": 0,
+          "accuracy": 0.004080351537978657
+        }
+      }
+    ],
+    "objective": "correct - 5*(wrong + absent false accepts)",
+    "scope": "conditional cross-backend check of already chosen finalists; not independent generalization"
+  }
+]

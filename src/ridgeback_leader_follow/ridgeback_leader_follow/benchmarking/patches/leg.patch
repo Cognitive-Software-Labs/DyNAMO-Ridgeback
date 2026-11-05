@@ -1,0 +1,37 @@
+diff --git a/src/leg_detector/include/leg_detector/laser_processor.h b/src/leg_detector/include/leg_detector/laser_processor.h
+index dcda1ed..48edf90 100644
+--- a/src/leg_detector/include/leg_detector/laser_processor.h
++++ b/src/leg_detector/include/leg_detector/laser_processor.h
+@@ -48,7 +48,7 @@
+ #include <algorithm>
+ #include <bullet/LinearMath/btVector3.h>
+ 
+-#include <tf2_geometry_msgs/tf2_geometry_msgs.h>
++#include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
+ 
+ 
+ 
+@@ -82,7 +82,7 @@ namespace laser_processor
+         /**
+         * @brief The comparator allowing the creation of an ordered set of Samples
+         */  
+-        inline bool operator() (const Sample* a, const Sample* b)
++        inline bool operator() (const Sample* a, const Sample* b) const
+         {
+             return (a->index <  b->index);
+         }
+diff --git a/src/leg_detector/src/cluster_features.cpp b/src/leg_detector/src/cluster_features.cpp
+index db5fae3..52f7a86 100644
+--- a/src/leg_detector/src/cluster_features.cpp
++++ b/src/leg_detector/src/cluster_features.cpp
+@@ -34,8 +34,8 @@
+ 
+ #include "leg_detector/cluster_features.h"
+ 
+-#include <opencv/cxcore.h>
+-#include <opencv/cv.h>
++#include <opencv2/core/core_c.h>
++#include <opencv2/imgproc/imgproc_c.h>
+ 
+ 
+ std::vector<float> ClusterFeatures::calcClusterFeatures(const laser_processor::SampleSet* cluster, const sensor_msgs::msg::LaserScan& scan)

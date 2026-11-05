@@ -1,0 +1,32 @@
+{
+  "blender": "4.2.9 LTS",
+  "height_m": 1.72,
+  "fps": 24,
+  "animation_frames": 48,
+  "cycle_seconds": 2.0,
+  "max_deviation_from_isaac_cache_m": 5.364418029785156e-07,
+  "joined_skin_max_deviation_m": 1.1324882507324219e-06,
+  "reparented_root_bones": [
+    "foot_l",
+    "foot_r"
+  ],
+  "textures": [
+    "body.png",
+    "eyebrow.png",
+    "eyelashes.png",
+    "hair_roots.png",
+    "low_poly.png",
+    "ponytail.png",
+    "teeth.png",
+    "top.png",
+    "trousers.png"
+  ],
+  "alpha_masked": [
+    "eyebrow",
+    "eyelashes",
+    "ponytail"
+  ],
+  "sha256": {
+    "walk.dae": "8c7a67c82dc287714f1105358f59d558aa928b6f3ce995fe4fb71d8eb46ca6f9"
+  }
+}

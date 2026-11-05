@@ -74,3 +74,49 @@ def test_person_without_appearance_is_never_locked():
     for _ in range(5):
         lock.update([person(1, np.empty(0, np.float32))], propose(1))
     assert lock.state == 'SEARCHING'
+
+
+def test_continuous_lidar_track_holds_verified_identity_without_gallery_update():
+    lock = LeaderLock()
+    lock_on(lock)
+    gallery = [f.copy() for f in lock.gallery]
+    empty = person(1, np.empty(0, np.float32))
+    for _ in range(20):
+        update = lock.update([empty], nobody, continuity=lambda track: track.track_id == 1)
+        assert update.valid(lock.state)
+    assert lock.reason == 'identity_held_by_track_continuity'
+    assert len(lock.gallery) == len(gallery)
+    lock.update([empty], nobody, continuity=lambda track: False)
+    assert lock.state == 'UNCERTAIN'
+
+
+def test_recovery_rejects_ambiguous_lookalikes_and_invalid_features():
+    lock = LeaderLock()
+    lock_on(lock)
+    lock.update([], nobody)
+    for _ in range(10):
+        lock.update([person(7, LEADER), person(8, LEADER)], propose(7))
+        assert lock.state != 'LOCKED'
+    assert lock.reason == 'ambiguous_appearance_recovery'
+    lock = LeaderLock()
+    lock_on(lock)
+    lock.update([person(1, np.array([np.nan, 0., 0.]))], nobody,
+                continuity=lambda track: True)
+    assert lock.state == 'UNCERTAIN'
+
+
+def test_feature_dimension_change_fails_closed():
+    lock = LeaderLock()
+    lock_on(lock)
+    lock.update([person(1, np.ones(5))], nobody)
+    assert lock.state == 'UNCERTAIN'
+
+
+def test_motion_filter_excludes_lookalike_on_an_incompatible_path():
+    lock=LeaderLock(acquire_frames=3)
+    lock_on(lock)
+    lock.update([],nobody)
+    for _ in range(3):
+        update=lock.update([person(7,LEADER),person(8,LEADER)],propose(7),
+                           recovery_filter=lambda tracks:[t for t in tracks if t.track_id==7])
+    assert update.valid(lock.state) and update.selected.track_id==7

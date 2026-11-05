@@ -1,0 +1,19 @@
+[
+  {
+    "doubleSided": true,
+    "name": "metal_office_desk",
+    "normalTexture": {
+      "index": 0
+    },
+    "pbrMetallicRoughness": {
+      "baseColorTexture": {
+        "index": 1
+      },
+      "metallicRoughnessTexture": {
+        "index": 2
+      }
+    },
+    "image": "textures/metal_office_desk_diff_1k.jpg",
+    "normal_image": "textures/metal_office_desk_nor_gl_1k.jpg"
+  }
+]

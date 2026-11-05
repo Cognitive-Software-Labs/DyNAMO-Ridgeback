@@ -5,6 +5,7 @@
   <description>Crowd leader following: leader identity lock, camera people tracking</description>
   <maintainer email="davszi@todo.com">davszi</maintainer>
   <license>BSD-3-Clause</license>
+  <license>CC-BY-4.0</license>
   <buildtool_depend>ament_cmake</buildtool_depend>
   <buildtool_depend>ament_cmake_python</buildtool_depend>
   <exec_depend>leader_follow_interfaces</exec_depend>
@@ -14,7 +15,19 @@
   <exec_depend>tf2_ros</exec_depend>
   <exec_depend>geometry_msgs</exec_depend>
   <exec_depend>python3-numpy</exec_depend>
+  <exec_depend>python3-scipy</exec_depend>
+  <exec_depend>ament_index_python</exec_depend>
+  <exec_depend>sensor_msgs</exec_depend>
+  <exec_depend>nav_msgs</exec_depend>
+  <exec_depend>tf2_msgs</exec_depend>
+  <exec_depend>robot_state_publisher</exec_depend>
+  <exec_depend>clearpath_generator_common</exec_depend>
+  <exec_depend>ridgeback_common</exec_depend>
+  <exec_depend>rosbag2_py</exec_depend>
+  <exec_depend>python3-pil</exec_depend>
+  <exec_depend>python3-yaml</exec_depend>
   <test_depend>ament_cmake_pytest</test_depend>
   <test_depend>python3-pytest</test_depend>
   <export><build_type>ament_cmake</build_type></export>
+  <exec_depend>rosbag2_interfaces</exec_depend>
 </package>

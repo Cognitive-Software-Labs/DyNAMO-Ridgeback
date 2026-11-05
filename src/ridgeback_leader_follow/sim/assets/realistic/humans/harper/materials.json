@@ -1,0 +1,206 @@
+[
+  {
+    "doubleSided": true,
+    "name": "Original accessory body",
+    "pbrMetallicRoughness": {
+      "baseColorFactor": [
+        0.02500000037252903,
+        0.019999999552965164,
+        0.017999999225139618,
+        1
+      ],
+      "metallicFactor": 0,
+      "roughnessFactor": 0.47999998927116394
+    }
+  },
+  {
+    "doubleSided": true,
+    "name": "Accessory detail",
+    "pbrMetallicRoughness": {
+      "baseColorFactor": [
+        0.054999999701976776,
+        0.0949999988079071,
+        0.11999999731779099,
+        1
+      ],
+      "metallicFactor": 0.30000001192092896,
+      "roughnessFactor": 0.23999999463558197
+    }
+  },
+  {
+    "alphaCutoff": 0.3499999940395355,
+    "alphaMode": "MASK",
+    "doubleSided": true,
+    "extensions": {
+      "KHR_materials_specular": {
+        "specularFactor": 0.5
+      }
+    },
+    "name": "Harper | anatomical body.eyebrow006",
+    "pbrMetallicRoughness": {
+      "baseColorTexture": {
+        "index": 0
+      },
+      "metallicFactor": 0,
+      "roughnessFactor": 0.7200000286102295
+    },
+    "image": "image_0.png"
+  },
+  {
+    "alphaCutoff": 0.3499999940395355,
+    "alphaMode": "MASK",
+    "doubleSided": true,
+    "extensions": {
+      "KHR_materials_specular": {
+        "specularFactor": 0.5
+      }
+    },
+    "name": "Harper | anatomical body.eyelashes01",
+    "pbrMetallicRoughness": {
+      "baseColorTexture": {
+        "index": 1
+      },
+      "metallicFactor": 0,
+      "roughnessFactor": 0.7200000286102295
+    },
+    "image": "image_1.png"
+  },
+  {
+    "doubleSided": true,
+    "extensions": {
+      "KHR_materials_specular": {
+        "specularFactor": 0.5
+      }
+    },
+    "name": "Harper | fine hair roots",
+    "pbrMetallicRoughness": {
+      "baseColorTexture": {
+        "index": 2
+      },
+      "metallicFactor": 0,
+      "roughnessFactor": 0.7200000286102295
+    },
+    "image": "image_2.png"
+  },
+  {
+    "doubleSided": true,
+    "extensions": {
+      "KHR_materials_specular": {
+        "specularFactor": 0.5
+      }
+    },
+    "name": "Harper | anatomical body.body",
+    "pbrMetallicRoughness": {
+      "baseColorTexture": {
+        "index": 3
+      },
+      "metallicFactor": 0,
+      "roughnessFactor": 0.5400000214576721
+    },
+    "image": "image_3.png"
+  },
+  {
+    "doubleSided": true,
+    "extensions": {
+      "KHR_materials_specular": {
+        "specularFactor": 0.5
+      }
+    },
+    "name": "Harper | anatomical body.low-poly",
+    "pbrMetallicRoughness": {
+      "baseColorTexture": {
+        "index": 4
+      },
+      "metallicFactor": 0,
+      "roughnessFactor": 0.7200000286102295
+    },
+    "image": "image_4.png"
+  },
+  {
+    "doubleSided": true,
+    "extensions": {
+      "KHR_materials_specular": {
+        "specularFactor": 0.5
+      }
+    },
+    "name": "Harper | original tailored business fabric",
+    "pbrMetallicRoughness": {
+      "baseColorTexture": {
+        "index": 5
+      },
+      "metallicFactor": 0,
+      "roughnessFactor": 0.6399999856948853
+    },
+    "image": "image_5.png"
+  },
+  {
+    "doubleSided": true,
+    "name": "Original dark ankle lining",
+    "pbrMetallicRoughness": {
+      "baseColorFactor": [
+        0.017999999225139618,
+        0.01600000075995922,
+        0.020999999716877937,
+        1
+      ],
+      "metallicFactor": 0,
+      "roughnessFactor": 0.800000011920929
+    }
+  },
+  {
+    "doubleSided": true,
+    "extensions": {
+      "KHR_materials_specular": {
+        "specularFactor": 0.5
+      }
+    },
+    "name": "Harper | anatomical body.shoes04",
+    "normalTexture": {
+      "index": 6
+    },
+    "pbrMetallicRoughness": {
+      "baseColorTexture": {
+        "index": 7
+      },
+      "metallicFactor": 0,
+      "roughnessFactor": 0.7200000286102295
+    },
+    "image": "image_7.png"
+  },
+  {
+    "alphaCutoff": 0.2800000011920929,
+    "alphaMode": "MASK",
+    "doubleSided": true,
+    "extensions": {
+      "KHR_materials_specular": {
+        "specularFactor": 0.5
+      }
+    },
+    "name": "Harper | anatomical body.short01",
+    "pbrMetallicRoughness": {
+      "baseColorTexture": {
+        "index": 8
+      },
+      "metallicFactor": 0,
+      "roughnessFactor": 0.7200000286102295
+    },
+    "image": "image_8.png"
+  },
+  {
+    "doubleSided": true,
+    "extensions": {
+      "KHR_materials_specular": {
+        "specularFactor": 0.5
+      }
+    },
+    "name": "Harper | anatomical body.teeth_base",
+    "pbrMetallicRoughness": {
+      "baseColorTexture": {
+        "index": 9
+      },
+      "metallicFactor": 0,
+      "roughnessFactor": 0.7200000286102295
+    },
+    "image": "image_9.png"
+  }
+]

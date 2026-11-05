@@ -1,0 +1,37 @@
+{
+  "status": "complete",
+  "scope": "F2 simulation only",
+  "candidate_methods": 20,
+  "candidate_runs": 320,
+  "sensor_qualified_cases": 16,
+  "selected_profile": "OWLv2 + LFE-PPN + ByteTrack-assisted CV Kalman fusion",
+  "selected_profile_reports": 16,
+  "ros_node_validations": [
+    {
+      "evidence": "artifacts/leader-following/f2-node-selected-gz-final-validation",
+      "status": "passed",
+      "messages": 379,
+      "nonempty_messages": 367,
+      "domain": 207,
+      "camera": "owlv2",
+      "lidar": "lfe-ppn",
+      "scope": "real ROS node, sensors/TF from bag, People publication; no motion command"
+    },
+    {
+      "evidence": "artifacts/leader-following/f2-node-selected-isaac-validation",
+      "status": "passed",
+      "messages": 406,
+      "nonempty_messages": 400,
+      "domain": 231,
+      "camera": "owlv2",
+      "lidar": "lfe-ppn",
+      "scope": "real ROS node, sensors/TF from bag, People publication; no motion command"
+    }
+  ],
+  "limitations": [
+    "dense crowds still have tracking errors",
+    "single human asset and one recording per configuration",
+    "workstation latency; robot/Thor performance deferred",
+    "F3 appearance and F4 closed loop remain open"
+  ]
+}

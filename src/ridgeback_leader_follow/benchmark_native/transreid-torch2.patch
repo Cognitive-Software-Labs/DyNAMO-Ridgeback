@@ -1,0 +1,13 @@
+diff --git a/model/backbones/vit_pytorch.py b/model/backbones/vit_pytorch.py
+index 9ebeb3d..7d12e73 100644
+--- a/model/backbones/vit_pytorch.py
++++ b/model/backbones/vit_pytorch.py
+@@ -27,7 +27,7 @@ from itertools import repeat
+ import torch
+ import torch.nn as nn
+ import torch.nn.functional as F
+-from torch._six import container_abcs
++import collections.abc as container_abcs
+ 
+ 
+ # From PyTorch internals

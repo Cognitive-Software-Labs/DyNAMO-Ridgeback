@@ -1,0 +1,21 @@
+{
+  "source": "plastic_crate_01.gltf",
+  "blender": "4.2.9 LTS",
+  "floor_center_translation": [
+    0.0,
+    0.0,
+    0.0
+  ],
+  "dimensions_m": [
+    0.29800063371658325,
+    0.40800413489341736,
+    0.2641694247722626
+  ],
+  "vertices": 21250,
+  "triangles": 18320,
+  "sha256": {
+    "mesh.npz": "e05ffbb58a22286696d952e5841f92d8c8da01c8c4c74f59b3bd465a89572dfe",
+    "model.dae": "7abc93b557696fe1361d5b9800de98cf837e3b67368ce4e071cf5dc2a80c4bb5",
+    "materials.json": "9ec4ef3396a6f906940e542179c8f9b5c97f28ca8aa3ddac9fc7432795c11780"
+  }
+}

@@ -1,0 +1,26 @@
+diff --git a/model/backbones/swin_transformer.py b/model/backbones/swin_transformer.py
+index c7c9402..1a1d52c 100644
+--- a/model/backbones/swin_transformer.py
++++ b/model/backbones/swin_transformer.py
+@@ -1363,7 +1363,7 @@ class SwinTransformer(BaseModule):
+         if self.semantic_weight >= 0 and semantic_weight == None:
+             w = torch.ones(x.shape[0],1) * self.semantic_weight
+             w = torch.cat([w, 1-w], axis=-1)
+-            semantic_weight = w.cuda()
++            semantic_weight = w.to(x.device)
+ 
+         x, hw_shape = self.patch_embed(x)
+ 
+diff --git a/model/backbones/vit_pytorch.py b/model/backbones/vit_pytorch.py
+index 66cf849..3750743 100644
+--- a/model/backbones/vit_pytorch.py
++++ b/model/backbones/vit_pytorch.py
+@@ -27,7 +27,7 @@ from itertools import repeat
+ import torch
+ import torch.nn as nn
+ import torch.nn.functional as F
+-from torch._six import container_abcs
++import collections.abc as container_abcs
+ 
+ 
+ # From PyTorch internals

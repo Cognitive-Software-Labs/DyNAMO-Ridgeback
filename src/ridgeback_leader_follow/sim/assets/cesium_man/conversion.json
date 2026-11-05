@@ -1,0 +1,14 @@
+{
+  "blender": "4.2.9 LTS",
+  "height_m": 1.75,
+  "cycle_seconds": 2.0,
+  "fps": 24,
+  "frames": 48,
+  "sha256": {
+    "CesiumMan.glb": "b7001eaeea8254bd44773bcd247e78696d94169388fbb2a1800fc69434e777d9",
+    "texture.png": "a1cd3c91b4fb87940c0272c275f38e9c6564cb7f2a67a61f316b733cad127269",
+    "walk.npz": "6747f8024d34d78087bf6b82be0377ac4addba0ee92f9616946c569b7c2e8850",
+    "walk.dae": "b554b3df6e51dfff115bb39718298cdfb337898260a59829a47a9fc8c9ec8ed7"
+  },
+  "source_revision": "8f492390ddc7a2ae221a1369ef560589cf8c70fb"
+}

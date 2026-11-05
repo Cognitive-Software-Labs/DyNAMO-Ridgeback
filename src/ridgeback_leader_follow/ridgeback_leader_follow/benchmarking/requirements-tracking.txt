@@ -1,0 +1,7 @@
+# Separate desktop environment: this stack requires NumPy 2.
+boxmot==26.0.0
+trackeval==1.3.0
+numpy==2.5.4
+scipy==1.17.1
+torch==2.11.0+cu128
+torchvision==0.26.0+cu128

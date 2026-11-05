@@ -1,0 +1,2015 @@
+{
+  "status": "evidence_checks_passed",
+  "automatic_qualification": false,
+  "checks": {
+    "f3-appearance-evaluation_qualified_corpus": true,
+    "f3-camera-exit-evaluation_qualified_corpus": true,
+    "five_complete_candidate_comparisons": true,
+    "offline_complete": true,
+    "offline_correct_lock_every_case": true,
+    "offline_zero_wrong_locks": true,
+    "offline_camera_exit_covered": true,
+    "offline_all_camera_exit_observations_held": true,
+    "ros_complete": true,
+    "ros_correct_lock_every_case": true,
+    "ros_zero_wrong_locks": true,
+    "ros_camera_exit_covered": true,
+    "ros_all_camera_exit_observations_held": true,
+    "ros_feature_publication": true
+  },
+  "comparisons": [
+    {
+      "candidate": "osnet-ain",
+      "complete_cases": 16
+    },
+    {
+      "candidate": "clip-reid",
+      "complete_cases": 16
+    },
+    {
+      "candidate": "transreid",
+      "complete_cases": 16
+    },
+    {
+      "candidate": "solider",
+      "complete_cases": 16
+    },
+    {
+      "candidate": "dinov2",
+      "complete_cases": 16
+    }
+  ],
+  "cases": [
+    {
+      "case": "isaac-leader_alone-4",
+      "offline": {
+        "identity_label_policy": "selected target nearest truth within 0.75 m, separated by 0.1 m; unselected duplicate tracks cannot steal its label",
+        "frames": 400,
+        "states": {
+          "SEARCHING": 2,
+          "LOCKED": 398
+        },
+        "locked_frames": 398,
+        "correct_locked_frames": 398,
+        "wrong_locked_frames": 0,
+        "correct_lock_fraction": 0.995,
+        "correct_locked_without_appearance_frames": 0,
+        "outside_camera_frames": 0,
+        "correct_locked_outside_camera_frames": 0,
+        "outside_camera_lock_fraction": null,
+        "recovery_seconds": [],
+        "unrecovered_loss": false,
+        "passed_zero_wrong_lock": true,
+        "world_anchor": "stationary base_link planar identity via recorded TF",
+        "parameters": {
+          "threshold": 0.65,
+          "recovery_margin": 0.15,
+          "appearance_association_weight": 0.75
+        },
+        "scope": "offline core replay; stationary observer; no ROS or motion qualification",
+        "inputs": {
+          "camera": "artifacts/leader-following/f3-appearance-evaluation/detections/isaac-leader_alone-4/owlv2/detections.jsonl",
+          "lidar": "artifacts/leader-following/f3-appearance-evaluation/detections/isaac-leader_alone-4/lfe-ppn/detections.jsonl",
+          "embeddings": "artifacts/leader-following/f3-appearance-evaluation/comparison/osnet-ain/isaac-leader_alone-4/embeddings.npz",
+          "annotations": "artifacts/leader-following/f3-appearance-evaluation/annotations-stationary-anchor/isaac-leader_alone-4.jsonl"
+        }
+      },
+      "ros": {
+        "identity_label_policy": "selected target nearest truth within 0.75 m, separated by 0.1 m; unselected duplicate tracks cannot steal its label",
+        "frames": 357,
+        "states": {
+          "LOCKED": 357
+        },
+        "locked_frames": 357,
+        "correct_locked_frames": 357,
+        "wrong_locked_frames": 0,
+        "correct_lock_fraction": 1.0,
+        "correct_locked_without_appearance_frames": 128,
+        "outside_camera_frames": 0,
+        "correct_locked_outside_camera_frames": 0,
+        "outside_camera_lock_fraction": null,
+        "recovery_seconds": [],
+        "unrecovered_loss": false,
+        "passed_zero_wrong_lock": true,
+        "status": "passed",
+        "scope": "real ROS tracker plus identity node, recorded sensors, stationary observer; no driving or hardware timing claim"
+      },
+      "publication": {
+        "status": "passed",
+        "messages": 362,
+        "nonempty_messages": 362,
+        "domain": 67,
+        "camera": "owlv2",
+        "lidar": "lfe-ppn",
+        "appearance": "osnet-ain",
+        "appearance_observations": 233,
+        "track_maximum_age": 3.0,
+        "observation_timeout": 0.25,
+        "identity_parameters": {
+          "match_threshold": 0.65,
+          "recovery_margin": 0.15,
+          "acquire_interval": 1,
+          "acquire_distance_tolerance": 0.25,
+          "acquire_lateral_tolerance": 0.1
+        },
+        "appearance_dimensions": [
+          512
+        ],
+        "leader_messages": 360,
+        "locked_messages": 358,
+        "scope": "real ROS feature/LeaderState publication; no identity-accuracy qualification"
+      }
+    },
+    {
+      "case": "isaac-crossing-4",
+      "offline": {
+        "identity_label_policy": "selected target nearest truth within 0.75 m, separated by 0.1 m; unselected duplicate tracks cannot steal its label",
+        "frames": 400,
+        "states": {
+          "SEARCHING": 2,
+          "LOCKED": 364,
+          "UNCERTAIN": 27,
+          "LOST": 7
+        },
+        "locked_frames": 364,
+        "correct_locked_frames": 364,
+        "wrong_locked_frames": 0,
+        "correct_lock_fraction": 0.91,
+        "correct_locked_without_appearance_frames": 0,
+        "outside_camera_frames": 0,
+        "correct_locked_outside_camera_frames": 0,
+        "outside_camera_lock_fraction": null,
+        "recovery_seconds": [
+          0.15000000000000213,
+          0.15000000000000213,
+          0.15000000000000213,
+          0.15000000000000213,
+          0.15000000000000213,
+          0.8000000000000114,
+          0.15000000000000213
+        ],
+        "unrecovered_loss": false,
+        "passed_zero_wrong_lock": true,
+        "world_anchor": "stationary base_link planar identity via recorded TF",
+        "parameters": {
+          "threshold": 0.65,
+          "recovery_margin": 0.15,
+          "appearance_association_weight": 0.75
+        },
+        "scope": "offline core replay; stationary observer; no ROS or motion qualification",
+        "inputs": {
+          "camera": "artifacts/leader-following/f3-appearance-evaluation/detections/isaac-crossing-4/owlv2/detections.jsonl",
+          "lidar": "artifacts/leader-following/f3-appearance-evaluation/detections/isaac-crossing-4/lfe-ppn/detections.jsonl",
+          "embeddings": "artifacts/leader-following/f3-appearance-evaluation/comparison/osnet-ain/isaac-crossing-4/embeddings.npz",
+          "annotations": "artifacts/leader-following/f3-appearance-evaluation/annotations-stationary-anchor/isaac-crossing-4.jsonl"
+        }
+      },
+      "ros": {
+        "identity_label_policy": "selected target nearest truth within 0.75 m, separated by 0.1 m; unselected duplicate tracks cannot steal its label",
+        "frames": 338,
+        "states": {
+          "LOCKED": 299,
+          "UNCERTAIN": 32,
+          "LOST": 7
+        },
+        "locked_frames": 299,
+        "correct_locked_frames": 299,
+        "wrong_locked_frames": 0,
+        "correct_lock_fraction": 0.8846153846153846,
+        "correct_locked_without_appearance_frames": 109,
+        "outside_camera_frames": 0,
+        "correct_locked_outside_camera_frames": 0,
+        "outside_camera_lock_fraction": null,
+        "recovery_seconds": [
+          0.3666666669999996,
+          0.1999999999999993,
+          0.16666666699999944,
+          0.9000000000000004,
+          0.9333333330000002
+        ],
+        "unrecovered_loss": false,
+        "passed_zero_wrong_lock": true,
+        "status": "passed",
+        "scope": "real ROS tracker plus identity node, recorded sensors, stationary observer; no driving or hardware timing claim"
+      },
+      "publication": {
+        "status": "passed",
+        "messages": 343,
+        "nonempty_messages": 343,
+        "domain": 64,
+        "camera": "owlv2",
+        "lidar": "lfe-ppn",
+        "appearance": "osnet-ain",
+        "appearance_observations": 446,
+        "track_maximum_age": 3.0,
+        "observation_timeout": 0.25,
+        "identity_parameters": {
+          "match_threshold": 0.65,
+          "recovery_margin": 0.15,
+          "acquire_interval": 1,
+          "acquire_distance_tolerance": 0.25,
+          "acquire_lateral_tolerance": 0.1
+        },
+        "appearance_dimensions": [
+          512
+        ],
+        "leader_messages": 341,
+        "locked_messages": 300,
+        "scope": "real ROS feature/LeaderState publication; no identity-accuracy qualification"
+      }
+    },
+    {
+      "case": "isaac-lookalike_parallel-4",
+      "offline": {
+        "identity_label_policy": "selected target nearest truth within 0.75 m, separated by 0.1 m; unselected duplicate tracks cannot steal its label",
+        "frames": 400,
+        "states": {
+          "SEARCHING": 2,
+          "LOCKED": 271,
+          "UNCERTAIN": 127
+        },
+        "locked_frames": 271,
+        "correct_locked_frames": 271,
+        "wrong_locked_frames": 0,
+        "correct_lock_fraction": 0.6775,
+        "correct_locked_without_appearance_frames": 0,
+        "outside_camera_frames": 0,
+        "correct_locked_outside_camera_frames": 0,
+        "outside_camera_lock_fraction": null,
+        "recovery_seconds": [
+          0.15000000000000013,
+          0.15000000000000013,
+          0.14999999999999947,
+          0.14999999999999947,
+          0.14999999999999947,
+          0.14999999999999947,
+          0.14999999999999947,
+          0.14999999999999947,
+          0.14999999999999947,
+          0.14999999999999947,
+          0.15000000000000213,
+          0.15000000000000213,
+          0.15000000000000213,
+          0.15000000000000213,
+          0.15000000000000213,
+          0.15000000000000213,
+          0.15000000000000213,
+          0.15000000000000213,
+          0.15000000000000213,
+          0.15000000000000213,
+          0.15000000000000213,
+          0.15000000000000213,
+          0.14999999999999325,
+          0.1499999999999897,
+          0.14999999999999147,
+          0.14999999999999147,
+          0.14999999999999147,
+          0.14999999999999147,
+          0.14999999999999147,
+          0.14999999999999147,
+          0.14999999999999147,
+          0.14999999999999147,
+          0.14999999999999147,
+          0.14999999999999147,
+          0.14999999999999147,
+          0.14999999999999147,
+          0.14999999999999147,
+          0.14999999999999147,
+          0.14999999999999147,
+          0.14999999999999147,
+          0.14999999999999147,
+          0.14999999999999147
+        ],
+        "unrecovered_loss": true,
+        "passed_zero_wrong_lock": true,
+        "world_anchor": "stationary base_link planar identity via recorded TF",
+        "parameters": {
+          "threshold": 0.65,
+          "recovery_margin": 0.15,
+          "appearance_association_weight": 0.75
+        },
+        "scope": "offline core replay; stationary observer; no ROS or motion qualification",
+        "inputs": {
+          "camera": "artifacts/leader-following/f3-appearance-evaluation/detections/isaac-lookalike_parallel-4/owlv2/detections.jsonl",
+          "lidar": "artifacts/leader-following/f3-appearance-evaluation/detections/isaac-lookalike_parallel-4/lfe-ppn/detections.jsonl",
+          "embeddings": "artifacts/leader-following/f3-appearance-evaluation/comparison/osnet-ain/isaac-lookalike_parallel-4/embeddings.npz",
+          "annotations": "artifacts/leader-following/f3-appearance-evaluation/annotations-stationary-anchor/isaac-lookalike_parallel-4.jsonl"
+        }
+      },
+      "ros": {
+        "identity_label_policy": "selected target nearest truth within 0.75 m, separated by 0.1 m; unselected duplicate tracks cannot steal its label",
+        "frames": 349,
+        "states": {
+          "LOCKED": 202,
+          "UNCERTAIN": 131,
+          "LOST": 16
+        },
+        "locked_frames": 202,
+        "correct_locked_frames": 202,
+        "wrong_locked_frames": 0,
+        "correct_lock_fraction": 0.5787965616045845,
+        "correct_locked_without_appearance_frames": 68,
+        "outside_camera_frames": 0,
+        "correct_locked_outside_camera_frames": 0,
+        "outside_camera_lock_fraction": null,
+        "recovery_seconds": [
+          0.23333333300000003,
+          0.36666666700000006,
+          0.30000000000000027,
+          0.23333333400000011,
+          0.3333333330000001,
+          0.8666666670000005,
+          0.5666666659999997,
+          0.16666666600000024,
+          0.7000000000000002,
+          0.1999999999999993,
+          0.33333333300000234,
+          0.1999999999999993,
+          0.5,
+          0.3000000000000007,
+          0.6333333329999995,
+          0.5,
+          0.8333333329999988
+        ],
+        "unrecovered_loss": true,
+        "passed_zero_wrong_lock": true,
+        "status": "passed",
+        "scope": "real ROS tracker plus identity node, recorded sensors, stationary observer; no driving or hardware timing claim"
+      },
+      "publication": {
+        "status": "passed",
+        "messages": 354,
+        "nonempty_messages": 354,
+        "domain": 68,
+        "camera": "owlv2",
+        "lidar": "lfe-ppn",
+        "appearance": "osnet-ain",
+        "appearance_observations": 447,
+        "track_maximum_age": 3.0,
+        "observation_timeout": 0.25,
+        "identity_parameters": {
+          "match_threshold": 0.65,
+          "recovery_margin": 0.15,
+          "acquire_interval": 1,
+          "acquire_distance_tolerance": 0.25,
+          "acquire_lateral_tolerance": 0.1
+        },
+        "appearance_dimensions": [
+          512
+        ],
+        "leader_messages": 352,
+        "locked_messages": 203,
+        "scope": "real ROS feature/LeaderState publication; no identity-accuracy qualification"
+      }
+    },
+    {
+      "case": "isaac-lookalike_crossing-4",
+      "offline": {
+        "identity_label_policy": "selected target nearest truth within 0.75 m, separated by 0.1 m; unselected duplicate tracks cannot steal its label",
+        "frames": 400,
+        "states": {
+          "SEARCHING": 2,
+          "LOCKED": 335,
+          "UNCERTAIN": 37,
+          "LOST": 26
+        },
+        "locked_frames": 335,
+        "correct_locked_frames": 335,
+        "wrong_locked_frames": 0,
+        "correct_lock_fraction": 0.8375,
+        "correct_locked_without_appearance_frames": 0,
+        "outside_camera_frames": 0,
+        "correct_locked_outside_camera_frames": 0,
+        "outside_camera_lock_fraction": null,
+        "recovery_seconds": [
+          0.15000000000000213,
+          0.15000000000000213,
+          0.15000000000000213,
+          0.15000000000000213,
+          0.15000000000000213,
+          0.15000000000000213,
+          1.8000000000000256,
+          0.15000000000000213,
+          0.15000000000000213,
+          0.15000000000000213
+        ],
+        "unrecovered_loss": false,
+        "passed_zero_wrong_lock": true,
+        "world_anchor": "stationary base_link planar identity via recorded TF",
+        "parameters": {
+          "threshold": 0.65,
+          "recovery_margin": 0.15,
+          "appearance_association_weight": 0.75
+        },
+        "scope": "offline core replay; stationary observer; no ROS or motion qualification",
+        "inputs": {
+          "camera": "artifacts/leader-following/f3-appearance-evaluation/detections/isaac-lookalike_crossing-4/owlv2/detections.jsonl",
+          "lidar": "artifacts/leader-following/f3-appearance-evaluation/detections/isaac-lookalike_crossing-4/lfe-ppn/detections.jsonl",
+          "embeddings": "artifacts/leader-following/f3-appearance-evaluation/comparison/osnet-ain/isaac-lookalike_crossing-4/embeddings.npz",
+          "annotations": "artifacts/leader-following/f3-appearance-evaluation/annotations-stationary-anchor/isaac-lookalike_crossing-4.jsonl"
+        }
+      },
+      "ros": {
+        "identity_label_policy": "selected target nearest truth within 0.75 m, separated by 0.1 m; unselected duplicate tracks cannot steal its label",
+        "frames": 340,
+        "states": {
+          "SEARCHING": 1,
+          "LOCKED": 276,
+          "UNCERTAIN": 32,
+          "LOST": 31
+        },
+        "locked_frames": 276,
+        "correct_locked_frames": 276,
+        "wrong_locked_frames": 0,
+        "correct_lock_fraction": 0.8117647058823529,
+        "correct_locked_without_appearance_frames": 99,
+        "outside_camera_frames": 0,
+        "correct_locked_outside_camera_frames": 0,
+        "outside_camera_lock_fraction": null,
+        "recovery_seconds": [
+          0.33333333300000056,
+          0.16666666700000032,
+          0.36666666599999953,
+          1.7999999979999988,
+          0.6999999999999993
+        ],
+        "unrecovered_loss": false,
+        "passed_zero_wrong_lock": true,
+        "status": "passed",
+        "scope": "real ROS tracker plus identity node, recorded sensors, stationary observer; no driving or hardware timing claim"
+      },
+      "publication": {
+        "status": "passed",
+        "messages": 343,
+        "nonempty_messages": 343,
+        "domain": 63,
+        "camera": "owlv2",
+        "lidar": "lfe-ppn",
+        "appearance": "osnet-ain",
+        "appearance_observations": 419,
+        "track_maximum_age": 3.0,
+        "observation_timeout": 0.25,
+        "identity_parameters": {
+          "match_threshold": 0.65,
+          "recovery_margin": 0.15,
+          "acquire_interval": 1,
+          "acquire_distance_tolerance": 0.25,
+          "acquire_lateral_tolerance": 0.1
+        },
+        "appearance_dimensions": [
+          512
+        ],
+        "leader_messages": 341,
+        "locked_messages": 276,
+        "scope": "real ROS feature/LeaderState publication; no identity-accuracy qualification"
+      }
+    },
+    {
+      "case": "isaac-leader_stop-4",
+      "offline": {
+        "identity_label_policy": "selected target nearest truth within 0.75 m, separated by 0.1 m; unselected duplicate tracks cannot steal its label",
+        "frames": 400,
+        "states": {
+          "SEARCHING": 2,
+          "LOCKED": 186,
+          "UNCERTAIN": 212
+        },
+        "locked_frames": 186,
+        "correct_locked_frames": 186,
+        "wrong_locked_frames": 0,
+        "correct_lock_fraction": 0.465,
+        "correct_locked_without_appearance_frames": 0,
+        "outside_camera_frames": 0,
+        "correct_locked_outside_camera_frames": 0,
+        "outside_camera_lock_fraction": null,
+        "recovery_seconds": [
+          0.15000000000000213,
+          0.15000000000000213,
+          0.15000000000000213,
+          0.15000000000000213,
+          0.15000000000000213,
+          0.15000000000000213,
+          0.15000000000000213,
+          0.15000000000000213,
+          0.15000000000000213,
+          0.15000000000000213,
+          0.15000000000000213,
+          0.15000000000000213,
+          0.15000000000000213,
+          0.15000000000000213,
+          0.15000000000000213,
+          0.15000000000000213,
+          0.15000000000000213,
+          0.15000000000000213,
+          0.15000000000000213,
+          0.15000000000000213,
+          0.15000000000000213,
+          0.15000000000000213,
+          0.15000000000000213,
+          0.15000000000000213,
+          0.15000000000000213,
+          0.15000000000000213,
+          0.15000000000000213,
+          0.15000000000000213,
+          0.15000000000000213,
+          0.15000000000000213,
+          0.15000000000000213,
+          0.15000000000000213,
+          0.15000000000000213,
+          0.15000000000000213,
+          0.15000000000000213,
+          0.15000000000000213,
+          0.15000000000000213,
+          0.15000000000000213,
+          0.15000000000000213,
+          0.15000000000000213,
+          0.15000000000000213,
+          0.15000000000000213,
+          0.15000000000000213,
+          0.15000000000000213,
+          0.15000000000000213,
+          0.15000000000000213,
+          0.15000000000000213,
+          0.15000000000000213,
+          0.15000000000000213,
+          0.15000000000000036,
+          0.1499999999999897,
+          0.14999999999999147,
+          0.14999999999999147,
+          0.14999999999999147,
+          0.14999999999999147,
+          0.14999999999999147,
+          0.14999999999999147,
+          0.14999999999999147,
+          0.14999999999999147,
+          0.14999999999999147,
+          0.14999999999999147,
+          0.14999999999999147,
+          0.14999999999999147,
+          0.14999999999999147,
+          0.14999999999999147,
+          0.14999999999999147,
+          0.14999999999999147,
+          0.14999999999999147,
+          0.14999999999999147,
+          0.14999999999999147
+        ],
+        "unrecovered_loss": true,
+        "passed_zero_wrong_lock": true,
+        "world_anchor": "stationary base_link planar identity via recorded TF",
+        "parameters": {
+          "threshold": 0.65,
+          "recovery_margin": 0.15,
+          "appearance_association_weight": 0.75
+        },
+        "scope": "offline core replay; stationary observer; no ROS or motion qualification",
+        "inputs": {
+          "camera": "artifacts/leader-following/f3-appearance-evaluation/detections/isaac-leader_stop-4/owlv2/detections.jsonl",
+          "lidar": "artifacts/leader-following/f3-appearance-evaluation/detections/isaac-leader_stop-4/lfe-ppn/detections.jsonl",
+          "embeddings": "artifacts/leader-following/f3-appearance-evaluation/comparison/osnet-ain/isaac-leader_stop-4/embeddings.npz",
+          "annotations": "artifacts/leader-following/f3-appearance-evaluation/annotations-stationary-anchor/isaac-leader_stop-4.jsonl"
+        }
+      },
+      "ros": {
+        "identity_label_policy": "selected target nearest truth within 0.75 m, separated by 0.1 m; unselected duplicate tracks cannot steal its label",
+        "frames": 356,
+        "states": {
+          "LOCKED": 144,
+          "UNCERTAIN": 187,
+          "LOST": 25
+        },
+        "locked_frames": 144,
+        "correct_locked_frames": 144,
+        "wrong_locked_frames": 0,
+        "correct_lock_fraction": 0.4044943820224719,
+        "correct_locked_without_appearance_frames": 47,
+        "outside_camera_frames": 0,
+        "correct_locked_outside_camera_frames": 0,
+        "outside_camera_lock_fraction": null,
+        "recovery_seconds": [
+          0.7333333340000001,
+          0.10833333300000003,
+          0.3333333329999997,
+          0.4333333340000012,
+          0.1999999999999993,
+          0.13333333300000128,
+          0.23333333299999914,
+          0.33333333300000056,
+          0.4333333340000003,
+          0.26666666700000086,
+          0.6999999999999993,
+          0.23333333299999914,
+          0.6666666669999994,
+          0.3666666670000005,
+          0.33333333300000056,
+          0.2666666669999991,
+          0.1333333329999995,
+          0.6666666660000011,
+          0.8666666669999987,
+          0.23333333299999914,
+          0.2666666669999991,
+          0.6333333329999995,
+          0.46666666699999837,
+          0.5333333329999981,
+          0.4333333340000003,
+          0.23333333300000092,
+          0.1999999999999993,
+          0.20000000000000284,
+          0.233333334000001
+        ],
+        "unrecovered_loss": true,
+        "passed_zero_wrong_lock": true,
+        "status": "passed",
+        "scope": "real ROS tracker plus identity node, recorded sensors, stationary observer; no driving or hardware timing claim"
+      },
+      "publication": {
+        "status": "passed",
+        "messages": 358,
+        "nonempty_messages": 358,
+        "domain": 69,
+        "camera": "owlv2",
+        "lidar": "lfe-ppn",
+        "appearance": "osnet-ain",
+        "appearance_observations": 889,
+        "track_maximum_age": 3.0,
+        "observation_timeout": 0.25,
+        "identity_parameters": {
+          "match_threshold": 0.65,
+          "recovery_margin": 0.15,
+          "acquire_interval": 1,
+          "acquire_distance_tolerance": 0.25,
+          "acquire_lateral_tolerance": 0.1
+        },
+        "appearance_dimensions": [
+          512
+        ],
+        "leader_messages": 358,
+        "locked_messages": 144,
+        "scope": "real ROS feature/LeaderState publication; no identity-accuracy qualification"
+      }
+    },
+    {
+      "case": "isaac-crowd-2",
+      "offline": {
+        "identity_label_policy": "selected target nearest truth within 0.75 m, separated by 0.1 m; unselected duplicate tracks cannot steal its label",
+        "frames": 400,
+        "states": {
+          "SEARCHING": 2,
+          "LOCKED": 368,
+          "UNCERTAIN": 30
+        },
+        "locked_frames": 368,
+        "correct_locked_frames": 368,
+        "wrong_locked_frames": 0,
+        "correct_lock_fraction": 0.92,
+        "correct_locked_without_appearance_frames": 0,
+        "outside_camera_frames": 0,
+        "correct_locked_outside_camera_frames": 0,
+        "outside_camera_lock_fraction": null,
+        "recovery_seconds": [
+          0.15000000000000013,
+          0.14999999999999947,
+          0.14999999999999936,
+          0.14999999999999947,
+          0.14999999999999947,
+          0.14999999999999947,
+          0.14999999999999947,
+          0.14999999999999947,
+          0.15000000000000213,
+          0.15000000000000213
+        ],
+        "unrecovered_loss": false,
+        "passed_zero_wrong_lock": true,
+        "world_anchor": "stationary base_link planar identity via recorded TF",
+        "parameters": {
+          "threshold": 0.65,
+          "recovery_margin": 0.15,
+          "appearance_association_weight": 0.75
+        },
+        "scope": "offline core replay; stationary observer; no ROS or motion qualification",
+        "inputs": {
+          "camera": "artifacts/leader-following/f3-appearance-evaluation/detections/isaac-crowd-2/owlv2/detections.jsonl",
+          "lidar": "artifacts/leader-following/f3-appearance-evaluation/detections/isaac-crowd-2/lfe-ppn/detections.jsonl",
+          "embeddings": "artifacts/leader-following/f3-appearance-evaluation/comparison/osnet-ain/isaac-crowd-2/embeddings.npz",
+          "annotations": "artifacts/leader-following/f3-appearance-evaluation/annotations-stationary-anchor/isaac-crowd-2.jsonl"
+        }
+      },
+      "ros": {
+        "identity_label_policy": "selected target nearest truth within 0.75 m, separated by 0.1 m; unselected duplicate tracks cannot steal its label",
+        "frames": 353,
+        "states": {
+          "LOCKED": 322,
+          "UNCERTAIN": 23,
+          "LOST": 8
+        },
+        "locked_frames": 322,
+        "correct_locked_frames": 322,
+        "wrong_locked_frames": 0,
+        "correct_lock_fraction": 0.9121813031161473,
+        "correct_locked_without_appearance_frames": 135,
+        "outside_camera_frames": 0,
+        "correct_locked_outside_camera_frames": 0,
+        "outside_camera_lock_fraction": null,
+        "recovery_seconds": [
+          0.266666666,
+          0.5333333330000001,
+          0.8000000000000003,
+          0.1999999999999993
+        ],
+        "unrecovered_loss": false,
+        "passed_zero_wrong_lock": true,
+        "status": "passed",
+        "scope": "real ROS tracker plus identity node, recorded sensors, stationary observer; no driving or hardware timing claim"
+      },
+      "publication": {
+        "status": "passed",
+        "messages": 357,
+        "nonempty_messages": 357,
+        "domain": 70,
+        "camera": "owlv2",
+        "lidar": "lfe-ppn",
+        "appearance": "osnet-ain",
+        "appearance_observations": 630,
+        "track_maximum_age": 3.0,
+        "observation_timeout": 0.25,
+        "identity_parameters": {
+          "match_threshold": 0.65,
+          "recovery_margin": 0.15,
+          "acquire_interval": 1,
+          "acquire_distance_tolerance": 0.25,
+          "acquire_lateral_tolerance": 0.1
+        },
+        "appearance_dimensions": [
+          512
+        ],
+        "leader_messages": 355,
+        "locked_messages": 322,
+        "scope": "real ROS feature/LeaderState publication; no identity-accuracy qualification"
+      }
+    },
+    {
+      "case": "isaac-crowd-4",
+      "offline": {
+        "identity_label_policy": "selected target nearest truth within 0.75 m, separated by 0.1 m; unselected duplicate tracks cannot steal its label",
+        "frames": 400,
+        "states": {
+          "SEARCHING": 2,
+          "LOCKED": 365,
+          "UNCERTAIN": 33
+        },
+        "locked_frames": 365,
+        "correct_locked_frames": 365,
+        "wrong_locked_frames": 0,
+        "correct_lock_fraction": 0.9125,
+        "correct_locked_without_appearance_frames": 0,
+        "outside_camera_frames": 0,
+        "correct_locked_outside_camera_frames": 0,
+        "outside_camera_lock_fraction": null,
+        "recovery_seconds": [
+          0.14999999999999947,
+          0.14999999999999947,
+          0.14999999999999947,
+          0.14999999999999947,
+          0.14999999999999947,
+          0.14999999999999947,
+          0.14999999999999947,
+          0.15000000000000213,
+          0.15000000000000258,
+          0.15000000000000213,
+          0.15000000000000213
+        ],
+        "unrecovered_loss": false,
+        "passed_zero_wrong_lock": true,
+        "world_anchor": "stationary base_link planar identity via recorded TF",
+        "parameters": {
+          "threshold": 0.65,
+          "recovery_margin": 0.15,
+          "appearance_association_weight": 0.75
+        },
+        "scope": "offline core replay; stationary observer; no ROS or motion qualification",
+        "inputs": {
+          "camera": "artifacts/leader-following/f3-appearance-evaluation/detections/isaac-crowd-4/owlv2/detections.jsonl",
+          "lidar": "artifacts/leader-following/f3-appearance-evaluation/detections/isaac-crowd-4/lfe-ppn/detections.jsonl",
+          "embeddings": "artifacts/leader-following/f3-appearance-evaluation/comparison/osnet-ain/isaac-crowd-4/embeddings.npz",
+          "annotations": "artifacts/leader-following/f3-appearance-evaluation/annotations-stationary-anchor/isaac-crowd-4.jsonl"
+        }
+      },
+      "ros": {
+        "identity_label_policy": "selected target nearest truth within 0.75 m, separated by 0.1 m; unselected duplicate tracks cannot steal its label",
+        "frames": 299,
+        "states": {
+          "SEARCHING": 3,
+          "LOCKED": 279,
+          "UNCERTAIN": 17
+        },
+        "locked_frames": 279,
+        "correct_locked_frames": 279,
+        "wrong_locked_frames": 0,
+        "correct_lock_fraction": 0.9331103678929766,
+        "correct_locked_without_appearance_frames": 77,
+        "outside_camera_frames": 0,
+        "correct_locked_outside_camera_frames": 0,
+        "outside_camera_lock_fraction": null,
+        "recovery_seconds": [
+          0.3000000009999999,
+          0.5333333330000003,
+          0.23333333300000003
+        ],
+        "unrecovered_loss": false,
+        "passed_zero_wrong_lock": true,
+        "status": "passed",
+        "scope": "real ROS tracker plus identity node, recorded sensors, stationary observer; no driving or hardware timing claim"
+      },
+      "publication": {
+        "status": "passed",
+        "messages": 299,
+        "nonempty_messages": 298,
+        "domain": 65,
+        "camera": "owlv2",
+        "lidar": "lfe-ppn",
+        "appearance": "osnet-ain",
+        "appearance_observations": 1075,
+        "track_maximum_age": 3.0,
+        "observation_timeout": 0.25,
+        "identity_parameters": {
+          "match_threshold": 0.65,
+          "recovery_margin": 0.15,
+          "acquire_interval": 1,
+          "acquire_distance_tolerance": 0.25,
+          "acquire_lateral_tolerance": 0.1
+        },
+        "appearance_dimensions": [
+          512
+        ],
+        "leader_messages": 299,
+        "locked_messages": 279,
+        "scope": "real ROS feature/LeaderState publication; no identity-accuracy qualification"
+      }
+    },
+    {
+      "case": "isaac-crowd-8",
+      "offline": {
+        "identity_label_policy": "selected target nearest truth within 0.75 m, separated by 0.1 m; unselected duplicate tracks cannot steal its label",
+        "frames": 400,
+        "states": {
+          "SEARCHING": 2,
+          "LOCKED": 284,
+          "UNCERTAIN": 114
+        },
+        "locked_frames": 284,
+        "correct_locked_frames": 284,
+        "wrong_locked_frames": 0,
+        "correct_lock_fraction": 0.71,
+        "correct_locked_without_appearance_frames": 0,
+        "outside_camera_frames": 0,
+        "correct_locked_outside_camera_frames": 0,
+        "outside_camera_lock_fraction": null,
+        "recovery_seconds": [
+          0.15000000000000013,
+          0.15000000000000013,
+          0.14999999999999947,
+          0.14999999999999947,
+          0.14999999999999947,
+          0.14999999999999947,
+          0.14999999999999947,
+          0.14999999999999947,
+          0.14999999999999947,
+          0.14999999999999947,
+          0.14999999999999947,
+          0.14999999999999947,
+          0.14999999999999947,
+          0.14999999999999947,
+          0.14999999999999947,
+          0.14999999999999947,
+          0.15000000000000124,
+          0.15000000000000258,
+          0.15000000000000213,
+          0.15000000000000213,
+          0.15000000000000213,
+          0.15000000000000213,
+          0.15000000000000213,
+          0.15000000000000213,
+          0.15000000000000213,
+          0.15000000000000213,
+          0.15000000000000213,
+          0.15000000000000213,
+          0.15000000000000213,
+          0.15000000000000213,
+          0.15000000000000213,
+          0.15000000000000213,
+          0.15000000000000213,
+          0.15000000000000213,
+          0.15000000000000213,
+          0.15000000000000213,
+          0.15000000000000213,
+          0.15000000000000213
+        ],
+        "unrecovered_loss": false,
+        "passed_zero_wrong_lock": true,
+        "world_anchor": "stationary base_link planar identity via recorded TF",
+        "parameters": {
+          "threshold": 0.65,
+          "recovery_margin": 0.15,
+          "appearance_association_weight": 0.75
+        },
+        "scope": "offline core replay; stationary observer; no ROS or motion qualification",
+        "inputs": {
+          "camera": "artifacts/leader-following/f3-appearance-evaluation/detections/isaac-crowd-8/owlv2/detections.jsonl",
+          "lidar": "artifacts/leader-following/f3-appearance-evaluation/detections/isaac-crowd-8/lfe-ppn/detections.jsonl",
+          "embeddings": "artifacts/leader-following/f3-appearance-evaluation/comparison/osnet-ain/isaac-crowd-8/embeddings.npz",
+          "annotations": "artifacts/leader-following/f3-appearance-evaluation/annotations-stationary-anchor/isaac-crowd-8.jsonl"
+        }
+      },
+      "ros": {
+        "identity_label_policy": "selected target nearest truth within 0.75 m, separated by 0.1 m; unselected duplicate tracks cannot steal its label",
+        "frames": 315,
+        "states": {
+          "SEARCHING": 1,
+          "LOCKED": 217,
+          "UNCERTAIN": 94,
+          "LOST": 3
+        },
+        "locked_frames": 217,
+        "correct_locked_frames": 217,
+        "wrong_locked_frames": 0,
+        "correct_lock_fraction": 0.6888888888888889,
+        "correct_locked_without_appearance_frames": 86,
+        "outside_camera_frames": 0,
+        "correct_locked_outside_camera_frames": 0,
+        "outside_camera_lock_fraction": null,
+        "recovery_seconds": [
+          0.333333333,
+          0.26666666699999997,
+          0.43333333299999977,
+          0.6666666669999999,
+          0.20000000000000018,
+          0.23333333300000003,
+          0.4333333340000003,
+          0.3333333329999997,
+          0.5333333329999999,
+          0.3666666669999996,
+          0.3333333329999997,
+          0.07500000000000107,
+          0.26666666700000086,
+          0.3000000000000007,
+          0.23333333299999914,
+          0.7999999999999989,
+          0.4333333330000002
+        ],
+        "unrecovered_loss": false,
+        "passed_zero_wrong_lock": true,
+        "status": "passed",
+        "scope": "real ROS tracker plus identity node, recorded sensors, stationary observer; no driving or hardware timing claim"
+      },
+      "publication": {
+        "status": "passed",
+        "messages": 319,
+        "nonempty_messages": 318,
+        "domain": 71,
+        "camera": "owlv2",
+        "lidar": "lfe-ppn",
+        "appearance": "osnet-ain",
+        "appearance_observations": 1575,
+        "track_maximum_age": 3.0,
+        "observation_timeout": 0.25,
+        "identity_parameters": {
+          "match_threshold": 0.65,
+          "recovery_margin": 0.15,
+          "acquire_interval": 1,
+          "acquire_distance_tolerance": 0.25,
+          "acquire_lateral_tolerance": 0.1
+        },
+        "appearance_dimensions": [
+          512
+        ],
+        "leader_messages": 317,
+        "locked_messages": 217,
+        "scope": "real ROS feature/LeaderState publication; no identity-accuracy qualification"
+      }
+    },
+    {
+      "case": "gz-leader_alone-4",
+      "offline": {
+        "identity_label_policy": "selected target nearest truth within 0.75 m, separated by 0.1 m; unselected duplicate tracks cannot steal its label",
+        "frames": 400,
+        "states": {
+          "SEARCHING": 2,
+          "LOCKED": 398
+        },
+        "locked_frames": 398,
+        "correct_locked_frames": 398,
+        "wrong_locked_frames": 0,
+        "correct_lock_fraction": 0.995,
+        "correct_locked_without_appearance_frames": 0,
+        "outside_camera_frames": 0,
+        "correct_locked_outside_camera_frames": 0,
+        "outside_camera_lock_fraction": null,
+        "recovery_seconds": [],
+        "unrecovered_loss": false,
+        "passed_zero_wrong_lock": true,
+        "world_anchor": "stationary base_link planar identity via recorded TF",
+        "parameters": {
+          "threshold": 0.65,
+          "recovery_margin": 0.15,
+          "appearance_association_weight": 0.75
+        },
+        "scope": "offline core replay; stationary observer; no ROS or motion qualification",
+        "inputs": {
+          "camera": "artifacts/leader-following/f3-appearance-evaluation/detections/gz-leader_alone-4/owlv2/detections.jsonl",
+          "lidar": "artifacts/leader-following/f3-appearance-evaluation/detections/gz-leader_alone-4/lfe-ppn/detections.jsonl",
+          "embeddings": "artifacts/leader-following/f3-appearance-evaluation/comparison/osnet-ain/gz-leader_alone-4/embeddings.npz",
+          "annotations": "artifacts/leader-following/f3-appearance-evaluation/annotations-stationary-anchor/gz-leader_alone-4.jsonl"
+        }
+      },
+      "ros": {
+        "identity_label_policy": "selected target nearest truth within 0.75 m, separated by 0.1 m; unselected duplicate tracks cannot steal its label",
+        "frames": 455,
+        "states": {
+          "SEARCHING": 1,
+          "LOCKED": 454
+        },
+        "locked_frames": 454,
+        "correct_locked_frames": 454,
+        "wrong_locked_frames": 0,
+        "correct_lock_fraction": 0.9978021978021978,
+        "correct_locked_without_appearance_frames": 234,
+        "outside_camera_frames": 0,
+        "correct_locked_outside_camera_frames": 0,
+        "outside_camera_lock_fraction": null,
+        "recovery_seconds": [],
+        "unrecovered_loss": false,
+        "passed_zero_wrong_lock": true,
+        "status": "passed",
+        "scope": "real ROS tracker plus identity node, recorded sensors, stationary observer; no driving or hardware timing claim"
+      },
+      "publication": {
+        "status": "passed",
+        "messages": 460,
+        "nonempty_messages": 458,
+        "domain": 72,
+        "camera": "owlv2",
+        "lidar": "lfe-ppn",
+        "appearance": "osnet-ain",
+        "appearance_observations": 222,
+        "track_maximum_age": 3.0,
+        "observation_timeout": 0.25,
+        "identity_parameters": {
+          "match_threshold": 0.65,
+          "recovery_margin": 0.15,
+          "acquire_interval": 1,
+          "acquire_distance_tolerance": 0.25,
+          "acquire_lateral_tolerance": 0.1
+        },
+        "appearance_dimensions": [
+          512
+        ],
+        "leader_messages": 458,
+        "locked_messages": 454,
+        "scope": "real ROS feature/LeaderState publication; no identity-accuracy qualification"
+      }
+    },
+    {
+      "case": "gz-crossing-4",
+      "offline": {
+        "identity_label_policy": "selected target nearest truth within 0.75 m, separated by 0.1 m; unselected duplicate tracks cannot steal its label",
+        "frames": 400,
+        "states": {
+          "SEARCHING": 2,
+          "LOCKED": 369,
+          "UNCERTAIN": 25,
+          "LOST": 4
+        },
+        "locked_frames": 369,
+        "correct_locked_frames": 369,
+        "wrong_locked_frames": 0,
+        "correct_lock_fraction": 0.9225,
+        "correct_locked_without_appearance_frames": 0,
+        "outside_camera_frames": 0,
+        "correct_locked_outside_camera_frames": 0,
+        "outside_camera_lock_fraction": null,
+        "recovery_seconds": [
+          0.15000000000000036,
+          0.14999999999999947,
+          0.14999999999999947,
+          0.15000000000000036,
+          0.15000000000000036,
+          0.5499999999999998,
+          0.15000000000000036
+        ],
+        "unrecovered_loss": false,
+        "passed_zero_wrong_lock": true,
+        "world_anchor": "stationary base_link planar identity via recorded TF",
+        "parameters": {
+          "threshold": 0.65,
+          "recovery_margin": 0.15,
+          "appearance_association_weight": 0.75
+        },
+        "scope": "offline core replay; stationary observer; no ROS or motion qualification",
+        "inputs": {
+          "camera": "artifacts/leader-following/f3-appearance-evaluation/detections/gz-crossing-4/owlv2/detections.jsonl",
+          "lidar": "artifacts/leader-following/f3-appearance-evaluation/detections/gz-crossing-4/lfe-ppn/detections.jsonl",
+          "embeddings": "artifacts/leader-following/f3-appearance-evaluation/comparison/osnet-ain/gz-crossing-4/embeddings.npz",
+          "annotations": "artifacts/leader-following/f3-appearance-evaluation/annotations-stationary-anchor/gz-crossing-4.jsonl"
+        }
+      },
+      "ros": {
+        "identity_label_policy": "selected target nearest truth within 0.75 m, separated by 0.1 m; unselected duplicate tracks cannot steal its label",
+        "frames": 365,
+        "states": {
+          "SEARCHING": 8,
+          "LOCKED": 326,
+          "UNCERTAIN": 24,
+          "LOST": 7
+        },
+        "locked_frames": 326,
+        "correct_locked_frames": 326,
+        "wrong_locked_frames": 0,
+        "correct_lock_fraction": 0.8931506849315068,
+        "correct_locked_without_appearance_frames": 117,
+        "outside_camera_frames": 0,
+        "correct_locked_outside_camera_frames": 0,
+        "outside_camera_lock_fraction": null,
+        "recovery_seconds": [
+          0.891,
+          0.8580000000000005,
+          0.1980000000000004
+        ],
+        "unrecovered_loss": false,
+        "passed_zero_wrong_lock": true,
+        "status": "passed",
+        "scope": "real ROS tracker plus identity node, recorded sensors, stationary observer; no driving or hardware timing claim"
+      },
+      "publication": {
+        "status": "passed",
+        "messages": 371,
+        "nonempty_messages": 368,
+        "domain": 73,
+        "camera": "owlv2",
+        "lidar": "lfe-ppn",
+        "appearance": "osnet-ain",
+        "appearance_observations": 465,
+        "track_maximum_age": 3.0,
+        "observation_timeout": 0.25,
+        "identity_parameters": {
+          "match_threshold": 0.65,
+          "recovery_margin": 0.15,
+          "acquire_interval": 1,
+          "acquire_distance_tolerance": 0.25,
+          "acquire_lateral_tolerance": 0.1
+        },
+        "appearance_dimensions": [
+          512
+        ],
+        "leader_messages": 369,
+        "locked_messages": 326,
+        "scope": "real ROS feature/LeaderState publication; no identity-accuracy qualification"
+      }
+    },
+    {
+      "case": "gz-lookalike_parallel-4",
+      "offline": {
+        "identity_label_policy": "selected target nearest truth within 0.75 m, separated by 0.1 m; unselected duplicate tracks cannot steal its label",
+        "frames": 400,
+        "states": {
+          "SEARCHING": 2,
+          "LOCKED": 282,
+          "UNCERTAIN": 116
+        },
+        "locked_frames": 282,
+        "correct_locked_frames": 282,
+        "wrong_locked_frames": 0,
+        "correct_lock_fraction": 0.705,
+        "correct_locked_without_appearance_frames": 1,
+        "outside_camera_frames": 0,
+        "correct_locked_outside_camera_frames": 0,
+        "outside_camera_lock_fraction": null,
+        "recovery_seconds": [
+          0.15000000000000002,
+          0.15000000000000002,
+          0.1499999999999998,
+          0.1499999999999999,
+          0.1499999999999999,
+          0.1499999999999999,
+          0.1499999999999999,
+          0.1499999999999999,
+          0.1499999999999999,
+          0.1499999999999999,
+          0.15000000000000036,
+          0.14999999999999947,
+          0.15000000000000036,
+          0.14999999999999947,
+          0.15000000000000036,
+          0.15000000000000036,
+          0.15000000000000036,
+          0.15000000000000036,
+          0.15000000000000036,
+          0.15000000000000036,
+          0.15000000000000213,
+          0.1500000000000039,
+          0.14999999999999858,
+          0.14999999999999858,
+          0.14999999999999858,
+          0.14999999999999858,
+          0.14999999999999858,
+          0.14999999999999858,
+          0.14999999999999858,
+          0.14999999999999858,
+          0.14999999999999858,
+          0.15000000000000213,
+          0.14999999999999858,
+          0.15000000000000213,
+          0.15000000000000213,
+          0.15000000000000213,
+          0.15000000000000213,
+          0.14999999999999858
+        ],
+        "unrecovered_loss": true,
+        "passed_zero_wrong_lock": true,
+        "world_anchor": "stationary base_link planar identity via recorded TF",
+        "parameters": {
+          "threshold": 0.65,
+          "recovery_margin": 0.15,
+          "appearance_association_weight": 0.75
+        },
+        "scope": "offline core replay; stationary observer; no ROS or motion qualification",
+        "inputs": {
+          "camera": "artifacts/leader-following/f3-appearance-evaluation/detections/gz-lookalike_parallel-4/owlv2/detections.jsonl",
+          "lidar": "artifacts/leader-following/f3-appearance-evaluation/detections/gz-lookalike_parallel-4/lfe-ppn/detections.jsonl",
+          "embeddings": "artifacts/leader-following/f3-appearance-evaluation/comparison/osnet-ain/gz-lookalike_parallel-4/embeddings.npz",
+          "annotations": "artifacts/leader-following/f3-appearance-evaluation/annotations-stationary-anchor/gz-lookalike_parallel-4.jsonl"
+        }
+      },
+      "ros": {
+        "identity_label_policy": "selected target nearest truth within 0.75 m, separated by 0.1 m; unselected duplicate tracks cannot steal its label",
+        "frames": 403,
+        "states": {
+          "SEARCHING": 1,
+          "LOCKED": 269,
+          "UNCERTAIN": 129,
+          "LOST": 4
+        },
+        "locked_frames": 269,
+        "correct_locked_frames": 269,
+        "wrong_locked_frames": 0,
+        "correct_lock_fraction": 0.6674937965260546,
+        "correct_locked_without_appearance_frames": 118,
+        "outside_camera_frames": 0,
+        "correct_locked_outside_camera_frames": 0,
+        "outside_camera_lock_fraction": null,
+        "recovery_seconds": [
+          0.32999999999999996,
+          0.42900000000000005,
+          0.16500000000000004,
+          0.2639999999999998,
+          0.1649999999999996,
+          0.29700000000000015,
+          0.49499999999999966,
+          0.33000000000000007,
+          0.16500000000000004,
+          0.1980000000000004,
+          0.23099999999999987,
+          0.2970000000000006,
+          0.5609999999999999,
+          0.1980000000000004,
+          0.5279999999999987,
+          0.1980000000000004,
+          0.16499999999999915,
+          0.23100000000000165,
+          0.2970000000000006,
+          0.16499999999999915,
+          0.23100000000000165,
+          0.2640000000000029
+        ],
+        "unrecovered_loss": true,
+        "passed_zero_wrong_lock": true,
+        "status": "passed",
+        "scope": "real ROS tracker plus identity node, recorded sensors, stationary observer; no driving or hardware timing claim"
+      },
+      "publication": {
+        "status": "passed",
+        "messages": 408,
+        "nonempty_messages": 406,
+        "domain": 74,
+        "camera": "owlv2",
+        "lidar": "lfe-ppn",
+        "appearance": "osnet-ain",
+        "appearance_observations": 478,
+        "track_maximum_age": 3.0,
+        "observation_timeout": 0.25,
+        "identity_parameters": {
+          "match_threshold": 0.65,
+          "recovery_margin": 0.15,
+          "acquire_interval": 1,
+          "acquire_distance_tolerance": 0.25,
+          "acquire_lateral_tolerance": 0.1
+        },
+        "appearance_dimensions": [
+          512
+        ],
+        "leader_messages": 406,
+        "locked_messages": 269,
+        "scope": "real ROS feature/LeaderState publication; no identity-accuracy qualification"
+      }
+    },
+    {
+      "case": "gz-lookalike_crossing-4",
+      "offline": {
+        "identity_label_policy": "selected target nearest truth within 0.75 m, separated by 0.1 m; unselected duplicate tracks cannot steal its label",
+        "frames": 400,
+        "states": {
+          "SEARCHING": 2,
+          "LOCKED": 347,
+          "UNCERTAIN": 26,
+          "LOST": 25
+        },
+        "locked_frames": 347,
+        "correct_locked_frames": 347,
+        "wrong_locked_frames": 0,
+        "correct_lock_fraction": 0.8675,
+        "correct_locked_without_appearance_frames": 0,
+        "outside_camera_frames": 0,
+        "correct_locked_outside_camera_frames": 0,
+        "outside_camera_lock_fraction": null,
+        "recovery_seconds": [
+          0.14999999999999947,
+          0.14999999999999947,
+          0.15000000000000036,
+          1.6499999999999995,
+          0.15000000000000036,
+          0.15000000000000036,
+          0.14999999999999858
+        ],
+        "unrecovered_loss": false,
+        "passed_zero_wrong_lock": true,
+        "world_anchor": "stationary base_link planar identity via recorded TF",
+        "parameters": {
+          "threshold": 0.65,
+          "recovery_margin": 0.15,
+          "appearance_association_weight": 0.75
+        },
+        "scope": "offline core replay; stationary observer; no ROS or motion qualification",
+        "inputs": {
+          "camera": "artifacts/leader-following/f3-appearance-evaluation/detections/gz-lookalike_crossing-4/owlv2/detections.jsonl",
+          "lidar": "artifacts/leader-following/f3-appearance-evaluation/detections/gz-lookalike_crossing-4/lfe-ppn/detections.jsonl",
+          "embeddings": "artifacts/leader-following/f3-appearance-evaluation/comparison/osnet-ain/gz-lookalike_crossing-4/embeddings.npz",
+          "annotations": "artifacts/leader-following/f3-appearance-evaluation/annotations-stationary-anchor/gz-lookalike_crossing-4.jsonl"
+        }
+      },
+      "ros": {
+        "identity_label_policy": "selected target nearest truth within 0.75 m, separated by 0.1 m; unselected duplicate tracks cannot steal its label",
+        "frames": 404,
+        "states": {
+          "SEARCHING": 6,
+          "LOCKED": 97,
+          "UNCERTAIN": 10,
+          "LOST": 291
+        },
+        "locked_frames": 97,
+        "correct_locked_frames": 97,
+        "wrong_locked_frames": 0,
+        "correct_lock_fraction": 0.2400990099009901,
+        "correct_locked_without_appearance_frames": 37,
+        "outside_camera_frames": 0,
+        "correct_locked_outside_camera_frames": 0,
+        "outside_camera_lock_fraction": null,
+        "recovery_seconds": [],
+        "unrecovered_loss": true,
+        "passed_zero_wrong_lock": true,
+        "status": "passed",
+        "scope": "real ROS tracker plus identity node, recorded sensors, stationary observer; no driving or hardware timing claim"
+      },
+      "publication": {
+        "status": "passed",
+        "messages": 410,
+        "nonempty_messages": 401,
+        "domain": 62,
+        "camera": "owlv2",
+        "lidar": "lfe-ppn",
+        "appearance": "osnet-ain",
+        "appearance_observations": 412,
+        "track_maximum_age": 3.0,
+        "observation_timeout": 0.25,
+        "identity_parameters": {
+          "match_threshold": 0.65,
+          "recovery_margin": 0.15,
+          "acquire_interval": 1,
+          "acquire_distance_tolerance": 0.25,
+          "acquire_lateral_tolerance": 0.1
+        },
+        "appearance_dimensions": [
+          512
+        ],
+        "leader_messages": 409,
+        "locked_messages": 97,
+        "scope": "real ROS feature/LeaderState publication; no identity-accuracy qualification"
+      }
+    },
+    {
+      "case": "gz-leader_stop-4",
+      "offline": {
+        "identity_label_policy": "selected target nearest truth within 0.75 m, separated by 0.1 m; unselected duplicate tracks cannot steal its label",
+        "frames": 400,
+        "states": {
+          "SEARCHING": 2,
+          "LOCKED": 368,
+          "UNCERTAIN": 30
+        },
+        "locked_frames": 368,
+        "correct_locked_frames": 368,
+        "wrong_locked_frames": 0,
+        "correct_lock_fraction": 0.92,
+        "correct_locked_without_appearance_frames": 0,
+        "outside_camera_frames": 0,
+        "correct_locked_outside_camera_frames": 0,
+        "outside_camera_lock_fraction": null,
+        "recovery_seconds": [
+          0.1499999999999999,
+          0.15000000000000036,
+          0.15000000000000036,
+          0.14999999999999947,
+          0.14999999999999947,
+          0.15000000000000036,
+          0.15000000000000036,
+          0.15000000000000036,
+          0.14999999999999947,
+          0.14999999999999947
+        ],
+        "unrecovered_loss": false,
+        "passed_zero_wrong_lock": true,
+        "world_anchor": "stationary base_link planar identity via recorded TF",
+        "parameters": {
+          "threshold": 0.65,
+          "recovery_margin": 0.15,
+          "appearance_association_weight": 0.75
+        },
+        "scope": "offline core replay; stationary observer; no ROS or motion qualification",
+        "inputs": {
+          "camera": "artifacts/leader-following/f3-appearance-evaluation/detections/gz-leader_stop-4/owlv2/detections.jsonl",
+          "lidar": "artifacts/leader-following/f3-appearance-evaluation/detections/gz-leader_stop-4/lfe-ppn/detections.jsonl",
+          "embeddings": "artifacts/leader-following/f3-appearance-evaluation/comparison/osnet-ain/gz-leader_stop-4/embeddings.npz",
+          "annotations": "artifacts/leader-following/f3-appearance-evaluation/annotations-stationary-anchor/gz-leader_stop-4.jsonl"
+        }
+      },
+      "ros": {
+        "identity_label_policy": "selected target nearest truth within 0.75 m, separated by 0.1 m; unselected duplicate tracks cannot steal its label",
+        "frames": 373,
+        "states": {
+          "SEARCHING": 2,
+          "LOCKED": 317,
+          "UNCERTAIN": 42,
+          "LOST": 12
+        },
+        "locked_frames": 317,
+        "correct_locked_frames": 317,
+        "wrong_locked_frames": 0,
+        "correct_lock_fraction": 0.8498659517426274,
+        "correct_locked_without_appearance_frames": 123,
+        "outside_camera_frames": 0,
+        "correct_locked_outside_camera_frames": 0,
+        "outside_camera_lock_fraction": null,
+        "recovery_seconds": [
+          0.3959999999999999,
+          0.3959999999999999,
+          0.19799999999999995,
+          0.2639999999999998,
+          0.2970000000000006,
+          0.6269999999999998,
+          0.33000000000000007
+        ],
+        "unrecovered_loss": false,
+        "passed_zero_wrong_lock": true,
+        "status": "passed",
+        "scope": "real ROS tracker plus identity node, recorded sensors, stationary observer; no driving or hardware timing claim"
+      },
+      "publication": {
+        "status": "passed",
+        "messages": 374,
+        "nonempty_messages": 374,
+        "domain": 66,
+        "camera": "owlv2",
+        "lidar": "lfe-ppn",
+        "appearance": "osnet-ain",
+        "appearance_observations": 904,
+        "track_maximum_age": 3.0,
+        "observation_timeout": 0.25,
+        "identity_parameters": {
+          "match_threshold": 0.65,
+          "recovery_margin": 0.15,
+          "acquire_interval": 1,
+          "acquire_distance_tolerance": 0.25,
+          "acquire_lateral_tolerance": 0.1
+        },
+        "appearance_dimensions": [
+          512
+        ],
+        "leader_messages": 373,
+        "locked_messages": 317,
+        "scope": "real ROS feature/LeaderState publication; no identity-accuracy qualification"
+      }
+    },
+    {
+      "case": "gz-crowd-2",
+      "offline": {
+        "identity_label_policy": "selected target nearest truth within 0.75 m, separated by 0.1 m; unselected duplicate tracks cannot steal its label",
+        "frames": 400,
+        "states": {
+          "SEARCHING": 2,
+          "LOCKED": 365,
+          "UNCERTAIN": 33
+        },
+        "locked_frames": 365,
+        "correct_locked_frames": 365,
+        "wrong_locked_frames": 0,
+        "correct_lock_fraction": 0.9125,
+        "correct_locked_without_appearance_frames": 0,
+        "outside_camera_frames": 0,
+        "correct_locked_outside_camera_frames": 0,
+        "outside_camera_lock_fraction": null,
+        "recovery_seconds": [
+          0.1499999999999999,
+          0.1499999999999999,
+          0.1499999999999999,
+          0.15000000000000013,
+          0.1499999999999999,
+          0.15000000000000036,
+          0.1499999999999999,
+          0.1499999999999999,
+          0.15000000000000036,
+          0.15000000000000036,
+          0.14999999999999947
+        ],
+        "unrecovered_loss": false,
+        "passed_zero_wrong_lock": true,
+        "world_anchor": "stationary base_link planar identity via recorded TF",
+        "parameters": {
+          "threshold": 0.65,
+          "recovery_margin": 0.15,
+          "appearance_association_weight": 0.75
+        },
+        "scope": "offline core replay; stationary observer; no ROS or motion qualification",
+        "inputs": {
+          "camera": "artifacts/leader-following/f3-appearance-evaluation/detections/gz-crowd-2/owlv2/detections.jsonl",
+          "lidar": "artifacts/leader-following/f3-appearance-evaluation/detections/gz-crowd-2/lfe-ppn/detections.jsonl",
+          "embeddings": "artifacts/leader-following/f3-appearance-evaluation/comparison/osnet-ain/gz-crowd-2/embeddings.npz",
+          "annotations": "artifacts/leader-following/f3-appearance-evaluation/annotations-stationary-anchor/gz-crowd-2.jsonl"
+        }
+      },
+      "ros": {
+        "identity_label_policy": "selected target nearest truth within 0.75 m, separated by 0.1 m; unselected duplicate tracks cannot steal its label",
+        "frames": 356,
+        "states": {
+          "SEARCHING": 1,
+          "LOCKED": 330,
+          "UNCERTAIN": 25
+        },
+        "locked_frames": 330,
+        "correct_locked_frames": 330,
+        "wrong_locked_frames": 0,
+        "correct_lock_fraction": 0.9269662921348315,
+        "correct_locked_without_appearance_frames": 118,
+        "outside_camera_frames": 0,
+        "correct_locked_outside_camera_frames": 0,
+        "outside_camera_lock_fraction": null,
+        "recovery_seconds": [
+          0.363,
+          0.23099999999999987,
+          0.23099999999999987,
+          0.13200000000000012,
+          0.39599999999999946,
+          0.2969999999999997
+        ],
+        "unrecovered_loss": false,
+        "passed_zero_wrong_lock": true,
+        "status": "passed",
+        "scope": "real ROS tracker plus identity node, recorded sensors, stationary observer; no driving or hardware timing claim"
+      },
+      "publication": {
+        "status": "passed",
+        "messages": 362,
+        "nonempty_messages": 359,
+        "domain": 75,
+        "camera": "owlv2",
+        "lidar": "lfe-ppn",
+        "appearance": "osnet-ain",
+        "appearance_observations": 711,
+        "track_maximum_age": 3.0,
+        "observation_timeout": 0.25,
+        "identity_parameters": {
+          "match_threshold": 0.65,
+          "recovery_margin": 0.15,
+          "acquire_interval": 1,
+          "acquire_distance_tolerance": 0.25,
+          "acquire_lateral_tolerance": 0.1
+        },
+        "appearance_dimensions": [
+          512
+        ],
+        "leader_messages": 360,
+        "locked_messages": 330,
+        "scope": "real ROS feature/LeaderState publication; no identity-accuracy qualification"
+      }
+    },
+    {
+      "case": "gz-crowd-4",
+      "offline": {
+        "identity_label_policy": "selected target nearest truth within 0.75 m, separated by 0.1 m; unselected duplicate tracks cannot steal its label",
+        "frames": 400,
+        "states": {
+          "SEARCHING": 2,
+          "LOCKED": 368,
+          "UNCERTAIN": 30
+        },
+        "locked_frames": 368,
+        "correct_locked_frames": 368,
+        "wrong_locked_frames": 0,
+        "correct_lock_fraction": 0.92,
+        "correct_locked_without_appearance_frames": 0,
+        "outside_camera_frames": 0,
+        "correct_locked_outside_camera_frames": 0,
+        "outside_camera_lock_fraction": null,
+        "recovery_seconds": [
+          0.15000000000000002,
+          0.1499999999999999,
+          0.1499999999999999,
+          0.15000000000000013,
+          0.1499999999999999,
+          0.1499999999999999,
+          0.1499999999999999,
+          0.1500000000000008,
+          0.15000000000000036,
+          0.14999999999999947
+        ],
+        "unrecovered_loss": false,
+        "passed_zero_wrong_lock": true,
+        "world_anchor": "stationary base_link planar identity via recorded TF",
+        "parameters": {
+          "threshold": 0.65,
+          "recovery_margin": 0.15,
+          "appearance_association_weight": 0.75
+        },
+        "scope": "offline core replay; stationary observer; no ROS or motion qualification",
+        "inputs": {
+          "camera": "artifacts/leader-following/f3-appearance-evaluation/detections/gz-crowd-4/owlv2/detections.jsonl",
+          "lidar": "artifacts/leader-following/f3-appearance-evaluation/detections/gz-crowd-4/lfe-ppn/detections.jsonl",
+          "embeddings": "artifacts/leader-following/f3-appearance-evaluation/comparison/osnet-ain/gz-crowd-4/embeddings.npz",
+          "annotations": "artifacts/leader-following/f3-appearance-evaluation/annotations-stationary-anchor/gz-crowd-4.jsonl"
+        }
+      },
+      "ros": {
+        "identity_label_policy": "selected target nearest truth within 0.75 m, separated by 0.1 m; unselected duplicate tracks cannot steal its label",
+        "frames": 323,
+        "states": {
+          "SEARCHING": 1,
+          "LOCKED": 289,
+          "UNCERTAIN": 33
+        },
+        "locked_frames": 289,
+        "correct_locked_frames": 289,
+        "wrong_locked_frames": 0,
+        "correct_lock_fraction": 0.8947368421052632,
+        "correct_locked_without_appearance_frames": 83,
+        "outside_camera_frames": 0,
+        "correct_locked_outside_camera_frames": 0,
+        "outside_camera_lock_fraction": null,
+        "recovery_seconds": [
+          0.42900000000000005,
+          0.4949999999999999,
+          0.363,
+          0.39599999999999946,
+          0.26399999999999935,
+          0.1979999999999995
+        ],
+        "unrecovered_loss": false,
+        "passed_zero_wrong_lock": true,
+        "status": "passed",
+        "scope": "real ROS tracker plus identity node, recorded sensors, stationary observer; no driving or hardware timing claim"
+      },
+      "publication": {
+        "status": "passed",
+        "messages": 328,
+        "nonempty_messages": 326,
+        "domain": 76,
+        "camera": "owlv2",
+        "lidar": "lfe-ppn",
+        "appearance": "osnet-ain",
+        "appearance_observations": 1174,
+        "track_maximum_age": 3.0,
+        "observation_timeout": 0.25,
+        "identity_parameters": {
+          "match_threshold": 0.65,
+          "recovery_margin": 0.15,
+          "acquire_interval": 1,
+          "acquire_distance_tolerance": 0.25,
+          "acquire_lateral_tolerance": 0.1
+        },
+        "appearance_dimensions": [
+          512
+        ],
+        "leader_messages": 326,
+        "locked_messages": 289,
+        "scope": "real ROS feature/LeaderState publication; no identity-accuracy qualification"
+      }
+    },
+    {
+      "case": "gz-crowd-8",
+      "offline": {
+        "identity_label_policy": "selected target nearest truth within 0.75 m, separated by 0.1 m; unselected duplicate tracks cannot steal its label",
+        "frames": 400,
+        "states": {
+          "SEARCHING": 2,
+          "LOCKED": 299,
+          "UNCERTAIN": 99
+        },
+        "locked_frames": 299,
+        "correct_locked_frames": 299,
+        "wrong_locked_frames": 0,
+        "correct_lock_fraction": 0.7475,
+        "correct_locked_without_appearance_frames": 0,
+        "outside_camera_frames": 0,
+        "correct_locked_outside_camera_frames": 0,
+        "outside_camera_lock_fraction": null,
+        "recovery_seconds": [
+          0.15000000000000002,
+          0.1499999999999999,
+          0.1499999999999999,
+          0.1499999999999999,
+          0.15000000000000013,
+          0.15000000000000013,
+          0.1499999999999999,
+          0.1499999999999999,
+          0.15000000000000036,
+          0.1499999999999999,
+          0.1499999999999999,
+          0.1499999999999999,
+          0.1499999999999999,
+          0.1499999999999999,
+          0.15000000000000036,
+          0.15000000000000036,
+          0.15000000000000036,
+          0.14999999999999947,
+          0.14999999999999947,
+          0.15000000000000036,
+          0.14999999999999858,
+          0.15000000000000036,
+          0.15000000000000036,
+          0.15000000000000036,
+          0.15000000000000036,
+          0.14999999999999858,
+          0.15000000000000036,
+          0.15000000000000036,
+          0.15000000000000036,
+          0.15000000000000036,
+          0.15000000000000036,
+          0.15000000000000036,
+          0.15000000000000036
+        ],
+        "unrecovered_loss": false,
+        "passed_zero_wrong_lock": true,
+        "world_anchor": "stationary base_link planar identity via recorded TF",
+        "parameters": {
+          "threshold": 0.65,
+          "recovery_margin": 0.15,
+          "appearance_association_weight": 0.75
+        },
+        "scope": "offline core replay; stationary observer; no ROS or motion qualification",
+        "inputs": {
+          "camera": "artifacts/leader-following/f3-appearance-evaluation/detections/gz-crowd-8/owlv2/detections.jsonl",
+          "lidar": "artifacts/leader-following/f3-appearance-evaluation/detections/gz-crowd-8/lfe-ppn/detections.jsonl",
+          "embeddings": "artifacts/leader-following/f3-appearance-evaluation/comparison/osnet-ain/gz-crowd-8/embeddings.npz",
+          "annotations": "artifacts/leader-following/f3-appearance-evaluation/annotations-stationary-anchor/gz-crowd-8.jsonl"
+        }
+      },
+      "ros": {
+        "identity_label_policy": "selected target nearest truth within 0.75 m, separated by 0.1 m; unselected duplicate tracks cannot steal its label",
+        "frames": 307,
+        "states": {
+          "SEARCHING": 1,
+          "LOCKED": 219,
+          "UNCERTAIN": 76,
+          "LOST": 11
+        },
+        "locked_frames": 219,
+        "correct_locked_frames": 219,
+        "wrong_locked_frames": 0,
+        "correct_lock_fraction": 0.7133550488599348,
+        "correct_locked_without_appearance_frames": 71,
+        "outside_camera_frames": 0,
+        "correct_locked_outside_camera_frames": 0,
+        "outside_camera_lock_fraction": null,
+        "recovery_seconds": [
+          0.19800000000000006,
+          0.33000000000000007,
+          0.33000000000000007,
+          0.42900000000000027,
+          0.23099999999999987,
+          0.19799999999999995,
+          0.2639999999999998,
+          0.3299999999999992,
+          0.16500000000000004,
+          0.3959999999999999,
+          0.2969999999999997,
+          0.36299999999999955,
+          0.2970000000000006,
+          0.26399999999999935,
+          0.26399999999999935,
+          0.33000000000000007,
+          0.891
+        ],
+        "unrecovered_loss": false,
+        "passed_zero_wrong_lock": true,
+        "status": "passed",
+        "scope": "real ROS tracker plus identity node, recorded sensors, stationary observer; no driving or hardware timing claim"
+      },
+      "publication": {
+        "status": "passed",
+        "messages": 312,
+        "nonempty_messages": 310,
+        "domain": 77,
+        "camera": "owlv2",
+        "lidar": "lfe-ppn",
+        "appearance": "osnet-ain",
+        "appearance_observations": 1745,
+        "track_maximum_age": 3.0,
+        "observation_timeout": 0.25,
+        "identity_parameters": {
+          "match_threshold": 0.65,
+          "recovery_margin": 0.15,
+          "acquire_interval": 1,
+          "acquire_distance_tolerance": 0.25,
+          "acquire_lateral_tolerance": 0.1
+        },
+        "appearance_dimensions": [
+          512
+        ],
+        "leader_messages": 310,
+        "locked_messages": 219,
+        "scope": "real ROS feature/LeaderState publication; no identity-accuracy qualification"
+      }
+    },
+    {
+      "case": "isaac-leader_out_of_view-4",
+      "offline": {
+        "identity_label_policy": "selected target nearest truth within 0.75 m, separated by 0.1 m; unselected duplicate tracks cannot steal its label",
+        "frames": 400,
+        "states": {
+          "SEARCHING": 2,
+          "LOCKED": 398
+        },
+        "locked_frames": 398,
+        "correct_locked_frames": 398,
+        "wrong_locked_frames": 0,
+        "correct_lock_fraction": 0.995,
+        "correct_locked_without_appearance_frames": 189,
+        "outside_camera_frames": 133,
+        "correct_locked_outside_camera_frames": 133,
+        "outside_camera_lock_fraction": 1.0,
+        "recovery_seconds": [],
+        "unrecovered_loss": false,
+        "passed_zero_wrong_lock": true,
+        "world_anchor": "stationary base_link planar identity via recorded TF",
+        "parameters": {
+          "threshold": 0.65,
+          "recovery_margin": 0.15,
+          "appearance_association_weight": 0.75
+        },
+        "scope": "offline core replay; stationary observer; no ROS or motion qualification",
+        "inputs": {
+          "camera": "artifacts/leader-following/f3-camera-exit-evaluation/detections/isaac-leader_out_of_view-4/owlv2/detections.jsonl",
+          "lidar": "artifacts/leader-following/f3-camera-exit-evaluation/detections/isaac-leader_out_of_view-4/lfe-ppn/detections.jsonl",
+          "embeddings": "artifacts/leader-following/f3-camera-exit-evaluation/comparison/osnet-ain/isaac-leader_out_of_view-4/embeddings.npz",
+          "annotations": "artifacts/leader-following/f3-camera-exit-evaluation/annotations-stationary-anchor/isaac-leader_out_of_view-4.jsonl"
+        }
+      },
+      "ros": {
+        "identity_label_policy": "selected target nearest truth within 0.75 m, separated by 0.1 m; unselected duplicate tracks cannot steal its label",
+        "frames": 357,
+        "states": {
+          "SEARCHING": 13,
+          "LOCKED": 344
+        },
+        "locked_frames": 344,
+        "correct_locked_frames": 344,
+        "wrong_locked_frames": 0,
+        "correct_lock_fraction": 0.9635854341736695,
+        "correct_locked_without_appearance_frames": 245,
+        "outside_camera_frames": 115,
+        "correct_locked_outside_camera_frames": 115,
+        "outside_camera_lock_fraction": 1.0,
+        "recovery_seconds": [],
+        "unrecovered_loss": false,
+        "passed_zero_wrong_lock": true,
+        "status": "passed",
+        "scope": "real ROS tracker plus identity node, recorded sensors, stationary observer; no driving or hardware timing claim"
+      },
+      "publication": {
+        "status": "passed",
+        "messages": 362,
+        "nonempty_messages": 362,
+        "domain": 60,
+        "camera": "owlv2",
+        "lidar": "lfe-ppn",
+        "appearance": "osnet-ain",
+        "appearance_observations": 322,
+        "track_maximum_age": 3.0,
+        "observation_timeout": 0.25,
+        "identity_parameters": {
+          "match_threshold": 0.65,
+          "recovery_margin": 0.15,
+          "acquire_interval": 1,
+          "acquire_distance_tolerance": 0.25,
+          "acquire_lateral_tolerance": 0.1
+        },
+        "appearance_dimensions": [
+          512
+        ],
+        "leader_messages": 361,
+        "locked_messages": 344,
+        "scope": "real ROS feature/LeaderState publication; no identity-accuracy qualification"
+      }
+    },
+    {
+      "case": "gz-leader_out_of_view-4",
+      "offline": {
+        "identity_label_policy": "selected target nearest truth within 0.75 m, separated by 0.1 m; unselected duplicate tracks cannot steal its label",
+        "frames": 400,
+        "states": {
+          "SEARCHING": 2,
+          "LOCKED": 398
+        },
+        "locked_frames": 398,
+        "correct_locked_frames": 398,
+        "wrong_locked_frames": 0,
+        "correct_lock_fraction": 0.995,
+        "correct_locked_without_appearance_frames": 191,
+        "outside_camera_frames": 133,
+        "correct_locked_outside_camera_frames": 133,
+        "outside_camera_lock_fraction": 1.0,
+        "recovery_seconds": [],
+        "unrecovered_loss": false,
+        "passed_zero_wrong_lock": true,
+        "world_anchor": "stationary base_link planar identity via recorded TF",
+        "parameters": {
+          "threshold": 0.65,
+          "recovery_margin": 0.15,
+          "appearance_association_weight": 0.75
+        },
+        "scope": "offline core replay; stationary observer; no ROS or motion qualification",
+        "inputs": {
+          "camera": "artifacts/leader-following/f3-camera-exit-evaluation/detections/gz-leader_out_of_view-4/owlv2/detections.jsonl",
+          "lidar": "artifacts/leader-following/f3-camera-exit-evaluation/detections/gz-leader_out_of_view-4/lfe-ppn/detections.jsonl",
+          "embeddings": "artifacts/leader-following/f3-camera-exit-evaluation/comparison/osnet-ain/gz-leader_out_of_view-4/embeddings.npz",
+          "annotations": "artifacts/leader-following/f3-camera-exit-evaluation/annotations-stationary-anchor/gz-leader_out_of_view-4.jsonl"
+        }
+      },
+      "ros": {
+        "identity_label_policy": "selected target nearest truth within 0.75 m, separated by 0.1 m; unselected duplicate tracks cannot steal its label",
+        "frames": 367,
+        "states": {
+          "LOCKED": 367
+        },
+        "locked_frames": 367,
+        "correct_locked_frames": 367,
+        "wrong_locked_frames": 0,
+        "correct_lock_fraction": 1.0,
+        "correct_locked_without_appearance_frames": 248,
+        "outside_camera_frames": 117,
+        "correct_locked_outside_camera_frames": 117,
+        "outside_camera_lock_fraction": 1.0,
+        "recovery_seconds": [],
+        "unrecovered_loss": false,
+        "passed_zero_wrong_lock": true,
+        "status": "passed",
+        "scope": "real ROS tracker plus identity node, recorded sensors, stationary observer; no driving or hardware timing claim"
+      },
+      "publication": {
+        "status": "passed",
+        "messages": 373,
+        "nonempty_messages": 371,
+        "domain": 61,
+        "camera": "owlv2",
+        "lidar": "lfe-ppn",
+        "appearance": "osnet-ain",
+        "appearance_observations": 355,
+        "track_maximum_age": 3.0,
+        "observation_timeout": 0.25,
+        "identity_parameters": {
+          "match_threshold": 0.65,
+          "recovery_margin": 0.15,
+          "acquire_interval": 1,
+          "acquire_distance_tolerance": 0.25,
+          "acquire_lateral_tolerance": 0.1
+        },
+        "appearance_dimensions": [
+          512
+        ],
+        "leader_messages": 371,
+        "locked_messages": 367,
+        "scope": "real ROS feature/LeaderState publication; no identity-accuracy qualification"
+      }
+    }
+  ],
+  "lock_profile": "selected-lidar-final",
+  "ros_root": "artifacts/leader-following/f3-live-validation-qualified-profile",
+  "policy": "Review coverage, recovery and per-scenario accuracy before declaring F3 complete. Missing evidence never passes.",
+  "scope": "stationary simulated observer; no driving or target-hardware timing claim"
+}

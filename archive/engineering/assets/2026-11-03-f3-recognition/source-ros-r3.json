@@ -1,0 +1,6 @@
+{
+  "base_revision": "4d29410dfbcdd1f53bd498d55d2e2d8734b2db69",
+  "provenance": "partial: dirty-tree implementation; cached inference and evaluation utilities evolved during the campaign; this archive captures the R3 ROS fixes",
+  "sha256": "dd71572972221f86f4460cbea24496ea4163470b26f41c341f636551f5528aa2",
+  "scope": "recognition sources, configuration, launch, compatibility patches and tests; scene assets and recorded bags retained separately under artifacts"
+}

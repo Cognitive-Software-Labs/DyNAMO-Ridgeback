@@ -1,0 +1,21 @@
+{
+  "source": "tree_small_02.gltf",
+  "blender": "4.2.9 LTS",
+  "floor_center_translation": [
+    0.14935654401779175,
+    -0.7636117935180664,
+    -0.02410384640097618
+  ],
+  "dimensions_m": [
+    2.9166998863220215,
+    4.292477130889893,
+    4.556740760803223
+  ],
+  "vertices": 1777278,
+  "triangles": 2062487,
+  "sha256": {
+    "mesh.npz": "ca82f35ef1b79257f94c07d9d8ab11e138f749ec78eb98d27bd1697987f028e2",
+    "model.dae": "1b4828ecf15e813c02a0dc5ed97c23289effabba930b848db476e3ed94fd6f53",
+    "materials.json": "016bfee196d1e3207f28b3ee0c7accf6f34e4ac00b5386ca4d144df24d1b27bc"
+  }
+}

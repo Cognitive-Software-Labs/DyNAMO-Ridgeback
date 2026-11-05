@@ -1,8 +1,17 @@
 # FOLLOWING — Leader following in crowds
 
-Status: planned, 2026-11-01. The message contract and the `leader_identity`
-node exist ([reference](../leader_following/architecture.md)); nothing here
-has driven a robot or run in a crowd scenario.
+Status: F1 complete: all six animated scene families, including three crowd
+densities, passed in Gazebo and Isaac with robot sensors and every person's
+simulator-observed position logged ([reference](../leader_following/simulation.md)).
+F2 simulation complete: twenty candidates compared on all sixteen qualified
+configurations, with the selected OWLv2/LFE-PPN/ByteTrack/Kalman tracker and
+per-case reports ([benchmark reference](../leader_following/benchmarks.md)).
+F3 simulation checks pass: five appearance candidates compared, OSNet-AIN
+selected, and eighteen ROS cases reached correct locks with zero wrong locks.
+Both camera-exit cases held every sampled outside-camera observation; visible
+lock coverage remains variable ([reference](../leader_following/recognition.md)).
+Robot/Thor performance is deferred until hardware access. F4–F6 remain open;
+no leader-following controller has driven a robot.
 
 ## Goal
 
@@ -15,7 +24,7 @@ and searches instead of following an unconfirmed person.
 
 | Decision | Choice |
 |---|---|
-| Leader choice | Lock onto the nearest person in front at start; a language prompt is not required |
+| Leader choice | Lock onto the nearest person in front at start, with the [documented geometric tie policy](../leader_following/recognition.md#initial-acquisition-ties) for uncertain equal-range estimates; a language prompt is not required |
 | First system | Modular baseline: lidar and RGB-D people tracking, appearance re-identification, the existing Nav2 stack for motion |
 | Crowd setting | A lab corridor with a few people first; a dense public space later |
 | Development order | Simulation first, across both simulators (Gazebo, Isaac) as a sim-to-sim check; real-robot tests after the simulated loop is stable |
@@ -37,10 +46,12 @@ flowchart LR
     VC -. nav_msgs/Path .-> FC
 ```
 
-- **people_tracker**: lidar person detection on the existing front+rear merged
-  scan, D455 detections with depth, constant-velocity Kalman fusion,
-  OSNet-AIN appearance embeddings; publishes `People`. Reuses
-  `camera_people.py`.
+- **people_tracker**: implemented simulation baseline with transformed/merged
+  front+rear lidar detections, registered D455 depth, image association and
+  constant-velocity Kalman fusion; publishes `People`. Appearance embeddings
+  are optional F3 inputs; OSNet-AIN is selected for simulation with the bounded F3 results documented
+  in the [recognition reference](../leader_following/recognition.md). The [tracker reference](../leader_following/people_tracker.md)
+  owns the implemented contract.
 - **leader_identity**: implemented.
 - **follow_controller**: holds a set distance and bearing; moves only when
   `LOCKED`; keeps the leader in camera view. Collision avoidance and speed
@@ -54,9 +65,9 @@ when its check passes, not when its code exists.
 
 | Phase | Work | Done when |
 |---|---|---|
-| F1 Crowd scenes | Moving pedestrians, including two dressed alike, in the Gazebo and Isaac backends; one scene per scenario below | Every scenario plays in both backends and the simulator logs every person's ground-truth position |
-| F2 People tracking | Candidate benchmark for detection and tracking (below), then a `people_tracker` node built from the chosen combination: merged scan plus D455 colour and depth, constant-velocity fusion, stable ids; publishes `People` | Every F2 candidate has a row in the results table, the chosen combination and its reason are recorded, and every scenario has a report, scored against simulator ground truth, of leader-track losses and ID switches |
-| F3 Leader recognition | Re-identification candidate benchmark (below), the chosen embeddings in `Person.appearance`, plus track continuity as a second identity cue in `lock_on.py`, so the lock holds while the leader is out of camera view | Every F3 candidate has a row in the results table; `leader_identity` reaches `LOCKED` on the leader in every scenario and holds it while the leader is out of camera view; leader-pick accuracy among nearby people reported per scenario, look-alike scenario included |
+| F1 Crowd scenes — complete | Moving pedestrians, including two dressed alike, in the Gazebo and Isaac backends; one scene per scenario below | Every scenario plays in both backends and the simulator logs every person's ground-truth position |
+| F2 People tracking — simulation complete | Candidate benchmark for detection and tracking (below), then a `people_tracker` node built from the chosen combination: merged scan plus D455 colour and depth, constant-velocity fusion, stable ids; publishes `People` | Every F2 candidate has a row in the results table, the chosen combination and its reason are recorded, and every scenario has a report, scored against simulator ground truth, of leader-track losses and ID switches |
+| F3 Leader recognition — simulation checks complete | Re-identification candidate benchmark (below), the chosen embeddings in `Person.appearance`, plus track continuity as a second identity cue in `lock_on.py`, so the lock holds while the leader is out of camera view | Every F3 candidate has a row in the results table; `leader_identity` reaches `LOCKED` on the leader in every scenario and holds it while the leader is out of camera view; leader-pick accuracy among nearby people reported per scenario, look-alike scenario included |
 | F4 Closed loop in sim | `follow_controller` through Nav2; moves only while `LOCKED` | Every scenario runs start to finish in both simulators with zero wrong-follow time, and every metric below is reported for both |
 | F5 Real robot | Recorded people replayed offline through the tracker first, with the lidar detector fine-tuned on robot scans using camera-detection pseudo-labels; then driving under the [driving readiness](../physical/driving_readiness.md) gates; the leader wears a ground-truth tag the system never reads | The scenario set and every metric exist for the real robot |
 | F6 Comparison | OmTrackVLA through `vla_client` (server `planner` mode) on the same scenarios | OmTrackVLA's metrics sit beside the baseline's for every scenario, in simulation and on the robot |
@@ -69,7 +80,10 @@ Only the best two per category are tuned.
 
 **Data:** every F1 scenario in both simulators, plus one or two real
 recordings once F5 starts. **Results:** one table per category in
-`docs/leader_following/benchmarks.md`; raw runs under `artifacts/`.
+`docs/leader_following/benchmarks.md`, with numerical campaign evidence linked
+there under Archived evidence; raw runs under `artifacts/`. F2 simulation rows
+are complete. Robot/Thor timing and GPU-memory measurements are deferred; the
+workstation measurements do not substitute for them.
 
 | Category | Candidates | Scored by |
 |---|---|---|

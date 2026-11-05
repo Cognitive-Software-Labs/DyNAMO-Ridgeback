@@ -1,0 +1,21 @@
+{
+  "source": "modern_arm_chair_01.gltf",
+  "blender": "4.2.9 LTS",
+  "floor_center_translation": [
+    0.003363475203514099,
+    0.08217088878154755,
+    0.0003815953677985817
+  ],
+  "dimensions_m": [
+    0.8203444480895996,
+    0.98656165599823,
+    1.0228520631790161
+  ],
+  "vertices": 5851,
+  "triangles": 8916,
+  "sha256": {
+    "mesh.npz": "7e971ee7626e43a91358f9a07c2243db90a4198e4d0ddbf80200c8e20d93b351",
+    "model.dae": "3d3ee44c8ca88d9ebbdf41632cb692694053d8cf314c0a7cac31586f5318a908",
+    "materials.json": "7dadafe71fa70e33270df1f420aac741cbbe52d0a0d8721e539754a8c747ba20"
+  }
+}

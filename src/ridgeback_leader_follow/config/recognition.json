@@ -1,0 +1,19 @@
+{
+  "status": "simulation_acceptance_passed",
+  "appearance_candidate": "osnet-ain",
+  "checkpoint": "osnet/osnet_ain_x1_0_msmt17_256x128_amsgrad_ep50_lr0.0015_coslr_b64_fb10_softmax_labsmth_flip_jitter.pth",
+  "checkpoint_sha256": "8a07e8da38946f7cee37f4561617bf8b6d2fe8f3a4027852893ea092e46d919f",
+  "source_revision": "f8cd150fdf77e8d9e1ed143b7f308c2c609ded50",
+  "feature_dimension": 512,
+  "match_threshold": 0.65,
+  "recovery_margin": 0.15,
+  "appearance_association_weight": 0.75,
+  "acquire_range": 8.0,
+  "selection": "highest aggregate nearby pick accuracy in the five-model F3 outfit comparison; lower embedding cost than TransReID; planned stationary-observer simulation checks passed",
+  "acquire_distance_tolerance": 0.25,
+  "acquire_lateral_tolerance": 0.1,
+  "acquire_interval": 1,
+  "track_maximum_age": 3.0,
+  "observation_timeout": 0.25,
+  "validation_scope": "18 recorded ROS cases; no wrong locks; full sampled camera-exit continuity; visible lock coverage varies; no driving or target-hardware qualification"
+}

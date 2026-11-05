@@ -1,0 +1,19 @@
+[
+  {
+    "doubleSided": true,
+    "name": "barrel_03",
+    "normalTexture": {
+      "index": 0
+    },
+    "pbrMetallicRoughness": {
+      "baseColorTexture": {
+        "index": 1
+      },
+      "metallicRoughnessTexture": {
+        "index": 2
+      }
+    },
+    "image": "textures/barrel_03_diff_1k.jpg",
+    "normal_image": "textures/barrel_03_nor_gl_1k.jpg"
+  }
+]

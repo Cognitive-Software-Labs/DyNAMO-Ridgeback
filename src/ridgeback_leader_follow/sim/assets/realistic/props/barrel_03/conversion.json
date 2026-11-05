@@ -1,0 +1,21 @@
+{
+  "source": "barrel_03.gltf",
+  "blender": "4.2.9 LTS",
+  "floor_center_translation": [
+    2.9802322387695312e-08,
+    -2.980232238769531e-07,
+    -1.1793932941372987e-07
+  ],
+  "dimensions_m": [
+    0.633943498134613,
+    0.6385995149612427,
+    0.9304736256599426
+  ],
+  "vertices": 1126,
+  "triangles": 1473,
+  "sha256": {
+    "mesh.npz": "c50a88ba0cc7f2058b3a8e8a88f1290aed3a2dd7af722d9ce4deb661baf1f939",
+    "model.dae": "59eda5721f448f26f146a5c96e7b7393e3115455dbe2c06c75e7a1e835ea6120",
+    "materials.json": "c43b9c264a92475a38f9ad94f5303dd5650ddfd98cff97b1f94badd79da807dd"
+  }
+}

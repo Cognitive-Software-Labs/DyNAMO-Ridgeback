@@ -1,0 +1,18 @@
+{
+  "osnet": {
+    "repository": "https://github.com/KaiyangZhou/deep-person-reid.git",
+    "revision": "f8cd150fdf77e8d9e1ed143b7f308c2c609ded50"
+  },
+  "clip-reid": {
+    "repository": "https://github.com/Syliz517/CLIP-ReID.git",
+    "revision": "eb1898b72c882875f478bebfc6d41644eece0a5d"
+  },
+  "transreid": {
+    "repository": "https://github.com/damo-cv/TransReID.git",
+    "revision": "dec55046fcdfadee14e2c28e2df89305d8f7557a"
+  },
+  "solider": {
+    "repository": "https://github.com/tinyvision/SOLIDER-REID.git",
+    "revision": "8c08e1c3255e8e1e51e006bf189e52cc57b009ed"
+  }
+}

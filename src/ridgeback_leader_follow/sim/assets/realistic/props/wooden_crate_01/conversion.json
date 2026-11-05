@@ -1,0 +1,21 @@
+{
+  "source": "wooden_crate_01.gltf",
+  "blender": "4.2.9 LTS",
+  "floor_center_translation": [
+    0.0,
+    -0.008337251842021942,
+    -0.00793334562331438
+  ],
+  "dimensions_m": [
+    0.8252729177474976,
+    0.4089537262916565,
+    0.3496182858943939
+  ],
+  "vertices": 4686,
+  "triangles": 6576,
+  "sha256": {
+    "mesh.npz": "eb6075afe415ceeb7145869ad31d7b206b0c068c286e3be6c15f3118e0c3f949",
+    "model.dae": "d46ea08b786f2c7e3012b0a201f0fe4a9070d249d95fa3a7761801095c401723",
+    "materials.json": "ad6136a2c9140f234bb152d5d1c54fcdfb2029909a8167ec43b655f56f4185e4"
+  }
+}

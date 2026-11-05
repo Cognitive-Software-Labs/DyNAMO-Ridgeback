@@ -1,0 +1,32 @@
+{
+  "blender": "4.2.9 LTS",
+  "height_m": 1.72,
+  "fps": 24,
+  "animation_frames": 48,
+  "cycle_seconds": 2.0,
+  "max_deviation_from_isaac_cache_m": 4.76837158203125e-07,
+  "joined_skin_max_deviation_m": 7.748603820800781e-07,
+  "reparented_root_bones": [
+    "foot_l",
+    "foot_r"
+  ],
+  "textures": [
+    "image_0.png",
+    "image_1.png",
+    "image_10.png",
+    "image_2.png",
+    "image_3.png",
+    "image_5.png",
+    "image_6.png",
+    "image_7.png",
+    "image_9.png"
+  ],
+  "alpha_masked": [
+    "image_0",
+    "image_1",
+    "image_2"
+  ],
+  "sha256": {
+    "walk.dae": "d03f05f7bffbec8a91e753ab79f4c612f4d6180948ae7c28d695942aee8580a5"
+  }
+}

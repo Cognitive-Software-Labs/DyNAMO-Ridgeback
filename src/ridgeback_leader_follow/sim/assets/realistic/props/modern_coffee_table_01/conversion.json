@@ -1,0 +1,21 @@
+{
+  "source": "modern_coffee_table_01.gltf",
+  "blender": "4.2.9 LTS",
+  "floor_center_translation": [
+    1.1920928955078125e-07,
+    -0.0002459883689880371,
+    -0.00011512637138366699
+  ],
+  "dimensions_m": [
+    0.6000000238418579,
+    1.2018300294876099,
+    0.38999998569488525
+  ],
+  "vertices": 3995,
+  "triangles": 4504,
+  "sha256": {
+    "mesh.npz": "135768d613ca3558606eee67e54443eb8d657340b91700016f821a41fd6b9e8b",
+    "model.dae": "357226ef7fc2e3f361374f0a719a6ce2d0e69f2ecd9725de139bf7731004a199",
+    "materials.json": "fb927c875ca89c8a964d035cd7be0ed53d12247bd8c4c8bab61e7c394fbc3c13"
+  }
+}

@@ -11,6 +11,10 @@ Only LOCKED may drive motion.  Two callables decide who counts as the leader:
   ``acquire_frames`` consecutive frames.  Appearance alone, or the proposal
   alone, never hands the lock to a different person.
 
+A verified original lidar track may recover after a brief observation gap
+when the supplied motion-continuity check confirms it repeatedly; a visible
+appearance contradiction disables that exception.
+
 Each returns ``(track or None, reason)``.  The leader_identity node passes the
 nearest person in front of the robot for both (acquisition.py).
 """
@@ -29,10 +33,11 @@ Proposer = Callable[[List[Track]], Proposal]
 
 
 def cosine_similarity(first: np.ndarray, second: np.ndarray) -> float:
-    first = np.asarray(first, dtype=np.float32).reshape(-1)
-    second = np.asarray(second, dtype=np.float32).reshape(-1)
-    denominator = float(np.linalg.norm(first) * np.linalg.norm(second))
-    return float(np.dot(first, second) / denominator) if denominator > 1e-8 else -1.0
+    from ridgeback_leader_follow.appearance import normalize_embedding
+    first, second = normalize_embedding(first), normalize_embedding(second)
+    if first is None or second is None or first.shape != second.shape:
+        return -1.0
+    return float(np.clip(np.dot(first, second), -1., 1.))
 
 
 @dataclass(frozen=True)
@@ -53,6 +58,7 @@ class LeaderLock:
         match_threshold: float = 0.72,
         gallery_update_threshold: float = 0.85,
         gallery_size: int = 8,
+        recovery_margin: float = 0.05,
         min_update_score: float = 0.50,
     ) -> None:
         self.acquire_interval = max(1, int(acquire_interval))
@@ -60,7 +66,8 @@ class LeaderLock:
         self.lost_frames = max(2, int(lost_frames))
         self.match_threshold = float(match_threshold)
         self.gallery_update_threshold = float(gallery_update_threshold)
-        self.gallery_size = int(gallery_size)
+        self.gallery_size = max(1, int(gallery_size))
+        self.recovery_margin = float(recovery_margin)
         self.min_update_score = float(min_update_score)
         self.reset()
 
@@ -76,6 +83,7 @@ class LeaderLock:
         self.recovery_track_id: Optional[int] = None
         self.recovery_frames = 0
         self.gallery: List[np.ndarray] = []
+        self.continuity_recovery_allowed = False
 
     def similarity(self, feature: np.ndarray) -> Optional[float]:
         if not self.gallery:
@@ -83,21 +91,32 @@ class LeaderLock:
         return max(cosine_similarity(feature, reference) for reference in self.gallery)
 
     def update(self, tracks: List[Track], acquire: Proposer,
-               confirm: Optional[Proposer] = None) -> LockUpdate:
+               confirm: Optional[Proposer] = None,
+               continuity: Optional[Callable[[Track], bool]] = None,
+               recovery_filter: Optional[Callable[[List[Track]], List[Track]]] = None) -> LockUpdate:
         confirm = confirm or acquire
         self.frame_index += 1
         selected = find_track(tracks, self.target_track_id)
         similarity = self.similarity(selected.feature) if selected is not None else None
 
         if self.state == "LOCKED":
-            if selected is None or similarity is None or similarity < self.match_threshold:
+            if selected is not None and continuity is not None and not continuity(selected):
+                self._begin_uncertain("track_discontinuity")
+            elif (selected is not None and np.asarray(selected.feature).size == 0
+                    and continuity is not None and continuity(selected)):
+                self.missing_frames = 0
+                self.reason = "identity_held_by_track_continuity"
+            elif selected is None or similarity is None or similarity < self.match_threshold:
                 self._begin_uncertain("target_missing" if selected is None else "appearance_mismatch")
             else:
                 self.missing_frames = 0
                 self.reason = "identity_verified"
                 self._update_gallery(selected)
         elif self.state in ("UNCERTAIN", "LOST"):
-            candidate, candidate_reason = self._recovery_candidate(tracks, selected, similarity, confirm)
+            if (selected is not None and np.asarray(selected.feature).size > 0
+                    and (similarity is None or similarity < self.match_threshold)):
+                self.continuity_recovery_allowed = False
+            candidate, candidate_reason = self._recovery_candidate(tracks, selected, similarity, confirm, continuity, recovery_filter)
             if candidate is None:
                 self.recovery_track_id = None
                 self.recovery_frames = 0
@@ -157,23 +176,34 @@ class LeaderLock:
 
     def _begin_uncertain(self, reason: str) -> None:
         self.state = "UNCERTAIN"
+        self.continuity_recovery_allowed = reason == "target_missing"
         self.reason = reason
         self.missing_frames = 1
         self.recovery_track_id = None
         self.recovery_frames = 0
 
     def _recovery_candidate(self, tracks: List[Track], original: Optional[Track],
-                            original_similarity: Optional[float], confirm: Proposer) -> Proposal:
-        """Either the original track with matching appearance, or a confirmed match to the gallery."""
-        if original is not None and original_similarity is not None and original_similarity >= self.match_threshold:
-            return original, "original_track_reappeared"
+                            original_similarity: Optional[float], confirm: Proposer,
+                            continuity: Optional[Callable[[Track], bool]] = None,
+                            recovery_filter: Optional[Callable[[List[Track]], List[Track]]] = None) -> Proposal:
+        """Require a separated gallery match and an independent recovery proposal."""
+        from ridgeback_leader_follow.appearance import match_gallery
+        if (self.continuity_recovery_allowed and original is not None
+                and np.asarray(original.feature).size == 0
+                and continuity is not None and continuity(original)):
+            return original, "original_lidar_track_reappeared"
         if not tracks:
             return None, "waiting_for_original_identity"
+        plausible = recovery_filter(tracks) if recovery_filter is not None else tracks
+        match = match_gallery(self.gallery, {t.track_id: t.feature for t in plausible},
+                              threshold=self.match_threshold, minimum_margin=self.recovery_margin)
+        if match.reason == 'ambiguous':
+            return None, "ambiguous_appearance_recovery"
         proposed, proposal_reason = confirm(tracks)
         if proposed is None:
             return None, f"recovery_unconfirmed:{proposal_reason}"
         similarity = self.similarity(proposed.feature)
-        if similarity is None or similarity < self.match_threshold:
+        if similarity is None or similarity < self.match_threshold or proposed.track_id != match.track_id:
             return None, "candidate_appearance_differs"
         return proposed, "appearance_and_candidate_match"
 

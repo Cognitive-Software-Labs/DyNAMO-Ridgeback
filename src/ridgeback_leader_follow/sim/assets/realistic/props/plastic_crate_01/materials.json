@@ -1,0 +1,19 @@
+[
+  {
+    "doubleSided": true,
+    "name": "plastic_crate_01",
+    "normalTexture": {
+      "index": 0
+    },
+    "pbrMetallicRoughness": {
+      "baseColorTexture": {
+        "index": 1
+      },
+      "metallicRoughnessTexture": {
+        "index": 2
+      }
+    },
+    "image": "textures/plastic_crate_01_diff_1k.jpg",
+    "normal_image": "textures/plastic_crate_01_nor_gl_1k.jpg"
+  }
+]

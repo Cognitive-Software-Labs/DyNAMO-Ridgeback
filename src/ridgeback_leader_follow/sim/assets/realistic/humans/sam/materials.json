@@ -1,0 +1,235 @@
+[
+  {
+    "alphaCutoff": 0.3499999940395355,
+    "alphaMode": "MASK",
+    "doubleSided": true,
+    "extensions": {
+      "KHR_materials_specular": {
+        "specularFactor": 0.5
+      }
+    },
+    "name": "Sam | anatomical body.eyebrow001",
+    "pbrMetallicRoughness": {
+      "baseColorTexture": {
+        "index": 0
+      },
+      "metallicFactor": 0,
+      "roughnessFactor": 0.7200000286102295
+    },
+    "image": "image_0.png"
+  },
+  {
+    "alphaCutoff": 0.3499999940395355,
+    "alphaMode": "MASK",
+    "doubleSided": true,
+    "extensions": {
+      "KHR_materials_specular": {
+        "specularFactor": 0.5
+      }
+    },
+    "name": "Sam | anatomical body.eyelashes01",
+    "pbrMetallicRoughness": {
+      "baseColorTexture": {
+        "index": 1
+      },
+      "metallicFactor": 0,
+      "roughnessFactor": 0.7200000286102295
+    },
+    "image": "image_1.png"
+  },
+  {
+    "doubleSided": true,
+    "extensions": {
+      "KHR_materials_specular": {
+        "specularFactor": 0.5
+      }
+    },
+    "name": "Sam | fine hair roots",
+    "pbrMetallicRoughness": {
+      "baseColorTexture": {
+        "index": 2
+      },
+      "metallicFactor": 0,
+      "roughnessFactor": 0.7200000286102295
+    },
+    "image": "image_2.png"
+  },
+  {
+    "doubleSided": true,
+    "extensions": {
+      "KHR_materials_specular": {
+        "specularFactor": 0.5
+      }
+    },
+    "name": "Sam | anatomical body.low-poly",
+    "pbrMetallicRoughness": {
+      "baseColorTexture": {
+        "index": 3
+      },
+      "metallicFactor": 0,
+      "roughnessFactor": 0.7200000286102295
+    },
+    "image": "image_3.png"
+  },
+  {
+    "doubleSided": true,
+    "extensions": {
+      "KHR_materials_specular": {
+        "specularFactor": 0.5
+      }
+    },
+    "name": "Sam | original top",
+    "normalTexture": {
+      "index": 4,
+      "scale": 0.5
+    },
+    "pbrMetallicRoughness": {
+      "baseColorFactor": [
+        0.10499999672174454,
+        0.17000000178813934,
+        0.12999999523162842,
+        1
+      ],
+      "metallicFactor": 0,
+      "roughnessFactor": 0.6800000071525574
+    }
+  },
+  {
+    "doubleSided": true,
+    "extensions": {
+      "KHR_materials_specular": {
+        "specularFactor": 0.5
+      }
+    },
+    "name": "Sam | original bottom",
+    "normalTexture": {
+      "index": 5,
+      "scale": 0.5
+    },
+    "pbrMetallicRoughness": {
+      "baseColorFactor": [
+        0.02500000037252903,
+        0.039000000804662704,
+        0.06499999761581421,
+        1
+      ],
+      "metallicFactor": 0,
+      "roughnessFactor": 0.6800000071525574
+    }
+  },
+  {
+    "doubleSided": true,
+    "name": "Original dark ankle lining",
+    "pbrMetallicRoughness": {
+      "baseColorFactor": [
+        0.017999999225139618,
+        0.01600000075995922,
+        0.020999999716877937,
+        1
+      ],
+      "metallicFactor": 0,
+      "roughnessFactor": 0.800000011920929
+    }
+  },
+  {
+    "doubleSided": true,
+    "name": "Original accessory body",
+    "pbrMetallicRoughness": {
+      "baseColorFactor": [
+        0.02500000037252903,
+        0.019999999552965164,
+        0.017999999225139618,
+        1
+      ],
+      "metallicFactor": 0,
+      "roughnessFactor": 0.47999998927116394
+    }
+  },
+  {
+    "doubleSided": true,
+    "name": "Accessory detail",
+    "pbrMetallicRoughness": {
+      "baseColorFactor": [
+        0.054999999701976776,
+        0.0949999988079071,
+        0.11999999731779099,
+        1
+      ],
+      "metallicFactor": 0.30000001192092896,
+      "roughnessFactor": 0.23999999463558197
+    }
+  },
+  {
+    "doubleSided": true,
+    "extensions": {
+      "KHR_materials_specular": {
+        "specularFactor": 0.5
+      }
+    },
+    "name": "Sam | anatomical body.body",
+    "pbrMetallicRoughness": {
+      "baseColorTexture": {
+        "index": 6
+      },
+      "metallicFactor": 0,
+      "roughnessFactor": 0.5400000214576721
+    },
+    "image": "image_5.png"
+  },
+  {
+    "doubleSided": true,
+    "extensions": {
+      "KHR_materials_specular": {
+        "specularFactor": 0.5
+      }
+    },
+    "name": "Sam | anatomical body.shoes01",
+    "normalTexture": {
+      "index": 7
+    },
+    "pbrMetallicRoughness": {
+      "baseColorTexture": {
+        "index": 8
+      },
+      "metallicFactor": 0,
+      "roughnessFactor": 0.7200000286102295
+    },
+    "image": "image_7.png"
+  },
+  {
+    "alphaCutoff": 0.2800000011920929,
+    "alphaMode": "MASK",
+    "doubleSided": true,
+    "extensions": {
+      "KHR_materials_specular": {
+        "specularFactor": 0.5
+      }
+    },
+    "name": "Sam | anatomical body.short01",
+    "pbrMetallicRoughness": {
+      "baseColorTexture": {
+        "index": 9
+      },
+      "metallicFactor": 0,
+      "roughnessFactor": 0.7200000286102295
+    },
+    "image": "image_8.png"
+  },
+  {
+    "doubleSided": true,
+    "extensions": {
+      "KHR_materials_specular": {
+        "specularFactor": 0.5
+      }
+    },
+    "name": "Sam | anatomical body.teeth_base",
+    "pbrMetallicRoughness": {
+      "baseColorTexture": {
+        "index": 10
+      },
+      "metallicFactor": 0,
+      "roughnessFactor": 0.7200000286102295
+    },
+    "image": "image_9.png"
+  }
+]

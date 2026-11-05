@@ -1,0 +1,25 @@
+{
+  "blender": "4.2.9 LTS",
+  "height_m": 1.72,
+  "fps": 24,
+  "frames": 48,
+  "cycle_seconds": 2.0,
+  "vertices": 65056,
+  "faces": 91610,
+  "gait_speed_mps": 1.2620621185648595,
+  "sha256": {
+    "image_8.png": "f34a0957184e3d1e911ed59245f874f8d4843f61ee44ff49f43edb4be0196949",
+    "materials.json": "b00066f816093cad789e229105d3acc56ab691259631bf6cc6d240a30fe84c70",
+    "image_2.png": "4aeb75aece572d539b77e6c3982ec33ec4afac2c47db1b9c7edc95b6f8b21e2f",
+    "image_9.png": "d0afb57869c6fbb56b98f5efc4aec629ee7593e70d8dd2bfb9de923acfb65f43",
+    "source.glb": "fbf6558ff408b6c5d12c82a5aaa506e07ec796f963a9ac1d4b9c88a39b0fd429",
+    "image_0.png": "9940f7d0b1b223709a19b05156ba6f6e9e4dbdbced02d7574f4d51d72c58967b",
+    "image_6.png": "a9bfd7223e98b8f93100e89596135e3a94e6044f9db11b4d23cec625c37a4599",
+    "walk.npz": "1dba1f222e0adc02082ffc0d10299a86194eb3c834c5ab9961408c13d628fed7",
+    "image_4.png": "1c31a7a5fbbef1ee40176114295038703f370d163a3cf040f55b60c85369d12c",
+    "image_5.png": "e897c4cc1b6ad5d10a7d2b2be92402feda4e772e6582dfaf0a1e8fc4621d8097",
+    "image_7.png": "50c9a406a7f1cb6aa7b42912348e78f09d0252aa3963c8229cf18dfe8353cdbf",
+    "image_1.png": "4b69c0fff2648874460e9caf80c31413c444218a5c50afebc425aeaa65484a35",
+    "image_3.png": "4659691c7295ad6206c78b003e5fd0e5f91dcd53032fa914a229bb48cabe424b"
+  }
+}

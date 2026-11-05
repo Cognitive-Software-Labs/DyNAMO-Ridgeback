@@ -1,0 +1,26 @@
+{
+  "blender": "4.2.9 LTS",
+  "height_m": 1.72,
+  "fps": 24,
+  "frames": 48,
+  "cycle_seconds": 2.0,
+  "vertices": 71110,
+  "faces": 102036,
+  "gait_speed_mps": 1.3451634948310296,
+  "sha256": {
+    "image_8.png": "dcb364300cac06ce8bef91b2f7c0970baf310898bbdd06b0c6b884ee9306eb97",
+    "materials.json": "077cae5107bdd315ba1b5a0ebb7151f9e557a8f3ec1fb2c5a8adc5e3d71815b8",
+    "image_2.png": "7bff7afbbc3f068e06f69abcddc8c2c9ce667ec181e0f2a918f8af78eba12610",
+    "image_9.png": "d0afb57869c6fbb56b98f5efc4aec629ee7593e70d8dd2bfb9de923acfb65f43",
+    "NOTICE.md": "065a5c3dcc2811b62e7ac4b396bd34fa8b85b4cd07c08c95c27d5706985aeee0",
+    "source.glb": "3c22e60a599526d264f7cbb744e5bc1f6b1e93a79daade322942c49e7aac6ab3",
+    "image_0.png": "1f6d34d722ef18e73494e62f2c7f1a933ff58ce75d01fd34de21d178d5afe4d8",
+    "image_6.png": "4659691c7295ad6206c78b003e5fd0e5f91dcd53032fa914a229bb48cabe424b",
+    "walk.npz": "896307a2a55164b5939f7d8cb5e3024f2e4214643877442e8c1ca4c1ef2968d7",
+    "image_4.png": "a1910442761f488277ff5e8b1791e72826e5b3e9276999c7718b0a319b8d9b5c",
+    "image_5.png": "4aeb75aece572d539b77e6c3982ec33ec4afac2c47db1b9c7edc95b6f8b21e2f",
+    "image_7.png": "1d82f782b7d2da732229633bd2d14754d873fff53cdb1d088977bcf67ae19dde",
+    "image_1.png": "4b69c0fff2648874460e9caf80c31413c444218a5c50afebc425aeaa65484a35",
+    "image_3.png": "66df9254f3da24f5ef8bf962b7702bf6f4addf45bf966a2a63087069f928da3c"
+  }
+}

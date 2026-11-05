@@ -97,8 +97,16 @@ troubleshooting, planning, and historical documentation.
 
 ## Leader following
 
+- [People-tracking benchmarks](leader_following/benchmarks.md) — F2 input,
+  scoring, candidate comparison and selected simulation profile
+
+- [Richer environments](leader_following/environments.md) — office, warehouse, courtyard and varied pedestrian assets.
+- [People tracker](leader_following/people_tracker.md) · [Leader recognition](leader_following/recognition.md) — RGB-D/lidar fusion,
+  synchronization, parameters and runtime
 - [Leader following](leader_following/architecture.md) — messages, the
   `leader_identity` node and the leader lock
+- [Crowd simulation](leader_following/simulation.md) — F1 scene commands,
+  pedestrian assets, robot sensors, ground truth and qualification
 - [Visual explainer](leader_following/assets/explainer.html) — plain-language
   overview for people outside the project
 
