@@ -213573,7 +213573,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "src/ridgeback_leader_follow/ridgeback_leader_follow/realistic_scene.py",
-      "source_location": "L509",
+      "source_location": "L512",
       "weight": 1.0,
       "source": "ridgeback_leader_follow_realistic_scene_gazebo_world",
       "target": "ridgeback_leader_follow_realistic_scene_fixture_texture",

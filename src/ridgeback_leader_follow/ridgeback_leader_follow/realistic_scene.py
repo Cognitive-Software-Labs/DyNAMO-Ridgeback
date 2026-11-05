@@ -498,7 +498,10 @@ def gazebo_world(scenario,output,environment):
                 if box.material=='glass':ET.SubElement(item,'transparency').text='.72'
             else:ET.SubElement(ET.SubElement(geometry,'box'),'size').text=' '.join(map(str,box.size))
             if tag=='visual':
-                color,rough,metal=PALETTE[box.material];mat=ET.SubElement(item,'material');ET.SubElement(mat,'diffuse').text=' '.join(map(str,(*color,1.)))
+                color,rough,metal=PALETTE[box.material];mat=ET.SubElement(item,'material')
+                # Ogre multiplies albedo maps by the diffuse colour; the modern office keeps texture pixels.
+                if environment=='modern_office' and (root/'surfaces'/box.material).exists():color=(1.,1.,1.)
+                ET.SubElement(mat,'diffuse').text=' '.join(map(str,(*color,1.)))
                 if box.name.startswith(('LightHousing','CoveLED')):
                     ET.SubElement(mat,'emissive').text='1 0.94 0.82 1'
                 elif box.material in EMISSIVE:
