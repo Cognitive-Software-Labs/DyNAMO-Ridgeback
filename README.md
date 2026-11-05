@@ -1560,6 +1560,56 @@ seconds end to end (about 50x). Five batches is therefore the legacy capture def
 the measured 32-thread host, 16 workers was the replay knee; choose workers for
 the machine rather than blindly using every logical CPU. See the Archived evidence section below.
 
+### Saved hardware-bag diagnostic
+
+`target_hardware_bag_validation` processes the saved 48-arrangement hardware
+session on the workstation. It shares inference across ten fixed paths and
+writes unscored estimates, inspection overlays and resumable per-bag evidence.
+See the [bridge contract](docs/target_distance_benchmarking/hardware_bag_validation.md)
+for timing, matching, reference limitations and artifact details.
+
+Build the changed packages after `tools/check_dependencies`, then use the
+perception environment with Jazzy's decoding libraries. No ROS graph or playback
+is needed. Describe reads metadata and validates pinned local model snapshots;
+it performs no frame inference. Paths resolve against this workspace.
+
+```bash
+source /opt/ros/jazzy/setup.bash
+source install/setup.bash
+source "${RIDGEBACK_PERCEPTION_VENV:-$PWD/perception_venv}/bin/activate"
+
+SESSION=/home/stefi/ScenesForDetectionTesting/20261029T141724Z-distance-benchmark-raw
+JOB=artifacts/benchmark-jobs/hardware_bridge_cpu.json
+OUT=artifacts/benchmarks/hardware_bridge_cpu
+ros2 run ridgeback_autonomy target_hardware_bag_validation describe \
+  --session "$SESSION" --job "$JOB" --output "$OUT" --device cpu
+ros2 run ridgeback_autonomy target_hardware_bag_validation check-models --job "$JOB"
+```
+
+Use an explicit `--device cuda:0` and fresh job/output for GPU processing after
+checking the driver, free GPU/RAM/disk and contention. There is no automatic
+fallback. Real-bag execution is a separate assignment from preparing the job.
+When execution is assigned:
+
+```bash
+ros2 run ridgeback_autonomy target_hardware_bag_validation run --job "$JOB"
+# After an interruption, keep the same job/configuration:
+ros2 run ridgeback_autonomy target_hardware_bag_validation resume --job "$JOB"
+# Inspect validated committed outputs without inference:
+ros2 run ridgeback_autonomy target_hardware_bag_validation report --output "$OUT"
+# Recompute a separate software derivative without raw reads or inference:
+ros2 run ridgeback_autonomy target_hardware_bag_validation remeasure \
+  --evidence "$OUT" --output artifacts/benchmarks/hardware_bridge_remeasured
+```
+
+Optional `remeasure --references corrections.json` accepts exact bag names
+mapped to revised qualified reference documents. All outputs remain unscored.
+Job/output names must be new; changed code, settings, input identity, models or
+dependencies refuse incompatible resume. Exit 2 indicates explicit single-input
+failures after unaffected bags finish; exit 1 indicates a stopped processing or
+validation fault. Both retain evidence. Offline duration establishes no live
+throughput or final hardware accuracy claim.
+
 ### Layered mask replay
 
 Use the typed replay path when masks themselves must be compared or rerun. The
@@ -1751,6 +1801,7 @@ Current recovery steps live in [troubleshooting](docs/troubleshooting.md), while
 
 ## Archived evidence
 
+- [Saved hardware-bag diagnostic and review](archive/engineering/2026-11-05-hardware-bag-diagnostic.md)
 - [6.1 migration evidence](archive/engineering/2026-09-13-isaac-6.1-migration.md)
 - [investigation history](archive/engineering/exact_stamp_depth_availability.md)
 - [projective parameter sensitivity](archive/engineering/projective_parameter_sensitivity.md)

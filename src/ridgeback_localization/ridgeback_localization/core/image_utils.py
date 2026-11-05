@@ -75,15 +75,16 @@ def decode_image_message(msg: Image) -> np.ndarray:
 
 
 def decode_buffer(msg: Image, dtype: np.dtype, channels: int) -> np.ndarray:
-    dtype = np.dtype(dtype)
-    row_elements = msg.step // dtype.itemsize
+    dtype = np.dtype(dtype).newbyteorder('>' if msg.is_bigendian else '<')
     expected_columns = msg.width * channels
-
-    if row_elements < expected_columns:
+    if msg.step < expected_columns * dtype.itemsize:
         raise ValueError('message step is smaller than expected image width')
-
-    buffer = np.frombuffer(msg.data, dtype=dtype).reshape(msg.height, row_elements)
-    cropped = buffer[:, :expected_columns]
+    if len(msg.data) != msg.height * msg.step:
+        raise ValueError('message data length differs from height * step')
+    # Byte strides also support padding not divisible by the pixel item size.
+    cropped = np.ndarray(
+        (msg.height, expected_columns), dtype=dtype, buffer=msg.data,
+        strides=(msg.step, dtype.itemsize))
 
     if channels == 1:
         return cropped.reshape(msg.height, msg.width)

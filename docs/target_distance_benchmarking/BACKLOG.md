@@ -74,6 +74,23 @@ results, candidate comparison, storage/resource measurements, scaling, and
 remaining limitations in a dated evidence record. Update maintained references
 with demonstrated facts and remove this item only when the listed gates pass.
 
+## Hardware-bag experiment qualification
+
+**Gap.** The [bridge tooling](hardware_bag_validation.md) completed the
+48-arrangement, ten-path diagnostic. Final comparisons still need independently
+reviewed target annotations/association, an agreed error and evaluation protocol,
+and justified treatment of the existing reference uncertainty. Numerical return
+rates include false objects and duplicate fragments and are not accuracy scores.
+
+**Completion criteria.** Freeze annotation/matching and metric rules; retain
+missed detections and explicit missing inputs; diagnose selection/depth behavior
+from caches before agreed tuning/ablation; report per-configuration coverage and
+reference-qualified accuracy with reproducible lineage. Group shared-reference
+placements appropriately. Do not infer a re-recording need from model failures
+or treat a review of existing measurement records as new physical evidence.
+The diagnostic identified no new onsite requirement. Future live hardware
+throughput/autonomy qualification remains separate.
+
 ## Camera-geometry benchmark recertification
 
 **Gap.** The current measured camera and LiDAR mounts supersede the geometry

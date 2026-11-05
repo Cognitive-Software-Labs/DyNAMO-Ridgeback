@@ -24,6 +24,7 @@ are excluded from ordinary repository search and the generated knowledge graph.
 
 ## Benchmarking and execution
 
+- [Saved hardware-bag diagnostic and review](2026-11-05-hardware-bag-diagnostic.md) — completed 48-bag processing, detector misses, numerical-return limitations and the boundary between offline follow-up and re-recording.
 - [Qualification campaign stopped by systemd-oomd](2026-11-03-qualification-oom.md) — retained memory peaks, ten-minute host history, incomplete workload attribution and preserved partial results.
 - [Gazebo and Isaac backend qualification](2026-10-26-benchmark-gazebo-isaac-qualification.md) — the first and accepted matched full runs, cross-simulator detector and ranking differences, reproducibility of each simulator, interrupted-stop cycles and installed-launch smokes.
 - [Benchmark shutdown ordering and RViz node ownership](2026-10-23-benchmark-shutdown-ownership.md) — client-before-provider rollback, retained view-controller services, native DDS unload evidence, and distinct qualification populations.

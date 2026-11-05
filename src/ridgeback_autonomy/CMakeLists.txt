@@ -42,6 +42,12 @@ install(PROGRAMS
 )
 
 install(PROGRAMS
+  ridgeback_autonomy/benchmarking/target_hardware_bag_validation.py
+  DESTINATION lib/${PROJECT_NAME}
+  RENAME target_hardware_bag_validation
+)
+
+install(PROGRAMS
   ridgeback_autonomy/benchmarking/target_replay_materialize_masks.py
   DESTINATION lib/${PROJECT_NAME}
   RENAME target_replay_materialize_masks
@@ -205,6 +211,7 @@ if(BUILD_TESTING)
   ament_add_pytest_test(test_recording test/test_recording.py)
   ament_add_pytest_test(test_replay test/test_replay.py)
   ament_add_pytest_test(test_layered_replay test/test_layered_replay.py)
+  ament_add_pytest_test(test_hardware_bag_validation test/test_hardware_bag_validation.py)
   ament_add_pytest_test(test_lidar_scan_assembler test/test_lidar_scan_assembler.py)
   ament_add_pytest_test(test_benchmark_configurator test/test_benchmark_configurator.py)
   ament_add_pytest_test(test_sweep test/test_sweep.py)
