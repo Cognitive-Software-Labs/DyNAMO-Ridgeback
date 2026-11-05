@@ -1,0 +1,126 @@
+{
+  "status": "passed",
+  "scope": "modern_office, six families x two backends, 20 s, scene/sensor gates only",
+  "results": [
+    {
+      "backend": "gz",
+      "scenario": "leader_alone",
+      "crowd_size": 4,
+      "people": 1,
+      "truth_rows": 400,
+      "maximum_pose_error": 2.220446049250313e-16,
+      "status": "passed",
+      "base_revision": "eeacb3d6f03002a9b504e10490153edddaba4111"
+    },
+    {
+      "backend": "gz",
+      "scenario": "crossing",
+      "crowd_size": 4,
+      "people": 2,
+      "truth_rows": 800,
+      "maximum_pose_error": 2.220446049250313e-16,
+      "status": "passed",
+      "base_revision": "eeacb3d6f03002a9b504e10490153edddaba4111"
+    },
+    {
+      "backend": "gz",
+      "scenario": "lookalike_parallel",
+      "crowd_size": 4,
+      "people": 2,
+      "truth_rows": 800,
+      "maximum_pose_error": 0.0,
+      "status": "passed",
+      "base_revision": "eeacb3d6f03002a9b504e10490153edddaba4111"
+    },
+    {
+      "backend": "gz",
+      "scenario": "lookalike_crossing",
+      "crowd_size": 4,
+      "people": 2,
+      "truth_rows": 800,
+      "maximum_pose_error": 5.551115123125783e-17,
+      "status": "passed",
+      "base_revision": "eeacb3d6f03002a9b504e10490153edddaba4111"
+    },
+    {
+      "backend": "gz",
+      "scenario": "leader_stop",
+      "crowd_size": 4,
+      "people": 4,
+      "truth_rows": 1600,
+      "maximum_pose_error": 1.734723475976807e-18,
+      "status": "passed",
+      "base_revision": "eeacb3d6f03002a9b504e10490153edddaba4111"
+    },
+    {
+      "backend": "gz",
+      "scenario": "crowd",
+      "crowd_size": 8,
+      "people": 9,
+      "truth_rows": 3600,
+      "maximum_pose_error": 2.220446049250313e-16,
+      "status": "passed",
+      "base_revision": "eeacb3d6f03002a9b504e10490153edddaba4111"
+    },
+    {
+      "backend": "isaac",
+      "scenario": "leader_alone",
+      "crowd_size": 4,
+      "people": 1,
+      "truth_rows": 400,
+      "maximum_pose_error": 1.2855169595482607e-07,
+      "status": "passed",
+      "base_revision": "eeacb3d6f03002a9b504e10490153edddaba4111"
+    },
+    {
+      "backend": "isaac",
+      "scenario": "crossing",
+      "crowd_size": 4,
+      "people": 2,
+      "truth_rows": 800,
+      "maximum_pose_error": 5.845581507735176e-08,
+      "status": "passed",
+      "base_revision": "eeacb3d6f03002a9b504e10490153edddaba4111"
+    },
+    {
+      "backend": "isaac",
+      "scenario": "lookalike_parallel",
+      "crowd_size": 4,
+      "people": 2,
+      "truth_rows": 800,
+      "maximum_pose_error": 0.0,
+      "status": "passed",
+      "base_revision": "eeacb3d6f03002a9b504e10490153edddaba4111"
+    },
+    {
+      "backend": "isaac",
+      "scenario": "lookalike_crossing",
+      "crowd_size": 4,
+      "people": 2,
+      "truth_rows": 800,
+      "maximum_pose_error": 1.0740875855397292e-08,
+      "status": "passed",
+      "base_revision": "eeacb3d6f03002a9b504e10490153edddaba4111"
+    },
+    {
+      "backend": "isaac",
+      "scenario": "leader_stop",
+      "crowd_size": 4,
+      "people": 4,
+      "truth_rows": 1600,
+      "maximum_pose_error": 5.548431225577133e-08,
+      "status": "passed",
+      "base_revision": "eeacb3d6f03002a9b504e10490153edddaba4111"
+    },
+    {
+      "backend": "isaac",
+      "scenario": "crowd",
+      "crowd_size": 8,
+      "people": 9,
+      "truth_rows": 3600,
+      "maximum_pose_error": 1.1659772436445337e-07,
+      "status": "passed",
+      "base_revision": "eeacb3d6f03002a9b504e10490153edddaba4111"
+    }
+  ]
+}

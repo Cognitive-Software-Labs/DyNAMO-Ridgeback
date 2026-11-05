@@ -73,8 +73,8 @@ the Rocketbox cast.
 
 Gazebo interiors add ceiling point lights and emissive fixture surfaces. Its
 fixture exporter namespaces Collada identifiers and gives copied architectural
-maps unique basenames, preventing Ogre's shared resource registry from reusing
-one texture for another surface; Rocketbox image identifiers are likewise the
+maps unique basenames in each run's `fixtures/textures/` directory, preventing
+Ogre's shared resource registry from reusing one texture for another surface; Rocketbox image identifiers are likewise the
 unique texture names. The static converter removes loose wire edges (Collada
 `<lines>`), which Gazebo would draw as unlit white strokes over tree foliage.
 Trees use a 180,000-triangle visual mesh and cylindrical trunk collisions in
@@ -210,7 +210,7 @@ matching SHA-256; evaluation refuses missing or mismatched geometry.
 odometry drift for a surveyed stationary observer. This option is not valid
 for a moving robot. These inputs are used only for scoring.
 
-Full 20-second playback of the modern office in both simulators is recorded under [archived evidence](#archived-evidence).
+All six scenario families passed 20-second scene/sensor playback in the modern office in both simulators (twelve cases; crowd with eight bystanders). Earlier worlds have not been replayed with the new cast.
 
 Rendering quality, playback validation and recognition performance are
 separate claims. The images below are actual simulator renders. They are
@@ -220,6 +220,37 @@ does not simulate cloth. Walk-to-idle switches are instantaneous; turns are
 rounded paths rather than biomechanical turning steps. Pedestrians do not
 react to the robot or each other. No recognition result exists for this cast.
 
+![Isaac robot-camera view of the modern office: oncoming and departing pedestrians between glazed meeting rooms and window workstations](assets/environments/modern-office-robot-camera.jpg)
+
+The Isaac robot camera (mount pose and 640x480 field of view) during the
+eight-bystander crowd: faces of oncoming walkers, a glazed meeting room on the
+left and window workstations on the right.
+
+![Isaac overview of the modern office with walking and waiting pedestrians](assets/environments/modern-office-overview.jpg)
+
+![The leader standing with a group of three in idle poses near the reception wall](assets/environments/modern-office-group.jpg)
+
+The stop scenario: the leader has joined three standing people, all playing
+the idle loop with different phases.
+
+![Two identical look-alike pedestrians walking side by side, out of step](assets/environments/modern-office-lookalikes.jpg)
+
+Look-alikes share one character deliberately; their gait phases differ.
+
+![All fourteen Rocketbox characters standing in two rows](assets/environments/modern-office-cast.jpg)
+
+![Gazebo robot camera in the modern office with the Rocketbox crowd](assets/environments/modern-office-gazebo.jpg)
+
+Gazebo renders the same layout and cast with simpler shading and no global illumination.
+
+The earlier worlds, rendered with the earlier four-character cast:
+
+![Earlier furnished office lobby with textured floor and reception furniture](assets/environments/office.png)
+
+![Warehouse aisle with racks, crates, barrels and pedestrians](assets/environments/warehouse.png)
+
+![Courtyard with trees, benches and windowed buildings](assets/environments/courtyard.png)
+
 ## Archived evidence
 
 - [Realistic worlds, asset conversion and startup validation](../../archive/engineering/2026-11-05-realistic-worlds.md) — tested population, tree/clock startup failures and verification limits.
@@ -227,3 +258,5 @@ react to the robot or each other. No recognition result exists for this cast.
 - [Material, lighting and vegetation review](../../archive/engineering/2026-11-05-visual-materials.md) — visual population and limited runtime evidence.
 
 - [Gazebo material isolation and full playback review](../../archive/engineering/2026-11-05-gazebo-material-isolation.md) — texture collision diagnosis and scenario coverage.
+
+- [Modern office and Rocketbox pedestrians](../../archive/engineering/2026-11-05-modern-office-rocketbox.md) — selection, retargeting findings and twelve-case playback.
