@@ -80,8 +80,8 @@ def test_gazebo_preserves_scenario_paths_and_actor_scales(environment,tmp_path):
         assert by_basename.setdefault(path.name,path)==path
         assert path.name!='Diffuse.jpg'
     if environment!='courtyard':
-        assert len([light for light in world.findall('light') if light.get('type')=='point'])==4
-        luminous=[model for model in world.findall('model') if model.get('name','').startswith(('LightHousing','CoveLED'))]
+        assert len([light for light in world.findall('light') if light.get('type')=='point'])==(8 if environment=='modern_office' else 4)
+        luminous=[model for model in world.findall('model') if model.get('name','').startswith(('LightHousing','CoveLED','LEDRun'))]
         assert luminous and all(model.find('link/visual/material/emissive') is not None for model in luminous)
     plugin=next(p for p in world.findall('plugin') if p.get('name')=='leader_follow::CrowdMotion')
     for person,config in zip(scenario.people,plugin.findall('person'),strict=True):
@@ -185,3 +185,13 @@ def test_gazebo_actor_switches_to_idle_animation(tmp_path):
         assert float(config.findtext('idle_cycle'))>0 and float(config.findtext('cycle'))>0
     emissive=[m for m in world.findall('model') if m.get('name','').startswith(('LEDRun','Display'))]
     assert emissive and all(m.find('link/visual/material/emissive') is not None for m in emissive)
+
+
+@pytest.mark.parametrize('name',SCENARIOS)
+def test_modern_office_starts_with_a_person_in_the_front_lidar_gate(name):
+    """crowd_qualify requires a leg return 0.65-2 m ahead (within 0.8 rad) at t=0."""
+    lidar=np.array([.3922,0.])
+    for person in load_scenario(name,8,'modern_office').people:
+        offset=np.array(person.sample(0.)[:2])-lidar
+        if .8<np.linalg.norm(offset)<1.85 and abs(np.arctan2(offset[1],offset[0]))<.7:return
+    pytest.fail('no pedestrian inside the front-lidar start gate')

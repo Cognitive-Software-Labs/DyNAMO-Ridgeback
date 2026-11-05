@@ -22,7 +22,7 @@ namespace leader_follow {
 struct Waypoint { double t, x, y; };
 struct Person {
   std::string name;
-  double gaitSpeed{.5}, cycle{2.}, idleCycle{0.}, idleOffset{0.};
+  double gaitSpeed{.5}, cycle{2.}, idleCycle{0.}, idleOffset{0.}, walkOffset{0.};
   std::string clip;
   std::vector<Waypoint> path;
   gz::sim::Entity entity{gz::sim::kNullEntity};
@@ -83,6 +83,7 @@ class CrowdMotion : public gz::sim::System,
       if (p->HasElement("cycle")) person.cycle = p->Get<double>("cycle");
       if (p->HasElement("idle_cycle")) person.idleCycle = p->Get<double>("idle_cycle");
       if (p->HasElement("idle_offset")) person.idleOffset = p->Get<double>("idle_offset");
+      if (p->HasElement("walk_offset")) person.walkOffset = p->Get<double>("walk_offset");
       for (auto w = p->GetElement("waypoint"); w;
            w = w->GetNextElement("waypoint")) {
         auto v = w->Get<gz::math::Vector3d>();
@@ -116,7 +117,7 @@ class CrowdMotion : public gz::sim::System,
                        gz::sim::ComponentState::OneTimeChange);
       }
       double seconds = idle ? std::fmod(elapsed+person.idleOffset,person.idleCycle)
-                            : std::fmod(distance/person.gaitSpeed,person.cycle);
+                            : std::fmod(distance/person.gaitSpeed+person.walkOffset,person.cycle);
       auto phase = std::chrono::duration_cast<std::chrono::steady_clock::duration>(
           std::chrono::duration<double>(seconds));
       auto animation = ecm.Component<gz::sim::components::AnimationTime>(person.entity);

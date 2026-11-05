@@ -41,7 +41,7 @@ PALETTE={
  'concrete_floor_02':((.5,.5,.48),.85,0.),'brick_pavement_02':((.5,.38,.3),.9,0.),
  'brick_wall_001':((.5,.35,.25),.85,0.),'grass_ground':((.18,.28,.07),.95,0.),
  # Modern office: textured surfaces keep their own pixels; flat finishes below.
- 'laminate_floor_02':((.62,.5,.36),.55,0.),'painted_plaster_wall':((.9,.89,.86),.9,0.),
+ 'laminate_floor_02':((.62,.5,.36),.55,0.),
  'white_oak_veneer':((.72,.6,.45),.5,0.),'marble_01':((.86,.84,.8),.25,0.),
  'denim_fabric_04':((.32,.38,.46),.9,0.),'aluminium':((.72,.73,.74),.35,.9),
  'matt_white':((.93,.93,.92),.6,0.),'wall_paint':((.88,.87,.84),.9,0.),'graphite':((.11,.115,.12),.5,.1),

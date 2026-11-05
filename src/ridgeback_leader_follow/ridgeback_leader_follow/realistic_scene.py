@@ -104,9 +104,9 @@ def natural_scenario(name,crowd_size,baseline):
         people=(person('lf_leader','leader',((1.6,.45),(17.,.45))),
                 person('lf_lookalike','bystander',((1.6,-.45),(17.,-.45))))
     elif name=='lookalike_crossing':
-        # Paths cross near x=8.3 about 1.3 s apart, so the pair swap sides.
-        people=(person('lf_leader','leader',((2.,-1.6),(13.,1.6),(15.,1.6))),
-                person('lf_lookalike','bystander',((3.5,1.8),(13.5,-1.5),(15.5,-1.5))))
+        # The pair swap sides; they never come closer than 1.5 m.
+        people=(person('lf_leader','leader',((1.7,-1.),(13.,1.6),(15.,1.6))),
+                person('lf_lookalike','bystander',((3.3,1.5),(13.5,-1.5),(15.5,-1.5))))
     elif name=='leader_stop':
         # The leader joins a standing group; a short step sets each member's facing.
         group=(((11.,1.3),(10.6,.95)),((11.2,-1.1),(10.85,-.75)),((12.,-.1),(11.55,-.05)))
@@ -483,6 +483,7 @@ def gazebo_world(scenario,output,environment):
             with np.load(directory/'idle.npz') as data:cycle=float(data['cycle_seconds'])
             ET.SubElement(config,'idle_cycle').text=str(cycle)
             ET.SubElement(config,'idle_offset').text=str(idle_offset(config.findtext('name'),cycle))
+            ET.SubElement(config,'walk_offset').text=str(idle_offset(config.findtext('name')+':gait',float(config.findtext('cycle'))))
     def model(name,position,yaw=0.):
         obj=ET.SubElement(world,'model',name=name);ET.SubElement(obj,'static').text='true'
         ET.SubElement(obj,'pose').text=' '.join(map(str,(*position,0,0,np.deg2rad(yaw))))

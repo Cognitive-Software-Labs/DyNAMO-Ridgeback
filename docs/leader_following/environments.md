@@ -1,75 +1,85 @@
 # Realistic simulation environments
 
 The `realistic` scene profile adds furnished worlds and a varied pedestrian
-cast to the crowd runner, with enclosed interiors, wayfinding signs and
-textured architectural surfaces. The existing F1/F2/F3
-benchmark results apply to their recorded profiles; they do not qualify these
-new worlds or characters. The observation robot remains stationary.
+cast to the crowd runner. Its default world is a modern open-plan office; the
+earlier office, warehouse and courtyard worlds remain available. The existing
+F1/F2/F3 benchmark results apply to their recorded profiles; they do not
+qualify these worlds or characters. The observation robot remains stationary.
 
-## Work-in-progress modern office
-
-The realistic profile now defaults to `modern_office`, a new clean office
-layout with glazed rooms and contemporary furnishings. The cast uses fourteen
-Microsoft Rocketbox models with publisher clothing, natural stature variation,
-and walk/idle animation assets. Sources are pinned in `rocketbox_cast.py`;
-asset download receipts and the Microsoft MIT licence are stored under
-`sim/assets/realistic/rocketbox/`. The earlier Sam/Maya/Harper/Jordan assets
-remain available, but are no longer the default realistic cast.
-
-This is a work-in-progress snapshot. Automated checks currently fail, including
-character foot-height assertions; new renders and full playback qualification
-are required before treating this population as validated. The earlier figures
-and playback evidence below describe the preceding four-model population,
-not the new Rocketbox cast or modern office.
-
-Run the new layout with `--scene-profile realistic --environment modern_office`.
-The baseline and F3 profiles remain separate.
-
-## Worlds and people
+## Worlds
 
 | `--environment` | Contents |
 |---|---|
-| `office` | Wood floor, ceiling and cove lights, glazed frontage, reception counter, desks, monitors, books, notebooks, lounge furniture, plants, bins and room signs |
+| `modern_office` (default) | Light-oak floor, warm-white walls, full-height south glazing with slim mullions, linear LED ceiling runs, window workstations with monitors and task chairs, two glazed meeting rooms with oak tables, wall displays and pendants, a lounge with sofa, mid-century chairs, rug and cube shelving, and an oak-slatted reception wall with a marble-topped counter |
+| `office` | Earlier lobby: wood floor, cove lights, glazed frontage, reception, desks, lounge furniture and room signs |
 | `warehouse` | Concrete floor, roof/skylight and clerestory windows, storage racks, crates, barrels, aisle markings, loading door and pedestrian signs |
 | `courtyard` | Paved walkways, planted grass/shrub beds, trees, benches, street lamps, bins, wayfinding and windowed building facades |
 
-The preceding realistic population used four source characters: Sam and Maya in casual clothing, Harper
-and Jordan in business clothing. Clothing colours and uniform stature scaling
-provide additional variants. Casual trousers keep neutral colours when shirt
-colours change. The cast reuses these four models; it is not a
-population of independently modelled people. Look-alike scenarios deliberately
-assign the leader and look-alike the same model, scale and clothing settings.
-Appearance assignments are rendering/evaluation metadata, never a recognition
-input. All routes are scripted rather than reactive pedestrian navigation.
+The modern office keeps pedestrian lanes at x 0.5-21.5 m and |y| <= 4.2 m
+clear of furniture; tests check every route against collision footprints.
+Workstations, partitions, glazing, sofa and task chairs are procedural boxes
+with Poly Haven surfaces; lounge chairs, coffee and side tables, shelving,
+credenza, pendants and plants are Poly Haven models. Monitors, wall displays,
+LED runs and a faint ceiling glow are emissive. Isaac lights the office with
+the daylight HDRI, a low south-west sun through the glazing, window fill and
+one rectangular light per LED run. Gazebo uses a directional sun, eight
+ceiling point lights and emissive fixtures, and keeps texture pixels unscaled
+by palette colours in this world.
+
+## People and motion
+
+The cast is fourteen distinct Microsoft Rocketbox (MIT) characters with the
+publisher's own outfits: business suits, blazers, a waistcoat, casual jackets,
+knitwear, dresses and jeans, across a range of ages, skin tones, builds and
+hair. Per-person scales map the publisher skeletons onto statures of about
+1.63-1.85 m. Assignments follow cast order, so a crowd of eight bystanders
+shows nine different people. Look-alike scenarios deliberately give the
+leader and look-alike the same character and scale. Appearance assignments
+are rendering/evaluation metadata, never a recognition input.
+
+Each character has two clips baked from the publisher's neutral motion
+capture: a 1.2 s walk cycle (about 1.0 m/s stride for men, 1.2 m/s for women
+before stature scaling) and an 8 s idle loop whose last second blends back to
+its start. While a scripted segment moves, gait phase follows travelled
+distance, so stance feet stay planted at any path speed; while a person stands
+(including before their first step and after their route ends) the idle loop
+plays. Deterministic per-person phase offsets keep pairs, including
+look-alikes, from walking or breathing in step. Isaac selects cached frames;
+Gazebo's `CrowdMotion` plugin switches each actor between its `walk` and
+`idle` animations using the same rule and offsets.
+
+In the modern office all six scenario families walk at 1.0-1.2 m/s with
+rounded corners: the alone route jogs left, turns around and returns towards
+the robot; the passer crosses between robot and leader; look-alikes walk side
+by side or swap sides about 1.3 s apart; the leader joins a standing group of
+three; and the crowd mixes oncoming, crossing and same-direction walkers.
+Everyone stays at least 0.8 m apart at crowd sizes 2, 4 and 8. The earlier
+realistic worlds keep their recorded routes, which walk at 0.2-0.5 m/s.
+All routes are scripted rather than reactive pedestrian navigation.
+
+## Rendering differences
 
 Both simulators consume the shared layout and cast. Isaac uses evaluated mesh
-animation and textured PreviewSurface materials with an OmniGlass surface for glazing; Gazebo uses native Collada
-actors with per-person gait speed. Fixture UVs keep wall textures horizontal
-and tile floor materials in metres. Rendering and material support differ. Isaac preserves source normal strength,
-metallic/roughness texture channels and dielectric specular strength. Surface
-roughness maps break up uniform highlights. Cloth texture brightness is
-normalized before tinting so dark source suits retain the assigned colour.
-Gazebo uses a flat assigned colour for textured business garments; it does not
-reproduce Isaac's fabric shading. Source pixels remain unchanged.
+animation and textured PreviewSurface materials with an OmniGlass surface for
+glazing; Gazebo uses native Collada actors with per-person gait speed. Fixture
+UVs keep wall textures horizontal and tile floor materials in metres. Isaac
+preserves source normal strength, metallic/roughness texture channels and
+dielectric specular strength; Gazebo shading is simpler and does not
+reproduce Isaac's fabric, glass or global illumination.
 
-Reception counters and doors use wood-grain textures. Office cove lights
-illuminate the ceiling; warehouse clerestory openings admit daylight. Courtyard
-grass and shrub strips use separate publisher opacity maps in both renderers.
-These decorative plants have no collision geometry; trees retain trunk proxies. Gazebo
-interiors add four ceiling point lights and emissive fixture surfaces. Its
+The earlier Innerscene and Maya characters stay in the repository so earlier
+recorded realistic populations remain scoreable; all realistic worlds now use
+the Rocketbox cast.
+
+Gazebo interiors add ceiling point lights and emissive fixture surfaces. Its
 fixture exporter namespaces Collada identifiers and gives copied architectural
 maps unique basenames, preventing Ogre's shared resource registry from reusing
-the wood-floor texture for brick walls or signs. These copies live in each
-run's `fixtures/textures/` directory; publisher files remain unchanged.
-The static converter removes loose wire edges (Collada `<lines>`), which
-Gazebo would draw as unlit white strokes over tree foliage; triangle geometry
-and texture pixels are unchanged.
-
-Trees use a 180,000-triangle visual mesh derived from the source and simple
-cylindrical trunk collisions in both backends. The proxy is approximate and
-does not model foliage collision. Lidar rendering still uses the visible tree.
-The Gazebo launch bridges `/world/leader_follow_scene/clock` to ROS `/clock`,
-so startup does not depend on Gazebo also creating the short `/clock` topic.
+one texture for another surface; Rocketbox image identifiers are likewise the
+unique texture names. The static converter removes loose wire edges (Collada
+`<lines>`), which Gazebo would draw as unlit white strokes over tree foliage.
+Trees use a 180,000-triangle visual mesh and cylindrical trunk collisions in
+both backends; foliage has no collision. The Gazebo launch bridges
+`/world/leader_follow_scene/clock` to ROS `/clock`.
 
 ## Run a scenario
 
@@ -78,7 +88,7 @@ Then choose one world and scenario:
 
 ```bash
 ros2 run ridgeback_leader_follow crowd_scene \
-  --backend gz --scene-profile realistic --environment office \
+  --backend gz --scene-profile realistic --environment modern_office \
   --scenario crossing --gui
 
 isaac_venv/bin/python -m ridgeback_leader_follow.crowd_runner \
@@ -88,7 +98,7 @@ isaac_venv/bin/python -m ridgeback_leader_follow.crowd_runner \
 
 | Scenario | CLI name | Behaviour |
 |---|---|---|
-| Alone | `leader_alone` | Straight sections and turns in the realistic profile |
+| Alone | `leader_alone` | Straight sections and turns (a turn-around in the modern office) |
 | Crossing | `crossing` | A passer-by crosses between observer and leader |
 | Look-alike | `lookalike_parallel` | Matching-looking pedestrian walks beside the leader |
 | Swap | `lookalike_crossing` | Leader and look-alike cross paths |
@@ -96,8 +106,9 @@ isaac_venv/bin/python -m ridgeback_leader_follow.crowd_runner \
 | Crowd | `crowd` | Combined paths with `--crowd-size 2`, `4` or `8` bystanders |
 
 `--environment` requires `--scene-profile realistic`; its default is `modern_office`.
-The other five routes reuse the original fixture paths. Only the realistic
-alone route adds turns; original baseline and F3 routes are unchanged.
+The modern office uses the natural-pace routes described above. In the earlier
+realistic worlds the other five routes reuse the original fixture paths and
+only the alone route adds turns. Baseline and F3 routes are unchanged.
 All normal recording, private-domain and owned-process cleanup options apply.
 
 ## Asset setup and conversion
@@ -107,11 +118,12 @@ Git LFS and run `git lfs install` followed by `git lfs pull` from the repository
 Downloaded weights, virtual environments and raw run output remain under the
 existing ignored directories.
 
-The CC0 sources and conversion hashes are recorded in
-[`sim/assets/realistic/NOTICE.md`](../../src/ridgeback_leader_follow/sim/assets/realistic/NOTICE.md)
-and its adjacent `sources.json`. Powered by [Poly Haven](https://polyhaven.com).
-The three additional characters are from Innerscene/MakeHuman. Maya's existing
-attribution remains in its asset directory.
+Licences, sources and conversion hashes are recorded in
+[`sim/assets/realistic/NOTICE.md`](../../src/ridgeback_leader_follow/sim/assets/realistic/NOTICE.md),
+its adjacent `sources.json` (CC0 Poly Haven props, surfaces and HDRI; powered
+by [Poly Haven](https://polyhaven.com)) and `rocketbox/sources.json` (MIT
+Microsoft Rocketbox characters and clips, pinned to one publisher commit).
+The earlier Innerscene/MakeHuman characters and Maya keep their attributions.
 
 To rebuild from publisher files, use system Python with `requests`, then the
 project's Blender 4.2.9 binary:
@@ -129,6 +141,31 @@ artifacts/leader-following/tools/blender-4.2.9-linux-x64/blender -b \
 Repeat conversion for each directory under `props/`. For each directory under
 `humans/`, append `human` after the directory argument. Blender evaluates the
 walk and exports the Gazebo skin; existing Maya assets are reused.
+
+Rocketbox characters are fetched into an ignored source cache (about 1.2 GB of
+FBX/TGA files), their textures converted into the asset tree, then baked one
+character at a time; the roster lives in `rocketbox_cast.py`:
+
+```bash
+python3 src/ridgeback_leader_follow/sim/fetch_rocketbox_humans.py \
+  artifacts/leader-following/rocketbox-source \
+  src/ridgeback_leader_follow/sim/assets/realistic/rocketbox
+
+artifacts/leader-following/tools/blender-4.2.9-linux-x64/blender -b \
+  --python-exit-code 1 \
+  --python src/ridgeback_leader_follow/sim/prepare_rocketbox_human.py -- \
+  artifacts/leader-following/rocketbox-source business_female_01 \
+  src/ridgeback_leader_follow/sim/assets/realistic/rocketbox/business_female_01
+```
+
+The bake bakes the FBX object transform into the rest pose, retargets each
+clip by copying world bone orientations onto the avatar's own bone offsets
+(pelvis motion scaled by leg length), removes the walk's net root travel,
+faces +X and seats the lowest sole on z=0. The facing turn stays on an unscaled
+armature node, because Gazebo keeps the root joint's rest orientation for
+actors. Vertices without skin weights inherit their nearest weighted
+neighbour's weights. The bake fails if the keyed skeleton departs from the
+retarget by more than 2 mm or the idle loop does not close.
 Static conversion verifies the exported world-space pose against the vertex
 cache, and reduces source meshes above 250,000 polygons to a 180,000-triangle
 budget. Material names are normalized during import to disambiguate duplicate
@@ -139,53 +176,49 @@ recorded population. Publisher content may change despite retaining its URL.
 
 ## Visual review and validation
 
-Render the three worlds without starting ROS nodes:
+Render a world without starting ROS nodes. Each sampled scenario time yields
+an overview, a human-height view, a close cast view and the robot camera's
+view (its mount pose and 640x480 field of view):
 
 ```bash
 OMNI_KIT_ACCEPT_EULA=YES isaac_venv/bin/python \
   src/ridgeback_leader_follow/sim/preview_realistic.py \
-  --output artifacts/leader-following/realistic-previews
+  --output artifacts/leader-following/realistic-previews \
+  --environments modern_office --scenario crowd --times 4 9
 ```
 
-The renderer closes after writing overview, human-height and cast PNGs and USD
-snapshots. Current checks cover static obstacle clearance across all six
-scenario families in all three layouts, cast assignment, turn geometry,
-Collada texture paths, actor scales and preservation of commanded paths.
+Tests cover static obstacle clearance for every route in every layout,
+modern-office pace and person-to-person separation, cast diversity and
+statures, look-alike assignment, Rocketbox receipt hashes and cache/skin
+consistency, idle selection, Gazebo walk/idle animations and emissive
+fixtures, Collada texture paths and preservation of commanded paths.
 The scene/sensor qualifier also accepts `--scene-profile realistic`,
-`--environments office warehouse courtyard`, `--scenarios` and `--crowd-sizes`
-filters. It does not run recognition. For example:
+`--environments`, `--scenarios` and `--crowd-sizes` filters; it defaults to the
+modern office. It does not run recognition. For example:
 
 ```bash
 ros2 run ridgeback_leader_follow qualify_crowd --scene-profile realistic \
-  --environments courtyard --scenarios crowd --crowd-sizes 8 \
+  --environments modern_office --scenarios crowd --crowd-sizes 8 \
   --backends gz --ros-domain 210
 ```
 
 Offline mesh annotations reconstruct the recorded route and use each person's
-recorded character, stature and gait speed. Realistic recordings require the
-saved animation cache and matching SHA-256; evaluation refuses missing or
-mismatched geometry. `benchmarking.annotations --stationary-base` uses recorded
-TF to remove odometry drift for a surveyed stationary observer. This option is
-not valid for a moving robot. These inputs are used only for scoring.
+recorded character, stature, gait speed and, when baked, idle loop and phase
+offsets. Realistic recordings require the saved walk and idle caches with
+matching SHA-256; evaluation refuses missing or mismatched geometry.
+`benchmarking.annotations --stationary-base` uses recorded TF to remove
+odometry drift for a surveyed stationary observer. This option is not valid
+for a moving robot. These inputs are used only for scoring.
 
-Rendered previews are provided below. Full 20-second scene/sensor checks cover all six scenario families in both
-simulators, distributed across office (alone/crossing), warehouse (both
-look-alikes) and courtyard (stop/crowd with eight bystanders). This is twelve
-cases rather than the complete world/scenario/crowd-size matrix. New recognition
-qualification remains pending.
+Full 20-second playback of the modern office in both simulators is recorded under [archived evidence](#archived-evidence).
 
-![Furnished office lobby with textured floor, reception furniture and varied walking pedestrians](assets/environments/office.png)
-
-![Warehouse aisle with racks, crates, barrels and pedestrians](assets/environments/warehouse.png)
-
-![Courtyard with trees, benches and windowed buildings](assets/environments/courtyard.png)
-
-![Gazebo robot camera showing distinct floor, brick wall, signs and illuminated fixtures](assets/environments/gazebo-office.png)
-
-Gazebo's robot camera uses different lighting and material support from the
-Isaac overview views above; the same layout and cast are used.
-
-![Casual and business-clothed pedestrian character variants](assets/environments/humans.png)
+Rendering quality, playback validation and recognition performance are
+separate claims. The images below are actual simulator renders. They are
+detailed and naturally lit but not photographic: Rocketbox meshes have about
+7,000-10,000 triangles, faces do not animate, hands keep one grip, and clothing
+does not simulate cloth. Walk-to-idle switches are instantaneous; turns are
+rounded paths rather than biomechanical turning steps. Pedestrians do not
+react to the robot or each other. No recognition result exists for this cast.
 
 ## Archived evidence
 

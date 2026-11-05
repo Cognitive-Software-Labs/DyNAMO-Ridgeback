@@ -27,6 +27,20 @@ The cast contains four source characters with repeated clothing/stature
 variants, rather than nine independently modelled identities. Deliberate
 look-alikes share their leader's model, scale and clothing settings.
 
+## Microsoft Rocketbox pedestrians
+
+The `rocketbox/` characters are derived from the
+[Microsoft Rocketbox avatar library](https://github.com/microsoft/Microsoft-Rocketbox),
+Copyright (c) 2020 Microsoft, released under the MIT License; the licence text
+is kept in `rocketbox/LICENSE.md`. Files are fetched from the pinned commit
+recorded in `rocketbox/sources.json` together with source and derived-texture
+SHA-256 hashes. Avatars use the publisher's own clothing textures (colour maps
+resized to 2048 px, normal and hair/lash opacity maps to 1024 px; specular maps
+are unused). Walk and idle motion are the publisher's neutral motion-capture
+clips, retargeted in Blender 4.2.9 by `sim/prepare_rocketbox_human.py`; each
+directory's `conversion.json` records the clips, stature, gait speed, retarget
+checks and output hashes. The MIT licence applies to these derived files.
+
 Rebuild using `sim/fetch_realistic_assets.py` and
 `sim/prepare_realistic_assets.py`; the maintained workflow is documented in
 `docs/leader_following/environments.md`. Large model and animation files are

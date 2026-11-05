@@ -28,7 +28,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from ridgeback_leader_follow.rocketbox_cast import IDLE, ROSTER, WALK  # noqa: E402
 
 FPS = 30
-IDLE_SECONDS, IDLE_BLEND_SECONDS, IDLE_CACHE_FPS = 8, 1, 15
+IDLE_SECONDS, IDLE_BLEND_SECONDS, IDLE_CACHE_FPS = 8, 1, 10
 NAMESPACE = 'http://www.collada.org/2005/11/COLLADASchema'
 
 

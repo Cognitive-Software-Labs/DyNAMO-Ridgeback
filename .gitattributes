@@ -6,3 +6,5 @@ src/ridgeback_leader_follow/sim/assets/**/*.npz filter=lfs diff=lfs merge=lfs -t
 src/ridgeback_leader_follow/sim/assets/**/*.glb filter=lfs diff=lfs merge=lfs -text
 src/ridgeback_leader_follow/sim/assets/**/*.dae filter=lfs diff=lfs merge=lfs -text
 src/ridgeback_leader_follow/sim/assets/**/*.bin filter=lfs diff=lfs merge=lfs -text
+src/ridgeback_leader_follow/sim/assets/realistic/rocketbox/**/*.jpg filter=lfs diff=lfs merge=lfs -text
+src/ridgeback_leader_follow/sim/assets/realistic/rocketbox/**/*.png filter=lfs diff=lfs merge=lfs -text

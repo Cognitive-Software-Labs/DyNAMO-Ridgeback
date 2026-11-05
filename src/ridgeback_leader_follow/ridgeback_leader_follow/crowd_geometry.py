@@ -161,7 +161,10 @@ def motion_frame(data, person, scenario_time):
         phase = (scenario_time + idle_offset(person.name, cycle)) % cycle
         return idle, int(phase * float(idle['fps'])) % len(idle['points'])
     speed = float(data['gait_speed_mps']) if 'gait_speed_mps' in data else .5
-    phase = (person.distance(scenario_time) / speed) % float(data['cycle_seconds'])
+    cycle = float(data['cycle_seconds'])
+    # Profiles with an idle loop also desynchronize gaits, so pairs do not march in step.
+    offset = idle_offset(person.name + ':gait', cycle) if idle is not None else 0.
+    phase = (person.distance(scenario_time) / speed + offset) % cycle
     return data, int(phase * float(data['fps'])) % len(data['points'])
 
 

@@ -19,9 +19,9 @@ import requests
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from ridgeback_leader_follow.rocketbox_cast import COMMIT, IDLE, REPOSITORY, ROSTER, WALK, raw_url  # noqa: E402
 
-# Colour maps keep facial and fabric detail; normal maps are smaller. Specular and
+# Colour maps keep facial and fabric detail; normal and hair/lash opacity maps are smaller. Specular and
 # wrinkle maps are not used by either renderer and are not converted.
-SIZES = {'color': 2048, 'normal': 1024, 'opacity': 2048}
+SIZES = {'color': 2048, 'normal': 1024, 'opacity': 1024}
 
 
 def sha(path):

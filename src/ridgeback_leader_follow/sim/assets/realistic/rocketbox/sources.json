@@ -6,7 +6,7 @@
   "texture_sizes": {
     "color": 2048,
     "normal": 1024,
-    "opacity": 2048
+    "opacity": 1024
   },
   "sources": {
     "LICENSE.md": {
@@ -604,7 +604,7 @@
     },
     "business_female_01/f014_opacity_color.png": {
       "source": "Assets/Avatars/Professions/Business_Female_01/Textures/f014_opacity_color.tga",
-      "sha256": "faeca810e28b66c1c6aafe0c0eb0d1d8b5a64f162cba21ee0327e3a09f945dae"
+      "sha256": "db5db2a2fac505252279e2bc242b7102eac80ab7fcee36b7b73d5db11f3ed36a"
     },
     "business_male_02/m008_body_color.jpg": {
       "source": "Assets/Avatars/Professions/Business_Male_02/Textures/m008_body_color.tga",
@@ -624,7 +624,7 @@
     },
     "business_male_02/m008_opacity_color.png": {
       "source": "Assets/Avatars/Professions/Business_Male_02/Textures/m008_opacity_color.tga",
-      "sha256": "825d1ca769aac8a16ae853d1d0e37be9e4341f469d76fb6ccd9edb68c4ce1081"
+      "sha256": "05221856bd4105ea81dfe62dc3eb56e159d517c5b24db6240d0ec9b85bf33825"
     },
     "business_female_02/f015_body_color.jpg": {
       "source": "Assets/Avatars/Professions/Business_Female_02/Textures/f015_body_color.tga",
@@ -652,7 +652,7 @@
     },
     "business_female_02/f015_opacity_color.png": {
       "source": "Assets/Avatars/Professions/Business_Female_02/Textures/f015_opacity_color.tga",
-      "sha256": "b96ac647b115852ba57ab67ee119028278a309d477dd7a35da9120d6418fed42"
+      "sha256": "c7453851af2cf2dbf26b10361196ab72cf02a8e5908f3e6da3d22af850fa8926"
     },
     "male_adult_12/m007_body_color.jpg": {
       "source": "Assets/Avatars/Adults/Male_Adult_12/Textures/m007_body_color.tga",
@@ -688,7 +688,7 @@
     },
     "female_adult_11/f011_opacity_color.png": {
       "source": "Assets/Avatars/Adults/Female_Adult_11/Textures/f011_opacity_color.tga",
-      "sha256": "8e755cf26db729233a0cfdf13c90d72c7da45c9bd2259cb44e1acc6c60c08951"
+      "sha256": "d5a0f8bc631dbfa60e1a88b3a845cb4388d56bfbb43d6b8d4d1e295806d41796"
     },
     "male_adult_03/m004_body_color.jpg": {
       "source": "Assets/Avatars/Adults/Male_Adult_03/Textures/m004_body_color.tga",
@@ -708,7 +708,7 @@
     },
     "male_adult_03/m004_opacity_color.png": {
       "source": "Assets/Avatars/Adults/Male_Adult_03/Textures/m004_opacity_color.tga",
-      "sha256": "c9c90ab3517f07858aadae0c9fcc87fd1d03cbe98f2c1df54236b88fe3c434c4"
+      "sha256": "2cf7358f3e66270b08ef7c0ead85af7348e0d957f5efaa152f4d5f7d0b365698"
     },
     "business_male_05/m016_body_color.jpg": {
       "source": "Assets/Avatars/Professions/Business_Male_05/Textures/m016_body_color.tga",
@@ -744,7 +744,7 @@
     },
     "female_adult_05/f005_opacity_color.png": {
       "source": "Assets/Avatars/Adults/Female_Adult_05/Textures/f005_opacity_color.tga",
-      "sha256": "861441cb4bfbd899123d039a3bf366b4a22ad674288999b65de2d8bcfe6b3bb4"
+      "sha256": "433d41dec2daa15f043f85f9da9dcb7e0962e737f905aac154f01a91f8396321"
     },
     "male_adult_17/m022_body_color.jpg": {
       "source": "Assets/Avatars/Adults/Male_Adult_17/Textures/m022_body_color.tga",
@@ -796,7 +796,7 @@
     },
     "female_party_02/f022_opacity_color.png": {
       "source": "Assets/Avatars/Adults/Female_Party_02/Textures/f022_opacity_color.tga",
-      "sha256": "a352240cdd94b14fd980bb3f5b75c3ffcd5a6326f1e34268a7f9cc68a54338d8"
+      "sha256": "c2f911685454423c6e3253ef42c22daf50a0428c626df11034db9ecfa2dff7c9"
     },
     "male_adult_08/m014_body_color.jpg": {
       "source": "Assets/Avatars/Adults/Male_Adult_08/Textures/m014_body_color.tga",
@@ -816,7 +816,7 @@
     },
     "male_adult_08/m014_opacity_color.png": {
       "source": "Assets/Avatars/Adults/Male_Adult_08/Textures/m014_opacity_color.tga",
-      "sha256": "076cfc4a3d8f192f0f3f1f5878ad97f903a8bd1d50adcf63577b064271f21bbd"
+      "sha256": "9476e05b3c9d134ae9fa27a58baaa276ec532848aea526651d627fcb602e5818"
     },
     "business_female_03/f016_body_color.jpg": {
       "source": "Assets/Avatars/Professions/Business_Female_03/Textures/f016_body_color.tga",
@@ -836,7 +836,7 @@
     },
     "business_female_03/f016_opacity_color.png": {
       "source": "Assets/Avatars/Professions/Business_Female_03/Textures/f016_opacity_color.tga",
-      "sha256": "f8bf88fcc2939c6cc4cfe79591685d4b6555f42341c1b5751a1a7a96abdffd1a"
+      "sha256": "ed53f6f19ab991b8b45393ce1fcf1c357a8d229a0e2c9475767bb8702d7e6d78"
     },
     "male_adult_14/m012_body_color.jpg": {
       "source": "Assets/Avatars/Adults/Male_Adult_14/Textures/m012_body_color.tga",

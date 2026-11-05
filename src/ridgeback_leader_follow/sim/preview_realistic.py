@@ -11,7 +11,7 @@ import sys
 
 parser=argparse.ArgumentParser();parser.add_argument('--output',type=Path,required=True)
 parser.add_argument('--environments',nargs='+',default=['modern_office'])
-parser.add_argument('--scenario',default='crowd');parser.add_argument('--crowd-size',type=int,default=8)
+parser.add_argument('--scenario',default='crowd',help="a scenario family, or 'lineup' for the whole cast standing in two rows");parser.add_argument('--crowd-size',type=int,default=8)
 parser.add_argument('--times',nargs='+',type=float,default=[2.])
 args=parser.parse_args();args.output.mkdir(parents=True,exist_ok=True)
 sys.argv=[sys.argv[0]]
@@ -29,13 +29,25 @@ try:
     from ament_index_python.packages import get_package_share_directory
     from ridgeback_leader_follow.realistic_scene import create_scene,load_scenario
     from ridgeback_leader_follow.crowd_geometry import animate_isaac_person
+    def lineup():
+        """Every cast member once, idling in two rows facing the robot."""
+        from ridgeback_leader_follow.crowd_scenarios import CrowdScenario,PersonPath
+        from ridgeback_leader_follow.realistic_scene import CAST,route
+        people=[]
+        for i in range(len(CAST)):
+            x,y=(5.2 if i%2 else 6.4),(i//2-3)*.95+(.45 if i%2 else 0.)
+            people.append(PersonPath('lf_leader' if i==0 else f'lf_crowd_{i}','leader' if i==0 else 'bystander',(.5,.5,.5),route(((x+.3,y),(x,y)),pace=.5)))
+        return CrowdScenario('lineup',20.,tuple(people))
     for environment in args.environments:
         omni.usd.get_context().new_stage();stage=omni.usd.get_context().get_stage()
-        scenario=load_scenario(args.scenario,args.crowd_size,environment);people=create_scene(stage,scenario,environment)
+        scenario=lineup() if args.scenario=='lineup' else load_scenario(args.scenario,args.crowd_size,environment)
+        people=create_scene(stage,scenario,environment)
         adapter=Path(get_package_share_directory('ridgeback_autonomy_isaac'))/'sim/isaac'
         robot=stage.DefinePrim('/ridgeback','Xform');robot.GetReferences().AddReference((adapter/'usd/robots/ridgeback_r100/ridgeback_r100.usda').as_uri())
         UsdGeom.XformCommonAPI(robot).SetTranslate(Gf.Vec3d(0,0,.06))
-        if environment=='modern_office':
+        if args.scenario=='lineup':
+            views=[('cast',(.6,0.,1.45),(6.,0.,1.),15.,(1600,900))]
+        elif environment=='modern_office':
             views=[('overview',(-2.8,-3.6,2.55),(9.,.5,.9),16.,(1280,800)),('human_view',(1.2,-2.4,1.62),(10.,.8,1.25),18.,(1280,800)),
                    ('cast',(9.5,-2.2,1.6),(5.,.6,1.05),24.,(1280,800)),('robot_camera',ROBOT_EYE,(10.,0.,ROBOT_EYE[2]),ROBOT_FOCAL,(1280,960))]
         else:

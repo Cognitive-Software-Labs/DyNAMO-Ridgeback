@@ -18,9 +18,9 @@ MODELS = ('modern_arm_chair_01','sofa_03','modern_coffee_table_01','potted_plant
           'mid_century_lounge_chair','coffee_table_round_01','modern_ceiling_lamp_01','potted_plant_04',
           'wooden_display_shelves_01','side_table_01','modern_wooden_cabinet')
 SURFACES = ('wood_floor','concrete_floor_02','brick_pavement_02','brick_wall_001','grass_ground','wood_table_001',
-            'laminate_floor_02','painted_plaster_wall','white_oak_veneer','marble_01','denim_fabric_04')
+            'laminate_floor_02','white_oak_veneer','marble_01','denim_fabric_04')
 # Large modern-office surfaces fill much of the camera view; fetch them at 2K.
-SURFACE_RESOLUTION = {'laminate_floor_02':'2k','painted_plaster_wall':'2k','white_oak_veneer':'2k'}
+SURFACE_RESOLUTION = {'laminate_floor_02':'2k','white_oak_veneer':'2k'}
 HUMANS = {
     'sam':'relaxed-walk-sam-3d-person-animated-732f1206',
     'jordan':'relaxed-walk-jordan-3d-person-animated-7ab9479d',

@@ -109,9 +109,10 @@ unthrottled by the F1 runner; GUI mode is paced at no more than real time.
 
 ## Richer environments
 
-The optional `realistic` profile adds office, warehouse and courtyard worlds,
-plus four source human characters and clothing/stature variants. The worlds
-include practical lighting, wayfinding and detailed props.
+The optional `realistic` profile adds a modern open-plan office (its default
+world) and earlier office, warehouse and courtyard worlds, with fourteen
+distinct Microsoft Rocketbox pedestrians that walk at a natural pace and stand
+with an idle animation. Visual changes do not alter the baseline or F3 scenes.
 Commands, asset setup, preview images and validation limits live in
 the [environment reference](environments.md).
 

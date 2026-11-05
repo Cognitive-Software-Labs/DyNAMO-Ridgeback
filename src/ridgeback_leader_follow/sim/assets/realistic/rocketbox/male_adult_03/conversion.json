@@ -13,7 +13,7 @@
   "height_m": 1.8090392351150513,
   "idle_seconds": 8,
   "idle_blend_seconds": 1,
-  "idle_cache_fps": 15,
+  "idle_cache_fps": 10,
   "vertices": 3749,
   "triangles": 7200,
   "max_rekey_deviation_m": 1.0248272933989406e-06,
@@ -22,9 +22,9 @@
   "idle_loop_gap_m": 0.0,
   "sha256": {
     "walk.npz": "e75d1678177940f5a9ca8b4fe1261748b511b00b1143871066fecd3c4c7fe96e",
-    "idle.npz": "0888e8f4bc233682f7278671b49fda6da26b68bccd996c5be18cec446939b89b",
-    "walk.dae": "feeda9aca8e7164cd372ddb5e3947b133a48fb6dda437a152d654c331e99d2ef",
-    "idle.dae": "a0a70fee1927ca2be1d05ae75b57587537b47f709e7432fe484d13eb395520b1",
+    "idle.npz": "1e7961bb9d0730d50851ffaf08c4d22a3f74052ac886c0796665dbe8939abd8b",
+    "walk.dae": "45ede41f36bd496f5a6afbad6bbeeaac57d1a9d2fd0a4c2d79a62a07009a6afe",
+    "idle.dae": "ca1c5e3cf0e0718dbe6e6434c8a2e92f430f422e28ee85d3eb5f4d1ba74d3ae6",
     "materials.json": "c889c1633184c39bb7d0ecf6942ba640480915a99da53c2c6f0488765a7e745b"
   }
 }
