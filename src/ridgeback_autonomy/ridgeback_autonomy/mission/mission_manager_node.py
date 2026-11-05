@@ -1654,7 +1654,8 @@ class MissionManagerNode(Node):
                 self._fail_planning(plan.failure_reason, f'no feasible parking pose: {counts}')
                 return
             # The geometric selection is provisional, not a path-feasible selection.
-            plan.selected.status = 'valid'
+            if plan.selected is not None:
+                plan.selected.status = 'valid'
             plan.selected = None
             plan.ok = False
             if target.facing_yaw_rad is not None:
@@ -2640,7 +2641,7 @@ class MissionManagerNode(Node):
 
     def _exclude_failed_directions(self, plan):
         """Reject valid candidates near a direction whose parking attempt failed."""
-        if not self._failed_bearings:
+        if not self._failed_bearings and not self._failed_sides:
             return
         for c in plan.candidates:
             bearing = math.atan2(c.task_y - plan.target.y, c.task_x - plan.target.x)
@@ -2656,6 +2657,9 @@ class MissionManagerNode(Node):
                 for c in valid:
                     if label(c) in self._failed_sides:
                         c.status, c.reason = 'rejected', 'failed_attempt_side'
+        # The planner's provisional pick may be among them; it must not be revived below.
+        if plan.selected is not None and plan.selected.status == 'rejected':
+            plan.selected = None
         if not any(c.status in ('valid', 'selected') for c in plan.candidates):
             plan.ok, plan.selected = False, None
             plan.failure_reason = plan.failure_reason or 'no_valid_candidate'

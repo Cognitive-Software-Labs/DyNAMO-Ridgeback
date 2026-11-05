@@ -588,3 +588,16 @@ def test_a_second_failure_on_the_same_side_excludes_it(manager_factory, monkeypa
     m.parking_plan.selected.preference_label = 'g1_left'
     m._parking_navigation_failed('lidar_clearance: lidar_obstacle_on_route', stop_first=True)
     assert m._failed_sides == {'g1_left'}
+
+
+def test_an_excluded_provisional_pick_is_not_revived(manager_factory, monkeypatch):
+    # Live run on fd6d966: the planner's own pick lay on the failed side, was rejected,
+    # then reset to 'valid' as a provisional selection, and attempt 3 parked there again.
+    m, _ = feasible(manager_factory, monkeypatch, attempts=3)
+    facing_left_side(m)
+    plan = m.parking_plan
+    plan.selected.status = 'selected'
+    m._failed_sides = {'g1_left'}
+    m._exclude_failed_directions(plan)
+    assert plan.selected is None
+    assert all(c.status == 'rejected' for c in plan.candidates if c.preference_label == 'g1_left')
