@@ -37,7 +37,8 @@ def test_registry_selects_each_simulators_adapter_and_scene_control_namespace() 
     assert (isaac.adapter_package, isaac.scene_control_service_namespace) == (
         'ridgeback_autonomy_isaac', '/isaac_sim')
     assert set(gz.settings) == {'gz_gui', 'headless_rendering'}
-    assert set(isaac.settings) == {'headless', 'rtf', 'sim_mode', 'depth_fidelity'}
+    assert set(isaac.settings) == {
+        'headless', 'rtf', 'sim_mode', 'renderer', 'anti_aliasing', 'depth_fidelity'}
     assert BACKEND_SETTING_NAMES == set(gz.settings) | set(isaac.settings)
     assert not set(gz.settings) & set(isaac.settings)
 
@@ -62,10 +63,12 @@ def test_settings_are_completed_with_defaults_and_normalized() -> None:
     isaac = BENCHMARK_BACKENDS['isaac']
 
     assert normalize_backend_settings(isaac, {}) == {
-        'headless': 'true', 'rtf': '1.0', 'sim_mode': 'realtime', 'depth_fidelity': 'ideal'}
+        'headless': 'true', 'rtf': '1.0', 'sim_mode': 'realtime',
+        'renderer': 'RealTimePathTracing', 'anti_aliasing': '3', 'depth_fidelity': 'ideal'}
     assert normalize_backend_settings(
         isaac, {'headless': 'False', 'rtf': '0', 'depth_fidelity': 'd455'}) == {
-        'headless': 'false', 'rtf': '0.0', 'sim_mode': 'realtime', 'depth_fidelity': 'd455'}
+        'headless': 'false', 'rtf': '0.0', 'sim_mode': 'realtime',
+        'renderer': 'RealTimePathTracing', 'anti_aliasing': '3', 'depth_fidelity': 'd455'}
     assert normalize_backend_settings(
         BENCHMARK_BACKENDS['gz'], {'headless_rendering': 'TRUE'}) == {
         'gz_gui': 'true', 'headless_rendering': 'true'}
@@ -148,7 +151,8 @@ def test_settings_round_trip_through_one_stable_parameter_value() -> None:
     encoded = encode_backend_settings(settings)
 
     assert encoded == (
-        '{"depth_fidelity":"ideal","headless":"true","rtf":"2.0","sim_mode":"realtime"}')
+        '{"anti_aliasing":"3","depth_fidelity":"ideal","headless":"true",'
+        '"renderer":"RealTimePathTracing","rtf":"2.0","sim_mode":"realtime"}')
     assert decode_backend_settings(encoded) == settings
     assert decode_backend_settings('') == {}
     with pytest.raises(ValueError):

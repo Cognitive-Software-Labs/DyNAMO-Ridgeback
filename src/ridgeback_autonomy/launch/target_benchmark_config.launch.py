@@ -384,6 +384,12 @@ def generate_launch_description():
             'sim_mode', default_value=isaac['sim_mode'].default,
             description=isaac['sim_mode'].description),
         DeclareLaunchArgument(
+            'renderer', default_value=isaac['renderer'].default,
+            description=isaac['renderer'].description),
+        DeclareLaunchArgument(
+            'anti_aliasing', default_value=isaac['anti_aliasing'].default,
+            description=isaac['anti_aliasing'].description),
+        DeclareLaunchArgument(
             'depth_fidelity', default_value=isaac['depth_fidelity'].default,
             description=isaac['depth_fidelity'].description),
         DeclareLaunchArgument('namespace', default_value='r100_0001'),

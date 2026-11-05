@@ -162,7 +162,7 @@ _DISPATCHER_ARGUMENT_NAMES = {
     },
     'isaac': {
         'setup_path', 'world', 'namespace', 'rtf', 'headless', 'livestream',
-        'odom_noise', 'noise_seed', 'camera', 'sim_mode', 'sensor_hz',
+        'odom_noise', 'noise_seed', 'camera', 'sim_mode', 'renderer', 'anti_aliasing', 'sensor_hz',
         'camera_profile', 'depth_fidelity',
     },
     'hardware': {'setup_path', 'namespace', 'start_platform'},
@@ -207,6 +207,7 @@ def test_simulation_dispatcher_forwards_exact_adapter_arguments(
          {'gz_gui': 'true', 'headless_rendering': 'false'}),
         ('isaac', 'g1_distance_calibration', 'ridgeback_autonomy_isaac',
          {'headless': 'true', 'rtf': '1.0', 'sim_mode': 'realtime',
+          'renderer': 'RealTimePathTracing', 'anti_aliasing': '3',
           'depth_fidelity': 'ideal'}),
     ],
 )
@@ -308,7 +309,8 @@ def _runner_parameters(context, nodes) -> dict:
          {'gz_gui': 'true', 'headless_rendering': 'false'}),
         ('isaac', 'ridgeback_autonomy_isaac', '/isaac_sim',
          {'depth_fidelity': 'ideal', 'headless': 'true', 'rtf': '1.0',
-          'sim_mode': 'realtime'}),
+          'sim_mode': 'realtime', 'renderer': 'RealTimePathTracing',
+          'anti_aliasing': '3'}),
     ],
 )
 def test_benchmark_runner_uses_the_selected_catalog_services_and_public_world(

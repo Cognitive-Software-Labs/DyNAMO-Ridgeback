@@ -127,6 +127,8 @@ CONFIG_LAUNCH_ARGUMENT_NAMES = frozenset({
     'headless',
     'rtf',
     'sim_mode',
+    'renderer',
+    'anti_aliasing',
     'depth_fidelity',
 })
 
@@ -138,6 +140,8 @@ ENV_LAYER_CONFIG_KEYS = frozenset({
     'headless',
     'rtf',
     'sim_mode',
+    'renderer',
+    'anti_aliasing',
     'depth_fidelity',
     # The detector lives in the persistent layer, so its selection and settings
     # are properties of a whole sweep. A per-config value would silently apply

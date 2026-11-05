@@ -1275,6 +1275,8 @@ Arguments:
 | `headless` | `true` | Isaac only: run Isaac Sim without its viewport window |
 | `rtf` | `1.0` | Isaac only: real-time factor; `0` is unthrottled |
 | `sim_mode` | `realtime` | Isaac only: `realtime` or fixed-step `deterministic` stepping |
+| `renderer` | `RealTimePathTracing` | Isaac only: RTX render mode of the camera images: `RealTimePathTracing`, `RaytracedLighting`, or `PathTracing` |
+| `anti_aliasing` | `3` | Isaac only: `0` off, `1` TAA, `2` FXAA, `3` DLSS, `4` RTXAA; temporal modes depend on frame history |
 | `depth_fidelity` | `ideal` | Isaac only: `ideal` renderer depth or D455-like `d455` stereo depth; see [camera depth](docs/isaac/camera-depth.md) |
 | `exploration_rviz` | `true` | Launch the persistent benchmark RViz window |
 | `estimate_viz` | `true` | Publish estimator rings and the benchmark distance HUD |
@@ -1484,8 +1486,9 @@ knobs are rejected. `backend`, `world`, `setup_path`, `namespace`, `use_sim_time
 `target_labels`, `detection_threshold`, `detector_fps`, and `detector_debug`
 may be set only in `defaults` because the environment cannot change mid-sweep.
 So may the backend-only settings
-(`gz_gui` and `headless_rendering` for Gazebo; `headless`, `rtf`, `sim_mode`, and
-`depth_fidelity` for Isaac), and a setting of the other backend is refused.
+(`gz_gui` and `headless_rendering` for Gazebo; `headless`, `rtf`, `sim_mode`,
+`renderer`, `anti_aliasing`, and `depth_fidelity` for Isaac), and a setting of the
+other backend is refused.
 `backend: hardware` is refused outright.
 The dry run prints the persistent environment command. Resume identity includes
 the resolved detector settings; a different checkpoint starts a different sweep.

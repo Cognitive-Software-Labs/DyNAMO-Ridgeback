@@ -80,6 +80,16 @@ def parse_args():
                          "contention-immune byte-identical sensor data — "
                          "reproducible A/B benchmarks (rtf:=0 to run flat out, "
                          "rtf:=1 headless:=false to watch).")
+    ap.add_argument("--renderer", default="RealTimePathTracing",
+                    choices=["RealTimePathTracing", "RaytracedLighting",
+                             "PathTracing"],
+                    help="RTX render mode. RealTimePathTracing (Isaac's default) "
+                         "samples stochastically and reuses earlier frames, so "
+                         "identical scenes render differently between sessions.")
+    ap.add_argument("--anti-aliasing", type=int, default=3,
+                    choices=[0, 1, 2, 3, 4],
+                    help="0 off, 1 TAA, 2 FXAA, 3 DLSS (Isaac's default), 4 RTXAA. "
+                         "TAA and DLSS jitter and accumulate across frames.")
     ap.add_argument("--sensor-hz", type=float, default=40.0,
                     help="lidar sweep rate; in deterministic mode this is the "
                          "fixed sim-dt (1/sensor_hz) advanced per frame, so "
@@ -138,7 +148,12 @@ def main():
     headless = args.headless == "true"
 
     from isaacsim import SimulationApp
-    app_cfg = {"headless": headless}
+    app_cfg = {"headless": headless, "renderer": args.renderer,
+               "anti_aliasing": args.anti_aliasing}
+    if args.renderer == "PathTracing":
+        # Fixed samples per frame, no AI denoiser: converged rather than
+        # reconstructed pixels.
+        app_cfg["denoiser"] = False
     if not headless:
         # Windowed on a software-X display (e.g. VNC): a vsync-locked
         # present loop can stall this manually-driven update loop (the
