@@ -282,6 +282,10 @@ def key_values(values):
         if '=' not in item:
             raise ValueError(f'expected NAME=VALUE: {item}')
         key, value = item.split('=', 1)
+        if value.lower() in ('true', 'false'):
+            # The D4 matrix row requires final_configuration to be a real boolean.
+            output[key] = value.lower() == 'true'
+            continue
         try:
             output[key] = float(value)
         except ValueError:

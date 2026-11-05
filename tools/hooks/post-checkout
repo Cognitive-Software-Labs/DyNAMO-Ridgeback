@@ -1,0 +1,24 @@
+#!/bin/bash
+# graphify-hook-start
+# The knowledge graph is committed with the code: the pre-commit hook rebuilds
+# and stages it whenever code changes. A checked-out revision therefore already
+# carries its own graph, and rebuilding it here only left graphify-out/ modified
+# (with an older revision's helper it could also fail midway), which then
+# blocked merges. Rebuild only when the checked-out revision has no graph.
+# Installed by: tools/install_hooks
+
+if [ "$3" != "1" ]; then
+    exit 0
+fi
+
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+if git cat-file -e HEAD:graphify-out/graph.json 2>/dev/null; then
+    exit 0
+fi
+if [ ! -x "$REPO_ROOT/tools/rebuild_graphify" ]; then
+    exit 0
+fi
+
+echo "[graphify hook] No committed graph at this revision - rebuilding..."
+"$REPO_ROOT/tools/rebuild_graphify" || echo "[graphify hook] Rebuild failed (exit $?); graph left as before" >&2
+# graphify-hook-end

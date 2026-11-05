@@ -4,16 +4,27 @@ This page routes a question to a profile, a profile to a way of starting it, and
 names the constraint that decides when more than one way exists. It routes; it
 does not explain. For what the benchmark is, what it compares, and what it may
 not claim, read [the overview](overview.md) first. The root README owns the
-commands.
+live commands; [launch arguments](launch_arguments.md), [sweeps](sweeps.md)
+and [profiles](profiles.md) own the arguments, the sweep format and the replay
+workflows.
 
-## Execution-environment prerequisite
+## Qualified execution environments
 
-Before parameter tuning or using new benchmark comparisons as reportable results,
-complete the [execution-environment qualification gate](BACKLOG.md#benchmark-execution-environment-qualification).
-Qualification/diagnostic runs establish that evidence; their outputs are not yet
-qualified tuning results. Replay tuning also requires qualified capture provenance.
-Use only the recorded environment, workload, camera profile, and display/capture
-conditions covered by qualification. The CLI does not enforce this workflow gate.
+Gazebo rendering through `tools/gpu-run`, with the Gazebo GUI and RViz open,
+is qualified on the physical seat (`:0`) and in an xrdp session: matched light (box, stereo) and heavy
+(silhouette, monocular) runs gave identical error and scored counts on both,
+and observation coverage varied as much between replications on one display
+as between displays. Results from either display may be compared, tuned on and
+reported, and replay tuning may use captures from either. The evidence predates
+the current camera model and covers the example scenes; the owner accepted it
+as sufficient.
+
+Not qualified: Isaac, headless EGL, `1280x720`, video recording, and runs
+without the Gazebo GUI or RViz. Qualify those before quoting them.
+Confirm the GL path with `tools/gpu-run glxinfo -B` from the run's own
+session. Software rendering is a failure, not an environment; see
+[troubleshooting](../troubleshooting.md#camera-rate-collapses-under-software-rendering).
+The CLI does not enforce any of this.
 
 ## Which question, which profile
 
@@ -40,7 +51,7 @@ individual artifact narrows the offline set further — see
 | configurator **Start** | the three offline | nothing special | yes — re-attaches from disk |
 | `target_replay_benchmark <job>` | the three offline | nothing special | it is your terminal |
 | `target_offline_replay_benchmark <dataset> <sweep>` | `measurement` only | nothing special | it is your terminal |
-| `target_benchmark_sweep <yaml>` | `live-system` | GPU-backed X session, hours | terminal only |
+| [`target_benchmark_sweep <yaml>`](sweeps.md) | `live-system` | GPU-backed X session, hours | terminal only |
 
 Plus `target_distance_benchmark.launch.py` for a single live run — and for
 *every* capture. Both replay formats are written by a live benchmark run, not by
@@ -96,10 +107,14 @@ Use `target_replay_benchmark` when the job came from the configurator, when the
 run should be reproducible from a single committed file, or when an interrupted
 run must not leave a directory that looks like a result. Use
 `target_offline_replay_benchmark` for a quick sweep over a dataset you already
-have — it is the form the README's legacy smoke workflow uses.
+have — it is the form the [legacy smoke workflow](profiles.md#legacy-smoke-workflow) uses.
 
 ## After the run
 
 [semantics](semantics.md) defines what a scored row is and why an estimator
 missed; [outputs](outputs.md) describes what landed on disk.
 [The overview](overview.md) maps the rest.
+
+## Archived evidence
+
+- [Remote versus physical-seat validation](../../archive/engineering/2026-09-07-seat-validation.md)

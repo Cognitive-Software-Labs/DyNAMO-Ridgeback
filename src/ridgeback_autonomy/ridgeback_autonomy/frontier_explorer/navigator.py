@@ -75,3 +75,9 @@ def get_frontier_clusters(robot_map):
                         queue.append(n)
         clusters.append(cluster)
     return clusters
+
+
+def facing_quaternion(start, target):
+    """Yaw-only quaternion (z, w) that points from start towards target."""
+    yaw = np.arctan2(target[1] - start[1], target[0] - start[0])
+    return float(np.sin(yaw / 2.0)), float(np.cos(yaw / 2.0))

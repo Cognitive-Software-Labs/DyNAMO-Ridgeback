@@ -60,6 +60,26 @@ for the physical unit. The `r100_0160` unit's factory calibration lies within
 about 1 % in focal length and a few pixels in principal point of both profiles.
 The profiles are therefore kept as they are; hardware runs read the live `K`.
 
+![The 1280x720 profile keeps the sensor's full width; the 640x480 profile keeps its full height and trims the sides.](assets/d455-profile-crops.svg)
+
+Resolution alone does not set the field of view; the aspect ratio does. A 4:3
+grid cut from the 16:10 sensor at full height keeps only the central 1067 of
+1280 columns, so `640x480` sees 2·atan(533/640) = 79.6 degrees horizontally,
+and scaling that crop by 0.6 gives `fx = 384`. A plain downscale of the whole
+sensor would instead give a 640 x 400 image with `fx = 320`; the factory
+calibration rules that out. `640x480` is therefore narrower than `1280x720`
+horizontally (frame edge at ±39.8 versus ±45 degrees) but 5.3 degrees taller,
+so pixel geometry such as which targets touch the image edge or lose their
+feet is profile-specific. Benchmark scene certifications use `640x480`, the
+profile the Thor perception host runs.
+
+Both simulators render pixel centres, so pixel index `i` sees the ray through
+image coordinate `i + 0.5` while `CameraInfo` publishes `cx = W / 2`. In the
+integer-centre convention that `deproject_pixel` uses, the simulated principal
+point therefore sits half a pixel from the published one: about 0.075 degrees
+of bearing at `640x480`, negligible for ranging. Hardware runs use the
+driver's factory calibration instead.
+
 The estimators read only `K` from `CameraInfo` (`intrinsics_from_camera_info`).
 They ignore the distortion coefficients `D` and treat the unrectified D455
 colour image as an ideal pinhole. On `r100_0160` this costs a fraction of a
@@ -72,7 +92,7 @@ and the [librealsense per-stream intrinsics API](https://github.com/realsenseai/
 | Contract | Gazebo | Isaac Sim 6 | Physical D455 |
 |---|---|---|---|
 | Producer | Clearpath Gazebo `rgbd_camera` plus ROS-Gazebo bridges | generated USD colour camera plus Isaac ROS 2 helpers; `d455` mode adds a left-depth render and custom matched publisher | `dynamo-camera.service`: the apt `realsense2_camera` driver, colour and aligned depth only |
-| Profile | shared `640x480` default or `1280x720` | shared `640x480` default or `1280x720` | chosen at install (`camera_service apply --profile`), checked by `camera_contract_check` |
+| Profile | shared `640x480` default or `1280x720` | shared `640x480` default or `1280x720` | `640x480` only, installed by `camera_service apply --profile 640x480` and checked by `camera_contract_check`; 1280x720 is unsupported on the robot |
 | Authored rate | 30 Hz | 30 Hz | verify live rate |
 | Intrinsics | selected nominal profile, published as `CameraInfo` | selected nominal profile, published as `CameraInfo` | factory calibration in live `CameraInfo` |
 | Clip/range model | 0.3-100 m render clip | 0.1-100 m render clip; `d455` additionally rejects below 0.32 m at VGA or 0.52 m at HD | physical stereo validity; no application hard cutoff |
@@ -202,10 +222,10 @@ contains a Gazebo-, Isaac-, or RealSense-specific projection constant.
   optional gate.
 - Physical camera-to-LiDAR extrinsic and clock validation remains a deployment
   gate for polar profiling.
-- The committed benchmark scenarios carry visibility certifications generated
-  against older camera and LiDAR geometry. They remain useful fixed A/B scenes,
-  but their certified fractions must be regenerated before being quoted for the
-  current measured mounts.
+- Benchmark scene certifications are generated from this geometry by
+  [`scene_audit`](../target_distance_benchmarking/semantics.md#scene-certification);
+  a rendered comparison and the benchmark reruns remain in the
+  [benchmarking backlog](../target_distance_benchmarking/BACKLOG.md#camera-geometry-benchmark-recertification).
 
 ## Source map
 

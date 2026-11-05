@@ -27,7 +27,6 @@ session.
 | A1 | Alignment overlay: upright board/box at ~1.5 m centre, ~3 m centre, ~2 m and ~0.6 m to the robot's left, then right | Board beams land on the board in every overlay; per placement, median aligned-depth residual of board beams within ±0.03 m; best sweep yaw within ±0.5°; no consistent sideways or vertical offset between placements | 25–35 min |
 | A2 | Only if A1 fails: frame conventions, live intrinsics, TF ownership, measured offsets; correct, then repeat at a **new** placement | Same as A1 at the new placement; previous config kept for rollback | 20–40 min |
 | B1 | Off-centre person at VGA: taped marks ~2 m ahead, ~0.6 m left and right; one mark ~1.5 m ahead, ~0.4 m left | Detections in ≥ 90 % of still frames; lateral sign correct; lateral within ±0.15 m of tape; distance within 10 % of tape for both estimators; empty-scene segment has no detections | 20–30 min |
-| B2 | HD smoke: switch profile, contract check, repeat B1's ~2 m centre and one off-centre mark | Contract check passes at 1280x720; same B1 limits; switch back to 640x480 and the contract check passes again | 30–45 min |
 | B3 | Estimator modes: box/silhouette × stereo/monocular at the ~2 m centre mark, plus empty scene | Finite plausible results in every valid case; correct status when invalid; monocular cases show real GPU inference; misses and estimator failures reported separately | 20–30 min |
 | B4 | Thor resources during B1–B3 | Recorded only: power, temperature, per-stage latency; no limit is declared here | parallel |
 
@@ -48,13 +47,7 @@ tools/intel_thor/record_localization_run mark --output <run>/ <mark>
 tools/intel_thor/record_localization_run summarize --output <run>/
 ```
 
-B2's switch restarts `clearpath-robot`, which briefly drops motor power and
-teleop; the operator runs it with the e-stop in reach, then switches back:
-
-```bash
-sudo tools/intel_thor/camera_service apply --profile 1280x720
-sudo tools/intel_thor/camera_service apply --profile 640x480
-```
+The session runs at 640x480 only. 1280x720 is not supported on the robot: it is not tested or developed further, and anyone who needs it must develop and qualify it first ([deferred gate](../BACKLOG.md#deferred-hardware-gates)).
 
 ## Results
 

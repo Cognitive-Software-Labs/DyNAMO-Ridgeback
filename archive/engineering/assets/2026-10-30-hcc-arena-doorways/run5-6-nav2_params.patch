@@ -1,0 +1,74 @@
+--- a/src/ridgeback_autonomy/config/nav2_params.yaml
++++ b/src/ridgeback_autonomy/config/nav2_params.yaml
+@@ -96,7 +96,8 @@
+         cost_weight: 3.0
+         threshold_to_consider: 0.5
+       PreferForwardCritic:
+-        enabled: true
++        # Off: the Smac path already says when to reverse (PathAngleCritic mode 2).
++        enabled: false
+         cost_power: 1
+         cost_weight: 5.0
+         threshold_to_consider: 0.5
+@@ -117,7 +118,8 @@
+         trajectory_point_step: 4
+         threshold_to_consider: 0.5
+         offset_from_furthest: 20
+-        use_path_orientations: false
++        # Smac Lattice stamps feasible headings on the path; follow them.
++        use_path_orientations: true
+       PathFollowCritic:
+         enabled: true
+         cost_power: 1
+@@ -131,15 +133,11 @@
+         offset_from_furthest: 4
+         threshold_to_consider: 0.5
+         max_angle_to_furthest: 1.0
+-        # mode 1 = NO_DIRECTIONAL_PREFERENCE: heading-agnostic, lets the omni
+-        # base reverse out of dead-ends instead of forcing a 180 turn.
+-        # NOT mode 2 (CONSIDER_FEASIBLE_PATH_ORIENTATIONS): mode 2 needs a
+-        # feasible planner (Smac) that stamps orientations on path poses; the
+-        # NavFn planner used here leaves identity orientations, so mode 2
+-        # penalized any heading away from world yaw=0 — an arbitrary bias.
+-        # A/B on warehouse (2026-07-09): motion quality equal to mode 2
+-        # (moving fraction 0.735 vs 0.71), early coverage slightly faster.
+-        mode: 1
++        # mode 2 = CONSIDER_FEASIBLE_PATH_ORIENTATIONS: track the headings the
++        # Smac Lattice planner stamps on each pose, so the base arrives at a
++        # doorway already turned to fit. Mode 1 (heading-agnostic) suited the
++        # former NavFn planner, whose poses carry no heading.
++        mode: 2
+ 
+ local_costmap:
+   local_costmap:
+@@ -264,15 +262,22 @@
+     enable_stamped_cmd_vel: true
+     planner_plugins: ["GridBased"]
+     GridBased:
+-      plugin: "nav2_navfn_planner::NavfnPlanner"
+-      # Frontier centroids often sit flush against walls, inside the inscribed-
+-      # lethal band of the 0.75 m inflation. With tolerance below that band's
+-      # width NavFn finds no valid endpoint, the goal aborts, and explore_lite
+-      # blacklists the frontier — runs quit with half the map unexplored.
+-      # 1.5 lets the planner stop at the nearest reachable cell instead.
+-      tolerance: 1.5
+-      use_astar: false
++      # State-lattice search over position and heading with full-footprint
++      # collision checks, so narrow doorways get a heading that fits instead of
++      # the inscribed-circle path NavFn produced. The omni primitives must match
++      # the 0.05 m costmap resolution.
++      plugin: "nav2_smac_planner::SmacPlannerLattice"
++      lattice_filepath: "$(find-pkg-share nav2_smac_planner)/sample_primitives/5cm_resolution/0.5m_turning_radius/omni/output.json"
++      # Frontier goals can sit in occupied cells; a non-zero tolerance returns
++      # the nearest reachable pose instead of throwing GoalOccupied.
++      tolerance: 0.5
+       allow_unknown: true
++      max_planning_time: 5.0
++      smooth_path: true
++      # The omni base backs out of a doorway as cheaply as it drives in; a
++      # forward-only lattice would demand an in-place turn the doorway lacks.
++      allow_reverse_expansion: true
++      reverse_penalty: 1.0
+ 
+ smoother_server:
+   ros__parameters:

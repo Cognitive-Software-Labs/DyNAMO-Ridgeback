@@ -7,7 +7,7 @@ remains open.
 
 Implemented behavior and commands are owned by the
 [bridge reference](../target_distance_benchmarking/hardware_bag_validation.md)
-and [README](../../README.md#saved-hardware-bag-diagnostic).
+and [README](../target_distance_benchmarking/hardware_bag_validation.md#running-the-diagnostic).
 
 The dated run, provenance limitations, unfavorable results and recording-usability
 decision are preserved in the Archived evidence section below. Remaining target

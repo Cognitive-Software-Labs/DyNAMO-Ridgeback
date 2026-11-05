@@ -186,7 +186,7 @@ def test_catalog_g1_spawns_and_reads_back_with_the_robot_in_one_update(
     assert (robot['position']['x'], robot['position']['y']) == (1.5, -0.5)
     assert yaw_of(robot) == pytest.approx(0.3)
     assert (pose['position']['x'], pose['position']['y'], pose['position']['z']) == (
-        3.0, -1.0, 0.0)
+        3.0, -1.0, g1.spawn_z_m)
     assert yaw_of(pose) == pytest.approx(2.5)
 
 

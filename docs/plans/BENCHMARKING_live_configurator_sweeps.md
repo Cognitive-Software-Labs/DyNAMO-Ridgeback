@@ -3,9 +3,7 @@
 Status: **cleanup ownership done (2026-10-14); live start, conflicts and
 supervision remain.** The
 [benchmarking backlog](../target_distance_benchmarking/BACKLOG.md#live-sweeps-from-the-configurator)
-owns this feature and its priority. Environment qualification takes priority;
-it can run through the existing terminal workflow without waiting for this UI.
-This plan covers the remaining live-run implementation, not the completed
+owns this feature and its priority. This plan covers the remaining live-run implementation, not the completed
 [offline run infrastructure](../target_distance_benchmarking/configurator.md).
 
 ## Cleanup ownership (done)
@@ -37,7 +35,7 @@ job/sweep parser as the CLI rather than recreating validation in browser code.
 Before Start, show the renderer for the environment the child will actually
 inherit, along with the recorded qualification status and covered conditions.
 A GPU renderer alone does not establish
-[environment qualification](../target_distance_benchmarking/BACKLOG.md#benchmark-execution-environment-qualification).
+[environment qualification](../target_distance_benchmarking/running_benchmarks.md#qualified-execution-environments).
 Keep unknown or unqualified conditions explicit. Apply that workflow gate to
 tuning and result claims without inventing a second qualification policy.
 

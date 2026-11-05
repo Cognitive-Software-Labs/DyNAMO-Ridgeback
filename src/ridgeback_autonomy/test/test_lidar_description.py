@@ -15,10 +15,8 @@ from pathlib import Path
 
 import pytest
 
-from ridgeback_common.camera_profiles import (
-    DEFAULT_CAMERA_PROFILE,
-    resolve_camera_profile,
-)
+from ridgeback_autonomy import robot_description
+from ridgeback_common.camera_profiles import DEFAULT_CAMERA_PROFILE
 from ridgeback_common.lidar_contract import (
     GAZEBO_RANGE_NOISE_STDDEV,
     RAW_ANGLE_INCREMENT,
@@ -41,30 +39,17 @@ ANGLE_TOLERANCE = 1e-8
 
 
 def _expand(setup_path: Path, *, is_sim: bool) -> str:
-    xacro = pytest.importorskip('xacro')
-    profile = resolve_camera_profile(DEFAULT_CAMERA_PROFILE)
-    return xacro.process_file(
-        str(setup_path / 'robot.urdf.xacro'),
-        mappings={
-            'is_sim': 'true' if is_sim else 'false',
-            'namespace': 'r100_0001',
-            'gazebo_controllers': '/dev/null',
-            'sim_camera_width': str(profile.width),
-            'sim_camera_height': str(profile.height),
-            'sim_camera_horizontal_fov': str(profile.horizontal_fov_rad),
-        },
-    ).toxml()
+    pytest.importorskip('xacro')
+    return robot_description.expand_description_xml(
+        setup_path, is_sim=is_sim, profile_name=DEFAULT_CAMERA_PROFILE)
 
 
 @pytest.fixture(scope='module')
 def setup_path(tmp_path_factory) -> Path:
     """A generated setup directory of our own, never the user's."""
-    generator_module = pytest.importorskip('clearpath_generator_common.description.generator')
-
-    path = tmp_path_factory.mktemp('clearpath_setup')
-    shutil.copyfile(ROBOT_YAML, path / 'robot.yaml')
-    generator_module.DescriptionGenerator(str(path)).generate()
-    return path
+    pytest.importorskip('clearpath_generator_common.description.generator')
+    return robot_description.generate_setup(
+        ROBOT_YAML, tmp_path_factory.mktemp('clearpath_setup'))
 
 
 @pytest.fixture(scope='module')
@@ -105,17 +90,8 @@ def _sensor(gazebo_sdf: ET.Element, name: str) -> ET.Element:
     return sensors[0]
 
 
-def _joint(urdf: ET.Element, name: str) -> ET.Element:
-    joints = [joint for joint in urdf.findall('joint') if joint.get('name') == name]
-    assert len(joints) == 1, f'expected exactly one joint named {name}, found {len(joints)}'
-    return joints[0]
-
-
-def _origin(joint: ET.Element) -> tuple[tuple[float, ...], tuple[float, ...]]:
-    origin = joint.find('origin')
-    xyz = tuple(float(value) for value in (origin.get('xyz') or '0 0 0').split())
-    rpy = tuple(float(value) for value in (origin.get('rpy') or '0 0 0').split())
-    return xyz, rpy
+_joint = robot_description.joint
+_origin = robot_description.origin
 
 
 @pytest.mark.parametrize('name', LIDARS)

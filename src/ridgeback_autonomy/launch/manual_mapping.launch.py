@@ -5,7 +5,7 @@ Manual SLAM mapping launch for ground-truth map generation.
 This brings up:
 - Gazebo simulation
 - SLAM (slam_toolbox)
-- Keyboard teleop
+- Interactive-marker teleop (RViz drag widget) through twist_mux
 
 Excludes Nav2 and frontier exploration so the operator can manually teleoperate
 through the entire reachable space to collect ground-truth maps.
@@ -74,7 +74,8 @@ def generate_launch_description():
                               default_value=os.path.expanduser('~/clearpath/')),
         DeclareLaunchArgument(
             'world', default_value='initial_test_world',
-            description='Gazebo world to load: initial_test_world, depot, or coworking_space'),
+            description='Gazebo world to load: initial_test_world, robocup_hcc_arena, depot, '
+                        'or coworking_space'),
         DeclareLaunchArgument('mapping_rviz', default_value='true',
                               description='Launch RViz for map visualization during mapping'),
 

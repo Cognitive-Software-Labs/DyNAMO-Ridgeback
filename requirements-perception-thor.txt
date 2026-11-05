@@ -4,7 +4,7 @@
 # cu128 x86 wheels in requirements-perception.txt. This file pins the same
 # torch/torchvision versions in their CUDA 13.0 aarch64 build and keeps the
 # model stack identical. Verified by the GPU gate in
-# docs/plans/PHYSICAL_thor_perception_environment.md (step 3).
+# archive/engineering/2026-10-12-r100-0160-thor-localization-smoke.md.
 #
 # Setup on Thor (first time only; the venv lives outside every checkout and
 # launches select it with RIDGEBACK_PERCEPTION_VENV):

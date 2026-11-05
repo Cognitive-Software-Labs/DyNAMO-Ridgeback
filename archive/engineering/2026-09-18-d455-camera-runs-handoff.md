@@ -1,11 +1,17 @@
 # PHYSICAL — D455 camera runs handoff (agent 1)
 
+Recorded dates: 2026-09-18
+Tested revisions: `950aacbddf8eec57ea312035ffda30a88d5acffd`
+Provenance: partial
+
+This is a dated handoff snapshot moved from `docs/plans/handoffs/` after its findings were resolved or carried into current references. Its links to repository documents point at the handoff revision. The live robot state it describes was not preserved, so provenance is partial.
+
 **Author:** agent 1 (Claude Code session on the robot host `cpr-r100-0160`)
 **Written:** 2026-09-18, 18:45 UTC · **Repository HEAD:** `950aacb` on
 `feat/real-hardware-exploration`
-**Governing plan:** [PHYSICAL — Robot measurements and stationary sensor validation](../PHYSICAL_robot_measurements_and_validation.md),
+**Governing plan:** [PHYSICAL — Robot measurements and stationary sensor validation](https://github.com/Cognitive-Software-Labs/DyNAMO-Ridgeback/blob/950aacbddf8eec57ea312035ffda30a88d5acffd/docs/plans/PHYSICAL_robot_measurements_and_validation.md),
 section "D455 camera validation", checks 1–3
-**Related:** [Intel–Thor transport](../../physical/intel_thor_transport.md)
+**Related:** [Intel–Thor transport](https://github.com/Cognitive-Software-Labs/DyNAMO-Ridgeback/blob/950aacbddf8eec57ea312035ffda30a88d5acffd/docs/physical/intel_thor_transport.md)
 (owned by the Intel–Thor work, referred to below as agent 2)
 
 The evidence folders listed here are under `artifacts/hardware/` on the robot

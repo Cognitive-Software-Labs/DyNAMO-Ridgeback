@@ -42,6 +42,33 @@ The YAML remains authoritative for these values. Camera internal transforms
 come from the nominal description in simulation and device calibration on
 hardware; a configured mount is not a calibration result.
 
+## Declared sensors
+
+The repository YAML declares these devices and settings; the table above gives
+their mounts.
+
+- **Middleware.** The checked-in Clearpath setup selects CycloneDDS
+  (`rmw_cyclonedds_cpp`), matching the stack's measured exact-stamp delivery
+  default. Deploy it to the robot only through an approved configuration diff.
+- **Hokuyo UST-10LX (`hokuyo_ust`), front and rear.** Planar scans for SLAM and
+  the costmaps. SLAM reads the front scan unless `slam_source:=merged`; target
+  localization uses only the front `lidar2d_0`.
+- **Intel RealSense D455 (`intel_realsense`, `device_type: d455`).** Mounted on
+  the [shared camera support](#shared-camera-support). `device_type` selects
+  both the driver's device filter and the URDF model, so it decides the
+  camera's geometry as well as which device the driver binds. The configured
+  streams are RGB and depth with `align_depth.enable: true` and
+  `enable_sync: true`. Stream profiles are left unspecified, so Clearpath's
+  640x480 @ 30 defaults apply. These driver settings drive the simulators; on
+  the robot the
+  [hardware camera service](../physical/robot_local_deployment.md#camera-service)
+  streams colour and aligned depth only, from the same mount.
+
+The [camera stack](../target_localization/camera_stack.md) owns the resulting
+frames and topics, and the
+[pipeline's sensor section](../target_localization/target_localization_pipeline.md#1-sensor-stack)
+owns the unwired organized cloud and the unused D455 IMU.
+
 ## Deployed hardware mounts
 
 The physical robot does not generate its description from the repository YAML.

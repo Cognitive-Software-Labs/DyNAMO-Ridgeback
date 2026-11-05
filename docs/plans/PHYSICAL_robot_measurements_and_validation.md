@@ -4,7 +4,7 @@ Status: **mount readings and LiDAR box checks recorded (2026-09-18), rear-offset
 service qualified at both profiles (2026-10-06); alignment and target acceptance
 still open.** Owner:
 people at the robot, assisted by an agent. The
-[project backlog](../BACKLOG.md#physical-stationary-integration) owns the overall
+[qualification plan](PHYSICAL_remaining_qualification.md) owns the overall
 stationary milestone; its individual geometry, camera, calibration, and motion
 gates retain their own completion criteria.
 
@@ -17,9 +17,7 @@ worksheet for people.
 
 The visit covers quick mount measurements, both LiDARs, stationary camera–LiDAR
 alignment, and G1/person integration.
-Measurements and sensor inspection can proceed alongside deployment. The
-[workstation package split](PHYSICAL_package_split.md) supplies an available
-handoff candidate; final distributed tests use its accepted installed revision and the
+Measurements and sensor inspection can proceed alongside deployment. Final distributed tests use the revision installed on both hosts and the
 [Intel–Thor deployment](PHYSICAL_intel_thor_deployment.md). Physical driving,
 braking, dynamic calibration, and autonomous missions remain outside this plan.
 
@@ -28,7 +26,7 @@ braking, dynamic calibration, and autonomous missions remain outside this plan.
 The September 18 field record names checkout
 `a01a4532a170fcb85df1a5aaffb8c28bf1601f96`, with partial provenance: it tested
 robot-local services with ad-hoc probes, and raw captures remain on the robot.
-The later [camera handoff](handoffs/PHYSICAL_d455_camera_runs_agent1.md) reports
+The later camera handoff (under [Archived evidence](#archived-evidence)) reports
 VGA and HD aligned-depth tests on Fast DDS, followed by failures on CycloneDDS.
 Those camera passes apply to the recorded configurations; final deployment
 acceptance requires reruns after the
@@ -50,13 +48,13 @@ The [geometry reference](../robot/geometry.md#deployed-hardware-mounts) separate
 physical readings, robot-local configuration, and nominal simulator geometry.
 The rear offset correction changed the robot YAML and vendor merger, not the
 repository's already symmetric declaration. Its independent stationary
-side-target recheck and stationary merged-output comparison are complete;
-driver recovery is not.
+side-target recheck and stationary merged-output comparison are complete, and
+in-driver reconnect after a session reset passed on both LiDARs (S3).
 
-Continue in this order: resolve and validate the services transport fault;
-confirm stable individual and merged scans;
-then run camera–LiDAR overlays, the localization smoke once a perception
-environment is installed, and G1/person integration. The camera service and its
+The services transport screens (S1, S4) and the first Thor localization smoke
+are done. Remaining here: the camera–LiDAR overlays in the
+[alignment session](PHYSICAL_camera_alignment_session.md) and G1/person
+integration. The camera service and its
 camera-to-base TF are in place and pass the contract check.
 
 ## Who does what
@@ -181,7 +179,8 @@ device/profiles, independently of the later camera–LiDAR and joint tests.
 - Record effective parameters for colour/depth enablement, alignment, and
   synchronization. Inspect active driver profiles rather than inferring them
   from repository YAML.
-- Request `640x480@30` and `1280x720@30` as separate runs. Record the actual
+- Request `640x480@30` (1280x720 is unsupported on the robot; see the
+  [deferred gate](../BACKLOG.md#deferred-hardware-gates)). Record the actual
   colour and native-depth profiles and resulting aligned-depth grid. Unsupported
   requests or fallback profiles are unresolved findings, not successful tests
   of the requested profile.
@@ -411,6 +410,7 @@ or physical motion safety.
 ## Archived evidence
 
 - [r100_0160 field readings and LiDAR box checks](../../archive/engineering/2026-09-18-r100-0160-field-measurements.md)
+- [D455 camera runs handoff, 2026-09-18](../../archive/engineering/2026-09-18-d455-camera-runs-handoff.md)
 - [r100_0160 D455 camera service qualification](../../archive/engineering/2026-10-06-r100-0160-camera-service.md)
 - [r100_0160 D455 factory calibration against the nominal simulator profiles](../../archive/engineering/2026-10-13-r100-0160-d455-calibration-vs-nominal.md)
 - [r100_0160 rear LiDAR side-target recheck](../../archive/engineering/2026-09-24-r100-0160-rear-lidar-recheck.md)

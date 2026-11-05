@@ -16,7 +16,7 @@ rules:
   target_prop_clearance_m: 0.5
   margin_m: 0.3
   sightline_corridor_m: 0.45
-  robot_footprint: [[0.497107, 0.263718], [0.477026, 0.338663], [0.422163, 0.393526], [0.347218, 0.413607], [-0.347218, 0.413607], [-0.422163, 0.393526], [-0.477026, 0.338663], [-0.497107, 0.263718], [-0.497107, -0.263718], [-0.477026, -0.338663], [-0.422163, -0.393526], [-0.347218, -0.413607], [0.347218, -0.413607], [0.422163, -0.393526], [0.477026, -0.338663], [0.497107, -0.263718]]  # nav2_params.yaml
+  robot_footprint: [[0.475762, 0.073265], [0.409768, 0.319557], [0.393065, 0.348488], [0.367198, 0.374355], [0.339166, 0.390539], [0.302752, 0.400297], [-0.302752, 0.400297], [-0.339166, 0.390539], [-0.367198, 0.374355], [-0.393065, 0.348488], [-0.409768, 0.319557], [-0.475762, 0.073265], [-0.475762, -0.073265], [-0.409768, -0.319557], [-0.393065, -0.348488], [-0.367198, -0.374355], [-0.339166, -0.390539], [-0.302752, -0.400297], [0.302752, -0.400297], [0.339166, -0.390539], [0.367198, -0.374355], [0.393065, -0.348488], [0.409768, -0.319557], [0.475762, -0.073265]]  # nav2_params.yaml
 footprints:  # [x0, x1, y0, y1] in the model frame, from model.sdf
   bookshelf: [-0.45, 0.45, -0.175, 0.175]
   clinic_cart: [-0.2955, 0.2955, -0.3425, 0.3425]
@@ -41,7 +41,7 @@ scenarios:
       bed_occluder_single: {dx_m: 3.35, anchor: {target_index: 0, backdrop: c_desk_a, gap_m: 1.0074}, drops: [c_chair_a]}
       curtain_occluder_single: {dx_m: 3.35, anchor: {target_index: 0, backdrop: c_desk_a, gap_m: 1.0074}, drops: [c_chair_a]}
   benchmark_scenarios_full.yaml:
-    sha256: 618c6e52f070cdfb1735ebe9717b16d6ad4f8c40afbed18f622e1f64c67c0fc9
+    sha256: 66160977449fcb4d39aa7e3dfa5fc89fac132731e30ebaedd5b131bca5750478
     scenes:
       single_facing_01: {dx_m: 3.1, anchor: {target_index: 0, backdrop: m_trolley, gap_m: 1.008}, drops: [c_desk_a, c_bin]}
       single_facing_02: {dx_m: 4.1, anchor: {target_index: 0, backdrop: c_chair_b, gap_m: 1.0011}, drops: [c_desk_a, c_desk_b, c_chair_a]}
@@ -94,11 +94,11 @@ scenarios:
       far_clamp_01: {dx_m: -0.55, anchor: {target_index: 0, backdrop: s_chair_b, gap_m: 1.0202}, drops: [m_chair, c_cart]}
       far_clamp_02: {dx_m: -1.75, anchor: {target_index: 0, backdrop: c_desk_b, gap_m: 0.9948}, drops: [c_desk_a, c_chair_a]}
       far_beyond_01: {dx_m: -3.9, anchor: {target_index: 0, backdrop: c_desk_a, gap_m: 1.0109}, drops: [c_chair_a]}
-      edge_mostly_in_01: {dx_m: 4.4, anchor: {target_index: 0, backdrop: s_chair_b, gap_m: 1.0022}, drops: [m_trolley, c_bin, c_cart]}
-      edge_mostly_in_02: {dx_m: 4.55, anchor: {target_index: 0, backdrop: n_chair_b, gap_m: 0.9985}, drops: [m_island, m_island_chair]}
-      edge_half_out_01: {dx_m: 0.95, anchor: {target_index: 0, backdrop: n_chair_a, gap_m: 0.9974}, drops: [m_cart]}
-      edge_half_out_02: {dx_m: 0.9, anchor: {target_index: 0, backdrop: s_cart, gap_m: 0.9982}, drops: [m_bin]}
-      edge_sliver_01: {dx_m: 8.3, anchor: {target_index: 0, backdrop: e_low_cabinet, gap_m: 0.9884}, drops: [e_desk, e_desk_chair, c_desk_a, c_desk_b, c_chair_a, c_plant]}
+      edge640_mostly_in_01: {dx_m: 4.4, anchor: {target_index: 0, backdrop: s_chair_b, gap_m: 0.9956}, drops: [s_chair_a, c_cart]}
+      edge640_mostly_in_02: {dx_m: 4, anchor: {target_index: 0, backdrop: n_chair_b, gap_m: 1.0134}, drops: [m_island, m_island_chair]}
+      edge640_half_out_01: {dx_m: 3.35, anchor: {target_index: 0, backdrop: n_chair_b, gap_m: 1.0046}, drops: [n_chair_a, m_island, m_cart]}
+      edge640_half_out_02: {dx_m: 0.2, anchor: {target_index: 0, backdrop: s_cart, gap_m: 0.9986}, drops: []}
+      edge640_sliver_01: {dx_m: 3.45, anchor: {target_index: 0, backdrop: m_island, gap_m: 0.9982}, drops: [m_cart]}
       trap_split_curtain: {dx_m: 7, anchor: {target_index: 0, backdrop: e_whiteboard, gap_m: 0.996}, drops: [m_board, c_desk_a, c_desk_b, c_chair_a, c_chair_b]}
       trap_split_pole: {dx_m: 4.5, anchor: {target_index: 0, backdrop: c_chair_b, gap_m: 0.9994}, drops: [c_desk_a, c_desk_b, c_chair_a, c_bin]}
       trap_lidar_bed: {dx_m: 6.25, anchor: {target_index: 0, backdrop: e_cabinet, gap_m: 0.989}, drops: [m_board, m_trolley, c_desk_a, c_desk_b, c_chair_a, c_chair_b, c_bin]}

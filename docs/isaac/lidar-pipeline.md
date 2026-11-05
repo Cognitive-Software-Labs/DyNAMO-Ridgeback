@@ -53,7 +53,7 @@ contain full-circle renderer output and are not navigation scan inputs.
 Gazebo publishes the same two raw scans directly from `gpu_lidar` sensors in
 the Clearpath description. Its geometry, range, rate and frames match the
 table above. `patches/clearpath_ust10lx_sim_lidar.patch` supplies the
-UST-10LX values; the [dependency runbook](../project/dependencies.md#ust-10lx-gazebo-lidar-patch)
+UST-10LX values; the [dependency runbook](../project/dependency_patches.md#ust-10lx-gazebo-lidar-patch)
 owns that patch. The two simulators still differ in three ways:
 
 - **Range noise.** Isaac's RTX noise is Gaussian, unbiased and independent

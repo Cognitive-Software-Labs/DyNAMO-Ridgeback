@@ -35,9 +35,10 @@ health producer. In external mode and in the observer, the overlay's depth panel
 subscribes to this host's aligned depth topic. The compute host's republish is
 the frame it measured, but it would have to cross the link. The local stream
 carries the same source stamps, because colour and aligned depth share them
-exactly. The overlay keeps its last 32 colour and depth frames by stamp and
-draws each measurement on the pair it was measured from. It falls back to the
-newest pair, with a warning, when the result is older than that buffer. The
+exactly. The overlay keeps its last 60 colour and depth frames by stamp (about
+2 s at 30 Hz) and draws each measurement on the pair it was measured from. It
+falls back to the newest pair, with a warning, when the result is older than
+that buffer. The
 box gate's mask panel is derived
 from the detections message. Only the silhouette gate's panel subscribes to the
 compute host's `debug/target/mask`, the one image that then crosses the link.
@@ -59,6 +60,14 @@ launches use the [measured r100_0160 front datum](../robot/geometry.md#hardware-
 pass the same override on Thor and Intel when choosing another reporting origin.
 The visualization adds this offset back before placing a point through TF, so
 using different offsets shifts the map marker even when the estimate is correct.
+The service unit supplies the hardware default when an older
+`/etc/default/dynamo-localization` has no `FRONT_OFFSET_M`; an explicit
+environment-file setting overrides it. Deploy the rebuilt packages and re-apply
+the service template before expecting an installed service to use these changes.
+Existing running processes and recorded artifacts are not updated.
+`tools/intel_thor/record_localization_run record` uses the same hardware default;
+pass `--front-offset-m` when recording a producer with another value. Its
+summarizer reads the offset saved with each recording.
 
 `RIDGEBACK_PERCEPTION_VENV` selects the compute Python environment. Without it,
 a discovered checkout's `perception_venv` is used if present; otherwise the
@@ -66,13 +75,27 @@ current Python environment is used. Only compute process environments change.
 An explicit invalid venv is rejected; Intel external/observer mode does not
 inspect it. `RIDGEBACK_WORKSPACE` explicitly selects checkout resources;
 otherwise checkout markers are discovered without assuming install depth.
+Child runs inherit their launcher's environment, so restart an already-running
+configurator after setting the variable. A direct
+`ros2 run ridgeback_localization target_detector_node` bypasses this helper and
+uses the Python environment of its own shell.
+
+Compute processes load checkpoints only from the local Hugging Face cache: the
+same helper sets `HF_HUB_OFFLINE=1` and `TRANSFORMERS_OFFLINE=1`, so a network
+outage cannot stall startup on download retries. Set
+`RIDGEBACK_MODEL_DOWNLOADS=1` in the launching shell for a first run that must
+download weights; an explicit `HF_HUB_OFFLINE` from the caller wins. OWLv2 needs
+the configured `detection_model`; `depth_source:=monocular` also needs the
+Depth-Anything V2 metric checkpoint, and `mask_gate:=silhouette` the SlimSAM
+checkpoint.
 
 `detector:=owlv2` selects the only production detector. `detection_model`
 identifies its checkpoint; the default remains
 `google/owlv2-base-patch16-ensemble`. `target_labels` is a comma-separated list,
 default `humanoid robot`. These are language queries, not a new trained G1 class.
-`detection_threshold` defaults to `0.55` and `detector_fps` to `10.0` on these
-local launches. All five settings are startup-only. Restart the compute process
+`detection_threshold` defaults to `0.30`; `detector_fps` follows the
+[cadence defaults](detection.md#detector-cadence-defaults). All five settings
+are startup-only. Restart the compute process
 to change them; Intel's observer and `localization_mode:=external` consume the
 already-running detector and reject local detector overrides. Disabled target
 localization starts no detector. Benchmark sweeps set detector settings in
@@ -80,6 +103,34 @@ localization starts no detector. Benchmark sweeps set detector settings in
 Existing replay payloads retain their recorded detections and cannot change
 detector queries after capture. Historical captures without detector identity
 remain unknown rather than being assigned today's defaults.
+
+## Intel RViz view
+
+Hardware exploration in external mode lets Intel watch Thor's results over a
+live map: Intel runs SLAM, Nav2 and RViz, and RViz shows the map, both LiDAR
+scans, the target rings and the camera overlay. The README owns its build and
+launch commands. Pass the same `estimators` and `mask_gate` that Thor runs. The
+overlay's colour, depth and mask panels follow the external-mode rules above.
+Without the patched `slam_toolbox` no map appears and Nav2 never starts.
+
+With `backend:=hardware`, RViz opens a copy of the exploration layout without
+the *2D Goal Pose* tool. Nav2's output reaches the robot's twist mux, so one
+click would otherwise drive the robot even with frontier goals off. Any other
+Nav2 client can still send goals, so keep the e-stop engaged until the command
+chain is qualified.
+
+Intel's VNC desktop renders RViz on the CPU, with no GPU. At the layout's
+30 fps RViz took a full core, and the camera contract check failed with
+467–567 ms depth gaps. With `backend:=hardware` the launch therefore:
+
+- redraws at 10 fps;
+- runs RViz at `nice -n 19`, pinned with `taskset` to the last two CPU cores on
+  hosts with at least four;
+- limits Mesa's software renderer to two threads (`LP_NUM_THREADS=2`).
+
+RViz then uses about a quarter of a core, and the check passes with RViz open.
+Viewing RViz from another computer avoids the load entirely.
+`ridgeback_autonomy/rviz_layouts.py` derives the layout and the process limits.
 
 ## Topics, types, and acquisition semantics
 
@@ -162,7 +213,16 @@ stateDiagram-v2
 ```
 
 A required mission starts inhibited and needs `mission/resume` after at least
-two advancing health observations. Loss latches a pause and requests cancellation
+two advancing health observations. Exploration requires it with
+`localization_mode:=external`, or explicitly with `localization_required:=true`.
+In simulation or fake-server qualification, after healthy advancing input and
+a resolved previous goal, resume explicitly:
+
+```bash
+ros2 service call /r100_0001/mission/resume std_srvs/srv/Trigger '{}'
+```
+
+Loss latches a pause and requests cancellation
 of the frontier owner's active `NavigateToPose` goal. A goal accepted after
 health loss is immediately canceled. Recovery alone never resumes the mission.
 
@@ -175,9 +235,56 @@ goals, not arbitrary Nav2 clients, teleoperation, or a physical emergency stop.
 Hardware autonomous motion remains off by default; do not enable it for the
 stationary milestone.
 
+## Workstation inference environment
+
+The workstation uses `perception_venv/` in the checkout, built from
+`requirements-perception.txt`; the README owns its setup commands. That file
+pins the CUDA 12.8 (`cu128`) PyTorch build, which carries the `sm_120` kernels
+that Blackwell GPUs such as the RTX PRO 6000 need. Plain `torch` from PyPI is a
+CPU-only build and silently runs OWLv2 and Depth-Anything on the CPU. For
+another GPU or CUDA version, change the index URL and torch pins in that file.
+
+## Thor inference environment
+
+Thor (JetPack 7, CUDA 13.0, `sm_110`) uses a `venv` over the system Python 3.12
+with `--system-site-packages`, as on the workstation, so compute nodes import
+ROS Jazzy's `rclpy`, `cv_bridge` and NumPy directly. Conda was rejected because
+its Python cannot reliably load the system ROS build; Thor's existing
+`~/miniforge3` environment belongs to another project. The venv lives at
+`~/venvs/dynamo-perception`, outside every checkout, and launches select it with
+`RIDGEBACK_PERCEPTION_VENV`. `requirements-perception-thor.txt` holds the setup
+commands and pins the workstation's `torch 2.11.0`/`torchvision 0.26.0` in
+their PyTorch CUDA 13.0 builds; NVIDIA's Jetson AI Lab index is the fallback
+only if `tools/intel_thor/check_perception_env` fails, and its different
+versions would need a new decision. Creating the venv needs Ubuntu's
+`python3.12-venv`. On the 2026-10-09 install, `pip check` reported two
+accepted items outside the model stack: Ubuntu's `python3-nacl` without
+`python3-cffi`, and a platform-tag warning for `nvidia-cusparselt-cu13`, which
+PyTorch loads.
+
 ## Qualification and paired rollback
 
-The package plan retains the [remaining handoff gates](../plans/PHYSICAL_package_split.md).
+Both hosts run the same installed revision since 2026-10-16 (P1 in the
+[qualification plan](../plans/PHYSICAL_remaining_qualification.md)); the
+workstation runtime evidence is under [Archived evidence](#archived-evidence).
+The workstation handoff candidate was `eaacd24b`, with build, import, replay and
+installed-smoke evidence under `artifacts/package-split/integration-eaacd24b/`.
+Recorded-input parity establishes schema and scoring preservation, not runtime
+timing equivalence; rerun live performance before quoting results for this
+process layout or non-default label queries.
+
+On `r100_0160` (2026-10-16, P1 and P2) both hosts ran `dev` `a31e770` and
+`check_link --no-traffic` passed 30 checks with matching revisions and a
+−0.02 ms clock offset. Killing the detector reported health `failure` and
+returned to `processing` 8 s after relaunch; since 2026-10-21 workers respawn
+automatically (`processing` within 13 s, no service restart), and Thor runs
+`dynamo-localization.service` from boot. A Thor cable pull recovered PTP in
+about 5 s after the PHC step fix. All four localization modes started and
+reached `processing` on the Thor GPU, with box-stereo delays of 367/383 ms,
+box-mono 575/592 ms, Thor at no more than 68 °C, a person tracked at two marks,
+and no false detections in a 28 s empty segment. Distance accuracy at taped
+marks, silhouette timing and G1 target cases were not measured; see the
+[deferred gates](../BACKLOG.md#deferred-hardware-gates).
 The current workstation checks include clean headless builds/imports, generated
 serialization, unchanged recorded-input estimator/scoring results, launch-role
 construction, fake Nav2 action cancellation, and bounded headless Gazebo/Isaac

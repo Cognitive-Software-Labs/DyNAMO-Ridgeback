@@ -26,7 +26,7 @@ The selected recovery scope excludes the vendor dashboard. The
 owns source preparation, selected host candidates and fresh-host build commands.
 
 The captured joystick/base files describe the original uncapped baseline.
-The current [commissioning caps](../../docs/physical/driving_readiness.md#commissioning-caps)
+The current [commissioning caps](../../docs/physical/commissioning_guard.md#speed-modes)
 are maintained in `tools/hardware/commissioning_speed_guard.py` and rendered by
 `tools/hardware/install_commissioning_caps.py`. Recovery preparation includes
 these newer candidates with explicit provenance rather than rewriting the
@@ -126,7 +126,7 @@ Reconstruction needs the `chrony` package, these root-owned 0644 files and an
 enabled `chrony.service`, followed by `tools/hardware/check_clock_ready.py`.
 The expanded profile and poll bound passed a local convergence check on
 2026-10-13; reboot and source-loss behavior remain unqualified;
-see [auxiliary checks](../../docs/physical/stationary_auxiliary_checks.md#intel-clock-source-expansion).
+see [auxiliary checks](../../docs/physical/stationary_auxiliary_checks.md#intel-clock-and-boot-policy).
 
 
 On 2026-10-13 the Intel pool profile was updated to `maxpoll 7` so its

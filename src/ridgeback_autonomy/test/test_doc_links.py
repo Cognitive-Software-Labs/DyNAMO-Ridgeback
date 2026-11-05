@@ -14,7 +14,7 @@ SPEC.loader.exec_module(CHECKER)
 
 def test_valid_links_images_references_and_fragments(tmp_path):
     (tmp_path / 'docs').mkdir()
-    (tmp_path / 'docs/page name.md').write_text('# Héllo `world`!\n\n## Again\n## Again\n<a id="custom"></a>\n')
+    (tmp_path / 'docs/page name.md').write_text('# Héllo `world`!\n\n### Again\n### Again\n<a id="custom"></a>\n')
     (tmp_path / 'image.png').touch()
     (tmp_path / 'README.md').write_text('''[inline](docs/page%20name.md#héllo-world)
 [duplicate](<docs/page name.md#again-1>)
@@ -186,3 +186,62 @@ def test_complete_and_unknown_archive_metadata():
     assert CHECKER.archive_metadata(RECORD_HEADER.replace(
         'Recorded dates: 2026-09-01', 'Recorded dates: unknown'
     ).replace('Provenance: partial', 'Provenance: unknown')) == []
+
+
+def _structure(relative, text):
+    return [error for _, error in CHECKER.page_structure(Path(relative), text)]
+
+
+def test_page_budget_points_to_splitting_and_accepts_reasoned_marker():
+    long_page = '# Reference\n' + 'line\n' * 700
+    errors = _structure('docs/topic/reference.md', long_page)
+    assert len(errors) == 1 and 'split a self-contained section' in errors[0]
+    marked = '# Reference\n<!-- doc-budget: 800 lines; reason: one indivisible table -->\n' + 'line\n' * 700
+    assert _structure('docs/topic/reference.md', marked) == []
+    assert any('needs a reason' in e for e in _structure(
+        'docs/topic/reference.md', marked.replace('one indivisible table', ' ')))
+    in_code = '# Reference\n`<!-- doc-budget: 800 lines; reason: example -->`\n' + 'line\n' * 700
+    assert any('exceeds the 600-line budget' in e for e in _structure('docs/topic/reference.md', in_code))
+
+
+def test_plans_have_a_smaller_budget_and_need_a_status():
+    assert any('exceeds the 500-line budget' in e for e in _structure(
+        'docs/plans/SCOPE_topic.md', '# Plan\n\nStatus: open.\n' + 'step\n' * 520))
+    assert any('Status:' in e for e in _structure('docs/plans/SCOPE_topic.md', '# Plan\n\nSteps.\n'))
+    assert _structure('docs/plans/handoffs/SCOPE_topic_agent.md', '# Handoff\n') == []
+
+
+@pytest.mark.parametrize('heading', ['## October 14 controller input', '### Measured, 2026-09-09'])
+def test_current_pages_reject_dated_headings(heading):
+    assert any('dated heading' in e for e in _structure('docs/topic/reference.md', f'# Ref\n\n{heading}\n'))
+    assert _structure('docs/plans/SCOPE_topic.md', f'# Plan\n\nStatus: open.\n\n{heading}\n') == []
+    assert _structure('archive/engineering/record.md', f'# Record\n\n{heading}\n') == []
+
+
+def test_duplicate_top_level_sections_are_rejected():
+    assert any('duplicate section heading' in e for e in _structure(
+        'README.md', '# Title\n\n### Camera service\n\n## Camera service\n'))
+    assert _structure('README.md', '# Title\n\n## A\n\n### Commands\n\n## B\n\n### Commands\n') == []
+
+
+def test_backlog_items_need_criteria_and_stay_short():
+    item = '## Gap\n\n**Gap.** Missing.\n\n**Completion criteria.** Done when measured.\n'
+    assert _structure('docs/BACKLOG.md', '# Backlog\n\n' + item + '\n## Archived evidence\n\n- x\n') == []
+    assert any('Completion criteria' in e for e in _structure('docs/BACKLOG.md', '# Backlog\n\n## Gap\n\nText.\n'))
+    assert any('limit 60' in e for e in _structure('docs/BACKLOG.md', '# Backlog\n\n' + item + 'more\n' * 60))
+
+
+def test_flowchart_node_ids_are_not_reused_for_different_nodes():
+    chart = '# Ref\n\n```mermaid\nflowchart LR\n  G[stop relay] --> M[mux]\n  M --> G[speed guard]\n```\n'
+    assert any('mermaid node G' in e for e in _structure('docs/topic/reference.md', chart))
+    sequence = '# Ref\n\n```mermaid\nsequenceDiagram\n  A->>B: call(x)\n  B->>A: call(y)\n```\n'
+    assert _structure('docs/topic/reference.md', sequence) == []
+
+
+def test_every_plan_is_linked_from_the_index(tmp_path):
+    (tmp_path / 'docs/plans').mkdir(parents=True)
+    (tmp_path / 'docs/plans/SCOPE_topic.md').write_text('# Plan\n\nStatus: open.\n')
+    (tmp_path / 'docs/index.md').write_text('# Index\n')
+    assert any('not linked from docs/index.md' in f for f in CHECKER.check(tmp_path))
+    (tmp_path / 'docs/index.md').write_text('# Index\n\n[Plan](plans/SCOPE_topic.md)\n')
+    assert CHECKER.check(tmp_path) == []

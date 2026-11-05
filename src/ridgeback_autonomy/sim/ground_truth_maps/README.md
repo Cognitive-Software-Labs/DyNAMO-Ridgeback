@@ -39,6 +39,7 @@ Certified Gazebo map sets:
 | Public world | Clearpath 3D source | Current evidence state |
 |---|---|---|
 | `initial_test_world` | repository `initial_test_world.sdf` | Analytical SDF slice at 0.30257 m |
+| `robocup_hcc_arena` | generated `robocup_hcc_arena.usda`, the same geometry as its SDF | `generate_gt_map.py` slice at 0.25257 m, 360×280 px from [-9.050, -6.500]; certified for Gazebo and Isaac |
 | `depot` | dependency `warehouse.sdf` | Driven capture recertified against Clearpath `590a4511` and pinned Fuel bundles |
 | `coworking_space` | dependency `office.sdf` | Driven capture recertified against Clearpath `590a4511` and repository meshes |
 

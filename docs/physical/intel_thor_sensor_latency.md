@@ -106,8 +106,8 @@ seconds of observed data, network + DDS p95 at most 20 ms, total p95 at most
 40 ms, loss at most 1%, exact pairing at least 99%, and the camera/scan contract.
 The one-second duration tolerance admits scheduling at the window boundary.
 Short or 15 Hz runs are diagnostic evidence and cannot pass the 30 Hz targets.
-No configuration is adopted automatically. Commands live in the
-[README](../../README.md#intel-thor-sensor-latency).
+No configuration is adopted automatically. Commands are under
+[Running the qualification](#running-the-qualification).
 
 ## Compressed transport candidates
 
@@ -167,6 +167,124 @@ Two decoder behaviours of Thor's Jazzy plugins (`image_transport_plugins`
 
 Measured outcomes are in
 [Intel–Thor camera transport candidates](../do_not_try_again/intel_thor_camera_transport.md).
+
+## Running the qualification
+
+The tools run from source; no workspace build is needed. Both hosts must run
+the same committed revision without tracked changes: the collector compares
+Intel's checkout with the Thor worktree (`--thor-worktree`, default
+`/home/robot/DyNAMO-Ridgeback-latency`) and refuses a mismatch. Push the
+revision through `origin` first.
+
+### Thor worktree
+
+On Thor, leave the existing checkout untouched and create the separate
+worktree once, at the revision Intel runs:
+
+```bash
+git -C ~/DyNAMO-Ridgeback fetch origin
+git -C ~/DyNAMO-Ridgeback worktree add --detach ~/DyNAMO-Ridgeback-latency <intel-revision>
+```
+
+For updates, fetch on the existing checkout again and run
+`git -C ~/DyNAMO-Ridgeback-latency checkout --detach <intel-revision>`.
+
+### Clock installation
+
+The operator installs clocks locally on each host while the robot is
+stationary:
+
+```bash
+# Intel, from this checkout
+sudo tools/intel_thor/time_sync apply --host intel
+# Thor, from ~/DyNAMO-Ridgeback-latency
+sudo tools/intel_thor/time_sync apply --host thor
+chronyc tracking
+```
+
+`tools/intel_thor/time_sync status` inspects the deployment;
+`sudo tools/intel_thor/time_sync rollback` restores the prior time service.
+Check the independent bound on Intel with `tools/intel_thor/check_clock`.
+
+chrony alone serves Thor an estimate of true time rather than Intel's wall
+clock, so the two clocks agree only to within Intel's pending internet
+correction. PTP carries the wall clock itself and is the
+[selected configuration](intel_thor_transport.md#sensor-timing-and-time-synchronization).
+With the robot stationary, re-apply `time_sync` on Intel first (it installs the
+slow slew rate PTP requires), then install PTP on each host:
+
+```bash
+# Intel, from this checkout
+sudo tools/intel_thor/time_sync apply --host intel
+sudo tools/intel_thor/ptp_sync apply --host intel
+# Thor, from ~/DyNAMO-Ridgeback-latency (stops Thor's chrony)
+sudo tools/intel_thor/ptp_sync apply --host thor
+```
+
+`tools/intel_thor/ptp_sync status` shows each host's daemons and their latest
+offsets; `sudo tools/intel_thor/ptp_sync rollback` removes PTP and restores
+chrony on Thor. Confirm the wall-clock agreement from Intel with
+`tools/intel_thor/check_clock`.
+
+### Baseline collection
+
+From Intel:
+
+```bash
+tools/intel_thor/check_link
+source /etc/clearpath/setup.bash
+tools/intel_thor/sensor_latency_run --namespace r100_0160
+```
+
+The collector writes reports, raw timestamps, before and after clock checks,
+CPU and link rates under `artifacts/hardware/`; `--output-dir` names a new run
+directory. `--repeats`, `--warmup` and `--duration` override the three repeats,
+10 seconds of warm-up and 60 seconds of measurement. Its Intel observer stops
+the run on scan gaps or sensor faults.
+
+For a short Thor contract diagnostic, from the Thor worktree:
+
+```bash
+source /opt/ros/jazzy/setup.bash
+source src/ridgeback_autonomy_hardware/config/intel_thor/dds_env.sh thor
+export ROS_DOMAIN_ID=0
+tools/camera_contract_check --backend hardware --host thor --namespace r100_0160 --timing --duration 10
+```
+
+Cross-host components stay unresolved until a valid `--clock-offset-ms` and
+`--clock-bound-ms` are supplied; the collector supplies them itself.
+
+### Transport candidates
+
+To measure O1 or O2, the operator applies one candidate on Intel, then repeats
+the collector with a new output directory:
+
+```bash
+sudo tools/intel_thor/camera_service apply --dds-profile camera --fps 30 --max-message-size default
+# O2: change only --max-message-size to 65500
+```
+
+Return to the installed baseline with `sudo tools/intel_thor/camera_service
+apply --dds-profile services --fps 30 --max-message-size default`.
+
+Compression candidates (O4) decode on Thor and need its image_transport plugins
+once, installed by the operator:
+
+```bash
+sudo apt install ros-jazzy-image-transport-plugins ros-jazzy-ffmpeg-image-transport
+```
+
+Then, on Intel, choose one variant per stream. Encoder parameters set with
+`--camera-param` apply to the whole run and are restored afterwards:
+
+```bash
+tools/intel_thor/sensor_latency_run --namespace r100_0160 --color-transport ffmpeg --depth-transport zstd
+tools/intel_thor/sensor_latency_run --namespace r100_0160 --color-transport compressed --depth-transport compressedDepth --camera-param .camera_0.aligned_depth_to_color.image_raw.compressedDepth.format=rvl
+```
+
+The deployment runs at 30 Hz; reduced-rate runs are not a tuning option.
+Compression and host tuning are selected only after the measured baseline and
+the raw transport candidates.
 
 ## Limits
 

@@ -1,0 +1,8 @@
+repo HEAD: f6e7d238a399af7ba2b46fafb331d05428ab1e26  fix(deps): pin .repos to exact revisions
+repo status:
+vendored:
+  clearpath_common     99603548679f90dcc7bc51b6e8d5569dc6f069dc  dirty=2
+  clearpath_config     5c92caaf646d96cb3d3028477c8b74a1ef8ddcca  dirty=0
+  clearpath_msgs       5d041717d6a50eb7cd60c0df23d91f6baeb4192b  dirty=0
+  clearpath_simulator  69e68331a13e9f1f51de8807b49f2c9e84913f71  dirty=3
+  slam_toolbox         22450ca095b9a517358090b5e1e2e5989a9a82e5  dirty=1

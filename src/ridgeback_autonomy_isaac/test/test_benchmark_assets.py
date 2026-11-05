@@ -38,7 +38,8 @@ def test_public_world_maps_to_the_stage_the_runner_loads() -> None:
 
 
 def test_target_is_the_ground_origin_g1_in_an_advertised_format() -> None:
-    g1 = load_asset_catalog(str(CATALOG)).targets[DEFAULT_TARGET]
+    catalog = load_asset_catalog(str(CATALOG))
+    g1 = catalog.targets[DEFAULT_TARGET]
     wrapper = PACKAGE_ROOT / 'sim' / 'isaac' / 'usd' / 'models' / 'g1' / 'g1.usda'
 
     assert Path(g1.uri) == wrapper
@@ -46,8 +47,9 @@ def test_target_is_the_ground_origin_g1_in_an_advertised_format() -> None:
     assert 'defaultPrim = "g1"' in text
     assert 'double3 xformOp:translate = (0, 0, 0.792)' in text
     assert g1.resource_format in scene_provider.SPAWN_FORMATS
-    # Literal spawn height, as in Gazebo.
-    assert g1.spawn_z_m == 0.0
+    # Literal spawn height onto the floor's top surface, as in Gazebo.
+    floor_z = worlds.floor_z_for_world(catalog.worlds[PUBLIC_WORLD].native_name)
+    assert g1.spawn_z_m == pytest.approx(floor_z)
     assert scene_provider.resolve_resource_path(g1.uri) == g1.uri
 
 
@@ -77,4 +79,5 @@ def test_catalog_lists_exactly_the_packaged_objects_and_generated_resources() ->
             PACKAGE_ROOT / 'sim' / 'isaac' / 'usd' / 'models' / name / f'{name}.usda')
         assert Path(resource.uri).is_file()
         assert resource.resource_format in scene_provider.SPAWN_FORMATS
-        assert resource.spawn_z_m == 0.0
+        assert resource.spawn_z_m == pytest.approx(
+            worlds.floor_z_for_world(catalog.worlds[PUBLIC_WORLD].native_name))

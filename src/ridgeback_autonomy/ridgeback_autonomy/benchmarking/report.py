@@ -228,7 +228,7 @@ def render_run_report(
         render_failure_reasons(status_histograms, display_names, selected),
         '',
         # Ahead of the per-scene table because that table is the only section
-        # that grows without bound -- ~92 rows for the 68-scene v2 set -- so a
+        # that grows without bound -- ~114 rows for the 88-scene full set -- so a
         # fixed-size block placed after it cannot be reached without scrolling
         # past the whole thing.
         '## Run configuration',

@@ -60,7 +60,6 @@ ORIGIN_SIGHTLINE_AND_OBJECT_DROPS = {
     'far_beyond_01': {
         'm_board': ['target_sightline'], 'c_desk_a': ['target_sightline'],
         'c_desk_b': ['target_sightline'], 'c_chair_a': ['target_sightline']},
-    'edge_mostly_in_01': {'m_bin': ['target_sightline']},
     'trap_layered_01': {'m_bin': ['object_footprint']},
 }
 
