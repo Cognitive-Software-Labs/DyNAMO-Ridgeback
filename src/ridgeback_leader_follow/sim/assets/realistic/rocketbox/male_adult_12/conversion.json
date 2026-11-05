@@ -10,21 +10,21 @@
   "cycle_seconds": 1.2,
   "stride_m": 1.214040536377464,
   "gait_speed_mps": 1.01170044698122,
-  "height_m": 1.8078892230987549,
+  "height_m": 1.8078891038894653,
   "idle_seconds": 8,
   "idle_blend_seconds": 1,
   "idle_cache_fps": 15,
   "vertices": 3383,
   "triangles": 6722,
-  "max_rekey_deviation_m": 9.55215573987456e-07,
+  "max_rekey_deviation_m": 9.587611960369517e-07,
   "leg_length_ratio": 1.0000001134886003,
   "rebound_unweighted_vertices": 0,
   "idle_loop_gap_m": 0.0,
   "sha256": {
-    "walk.npz": "f13c8d33e468e771c0654d6090498c0d2516665950b1724c012867f367168562",
-    "idle.npz": "c1c86a15251b31f2b4411458bf47e4ef0d2745c2daa1e0f6aa1d616bbbc81fcc",
-    "walk.dae": "af250a2dbeba41bc70dcf19d004c41f0555b68e1fbda0f6d4ecc595667350de9",
-    "idle.dae": "a39661aa5d3af37a95e4ee796877c28d903fb1445bf9c2aa09502b8c81e2d973",
+    "walk.npz": "a38513ff9e5e1effb0513a47cf5210c354fd435ce0085663244d02b00d9dceb0",
+    "idle.npz": "aa50aca4c7de02fb090e5b5b1291c332a98a711333a17f604bda19e3f298a3dd",
+    "walk.dae": "4973a672a6cbe2a3981fc16d9f9d8cc6b46b2cb8ba6670b567f196cc0604b095",
+    "idle.dae": "149123c989cca9995d1442ef4280c01a59487cfb9c89a59be65503c4f3073c6d",
     "materials.json": "12f88a6181ddde3859ca07a6771d7b3d36d1a94bf048bd371872b9350d2e28b9"
   }
 }

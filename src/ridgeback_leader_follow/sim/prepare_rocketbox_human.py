@@ -306,7 +306,7 @@ def main():
         bpy.data.objects.remove(clip)
 
     # Key provisional clips, measure facing/floor/centre, then key the final
-    # normalized poses so the rig object stays the identity for Gazebo.
+    # normalized poses; the rig object keeps only the facing turn (no scale).
     identity = Matrix.Identity(4)
     rig.animation_data_create()
     walk_samples.append(walk_samples[0])
@@ -328,8 +328,11 @@ def main():
         bpy.data.actions.remove(action)
     final = lambda samples: [(world, {n: normalization @ m for n, m in poses.items()}) for world, poses in samples]
     walk_samples, idle_samples = final(walk_samples), final(idle_samples)
-    walk_action = key_bones(rig, identity, walk_samples, f'{name}_walk')
-    idle_action = key_bones(rig, identity, idle_samples, f'{name}_idle')
+    # Gazebo keeps the skeleton root joint's rest orientation for actors, so the
+    # facing turn lives on the (unscaled) armature node, as in the earlier skins.
+    rig.matrix_world = turn
+    walk_action = key_bones(rig, turn, walk_samples, f'{name}_walk')
+    idle_action = key_bones(rig, turn, idle_samples, f'{name}_idle')
     idle_samples = idle_samples[:-1]
     deviation = 0.
     rig.animation_data.action = walk_action
@@ -349,8 +352,8 @@ def main():
     if deviation > 2e-3 or loop_gap > 2e-3:
         raise RuntimeError(f'Keyed skeleton differs from the retarget by {deviation} m; idle loop gap {loop_gap} m')
     rig.animation_data.action = walk_action
-    if rig.matrix_world != Matrix.Identity(4):
-        raise RuntimeError('Rig object must stay the identity for Gazebo skinning')
+    if max(abs(a - b) for r, t in zip(rig.matrix_world, turn) for a, b in zip(r, t)) > 1e-6:
+        raise RuntimeError('Rig object must be the unscaled facing turn for Gazebo skinning')
 
     data = mesh_object.data
     data.calc_loop_triangles()
