@@ -23,8 +23,8 @@
   "sha256": {
     "walk.npz": "b57f20c80c2cada377056c9a8ec5d109b2c609e607723c4ce4cbcfb9eca1daa6",
     "idle.npz": "db364f0b1a239a07209c093dd61d72d6b2248fc550c1ecf3e32ea609a5335a1a",
-    "walk.dae": "0f86da546d4a6099058d2643e2f5ee766c4ccb46af831de3ab3ceb46b1b5c7ac",
-    "idle.dae": "a47ee98cc163fbe2ee1a2adb356cc217da7fa5c401715b1843fb6719529b53af",
+    "walk.dae": "fd124bc117f9bd7f52392eb653a72499580385c70fcfb8b0d1dd969c3e5d6cfb",
+    "idle.dae": "b47df8c2563aa57449cbbd2f7a3f9e4b4ac8c3511e7bc594579caaa6b81b7dc7",
     "materials.json": "fff2f2134b1f89b5317ec0a30e8f1dd0e67169d9043d7c5c0b6cbe99dae2a7a6"
   }
 }
