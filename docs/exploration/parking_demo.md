@@ -105,6 +105,9 @@ explicit `setup_path:=...` remains supported, but Isaac rejects a sensor rig
 different from its committed USD. Manager odometry defaults to
 `platform/odom/filtered` on Gazebo and `platform/odom` on Isaac, with
 `odometry_topic:=...` available as an override. Nav2 retains filtered odometry.
+The detector runs at `detection_threshold:=0.40` in local localization mode, for
+the [relocalization hysteresis](architecture.md#observation-return); the mission
+still confirms and first localizes G1 at 0.50.
 Use the normal pinned dependency installation, including the maintained
 Clearpath sensor and namespaced SLAM patches; an old system-only generator is
 not the repository's sensor contract.

@@ -11,6 +11,7 @@
     --paper: #f6f8fb; --card: #ffffff; --line: #dfe4ea;
     --accent: #3b5b8c; --accent-bg: #eef2f8;
     --ok: #2f7d4f; --ok-bg: #e9f5ee; --safe: #8a6a12; --safe-bg: #fbf3dc; --bad: #b3512f; --bad-bg: #fdf1ea;
+    --warn: #6b4f9a; --warn-bg: #f1ecf8;
     --mono: ui-monospace, "SF Mono", "Cascadia Code", Menlo, Consolas, monospace;
   }
   @media (prefers-color-scheme: dark) {
@@ -19,6 +20,7 @@
       --paper: #12161c; --card: #1a2028; --line: #2c3540;
       --accent: #8fb0e6; --accent-bg: #1f2a3a;
       --ok: #7fd3a1; --ok-bg: #18301f; --safe: #e8c66a; --safe-bg: #332a12; --bad: #f0a07c; --bad-bg: #36231b;
+      --warn: #c3a8ef; --warn-bg: #2a2238;
     }
   }
   * { box-sizing: border-box; }
@@ -54,6 +56,11 @@
   .badge.ok { color: var(--ok); background: var(--ok-bg); }
   .badge.safe { color: var(--safe); background: var(--safe-bg); }
   .badge.bad { color: var(--bad); background: var(--bad-bg); }
+  .badge.warn { color: var(--warn); background: var(--warn-bg); }
+  .badge.old { color: var(--faint); border: 1px solid var(--line); }
+  .card.historical { opacity: .82; }
+  tr.historical td { color: var(--faint); }
+  .legend { display: flex; flex-wrap: wrap; gap: .4rem .9rem; margin: .4rem 0 .8rem; font-size: .85rem; }
   .links { font-size: .82rem; margin: .6rem 0 0; }
   a { color: var(--accent); }
   ol, ul { max-width: 82ch; }
@@ -64,8 +71,9 @@
 <h1>Autonomous parking scenarios</h1>
 <p>Ridgeback explores around a Unitree G1, chooses a parking pose beside it so G1 can reach the
 basket, drives there under LiDAR supervision and returns to its start. Each card below is one
-recorded simulator run of an unchanged mission in a different scene. Code: <code>{{COMMITS}}</code>
-plus the scenario, basket and tool changes then in the working tree, committed as <code>28769c2</code>.</p>
+recorded simulator run of the mission in a different scene, labelled with the campaign and the
+exact code that ran. For a scenario, the newest code comes first; older runs stay as historical
+evidence and are marked so.</p>
 <p class="note">Ground truth (reach, bearing, pose error, clearance) is read from Gazebo for
 validation only; the mission never sees it. "Sides tried" are the mission's own labels from its
 estimated G1 heading. A safe failure is a run that parked nowhere unsafe and returned to its start.
@@ -98,16 +106,26 @@ Whether G1's hands can reach into the crate is not modelled. See the
 <a href="../robot/geometry.md#photographed-payload-and-the-provisional-basket">geometry reference</a>.</p>
 
 <h2>Results</h2>
+<div class="legend">
+<span><span class="badge ok">parked, returned</span> parking completed</span>
+<span><span class="badge safe">refused to park</span> the planner found no safe pose and said why</span>
+<span><span class="badge bad">perception: G1 not localized</span> G1 was not (re)localized in time</span>
+<span><span class="badge warn">stopped</span> another check stopped the mission</span>
+</div>
 <div class="wrap"><table>
-<tr><th>Scenario</th><th>Simulator</th><th>Outcome</th><th>Sides tried</th><th>Attempts</th>
-<th>Reach (truth)</th><th>Min clearance (truth)</th><th>Mission</th><th>Returned to start</th></tr>
+<tr><th>Scenario</th><th>Simulator</th><th>Campaign</th><th>Outcome</th><th>Sides tried</th><th>Attempts</th>
+<th>Reach (truth)</th><th>Min clearance (truth)</th><th>Mission</th></tr>
 {{SUMMARY}}
 </table></div>
-<p class="note">Cards show each scenario's final layout. Earlier layouts of A, E and F placed tall
-objects next to or behind G1, or showed G1 side-on; the detector then found G1 in under 8% of
-frames and localization timed out before planning. Those runs are listed in the
-<a href="../../archive/engineering/2026-11-05-parking-scenarios.md">scenario record</a>.
-One run per scenario shows behaviour, not a success rate. The five-run reliability
+<p class="note">In the P7 campaign the detector ran at the generic 0.55 floor: side-on views of G1
+and views beside tall objects scored 0.42-0.55, so <code>heading_90</code> and <code>no_feasible</code>
+stopped before planning. The validation-gaps campaign runs the parking detector at 0.40, keeps
+search confirmation and the first localization at the mission's G1 floor of 0.50, and accepts
+0.40-0.50 views during relocalization only near the known G1 position. Earlier layouts of A, E
+and F and every intermediate run are in the
+<a href="../../archive/engineering/2026-11-05-parking-scenarios.md">scenario record</a> and the
+<a href="../../archive/engineering/2026-11-05-parking-detection-gaps.md">detection-gaps record</a>.
+One or two runs per scenario show behaviour, not a success rate. The five-run reliability
 baseline of the standard scene is in the
 <a href="../../archive/engineering/2026-11-05-parking-retries-and-reliability.md">retry record</a>.</p>
 
@@ -118,7 +136,11 @@ baseline of the standard scene is in the
 <li>The basket, the mast-top enclosure and G1's hand reach are not measured; access is judged by the reach band only.</li>
 <li>Height is checked by the camera overlay only within 1.6 m of G1 and only where the camera has looked; Nav2 never sees tabletops.</li>
 <li>Side poses come close to G1's legs. The LiDAR monitor stops such approaches, and a retry moves elsewhere.</li>
-<li>G1 detection can fail in cluttered views, and relocalization can time out; both end safely without parking.</li>
+<li>OWLv2 scores a static view the same on every frame: when G1 stands side-on in front of a
+matching background (a steel column) it scores below 0.40 and relocalization times out; this
+ends safely without parking.</li>
+<li>During G1-centred exploration the shared explorer drove within 0.02-0.03 m of the pen's
+objects (ground truth); no parking leg came that close.</li>
 <li>Ground-truth clearance is sampled at about 1 Hz and treats G1 as a 0.19 m lower-body circle.</li>
 </ul>
 <p class="note">Scenario definitions: <code>src/ridgeback_autonomy/config/parking_scenarios.yaml</code>. Reference:

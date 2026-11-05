@@ -35,6 +35,9 @@ The original G1 detector filtered at `0.50`, while the current generic detector
 defaults to `0.55`. The adapter retains the original `0.50` floor but does not
 alter the upstream detector, so the current live pipeline remains effectively
 `0.55` until launch configuration is considered in a later integration phase.
+The parking launch now runs the detector at 0.40 and keeps the 0.50 floor for
+search confirmation and first localization; see
+[observation return](../exploration/architecture.md#observation-return).
 
 ## Phase 2 localization input
 
@@ -449,4 +452,5 @@ TF or changing estimator validation.
 - [Parking retries and reliability](../../archive/engineering/2026-11-05-parking-retries-and-reliability.md)
   — retry side selection, obstacles above the LiDAR plane, and Gazebo success by revision.
 - [Parking scenarios](../../archive/engineering/2026-11-05-parking-scenarios.md)
+- [Parking detection gaps](../../archive/engineering/2026-11-05-parking-detection-gaps.md)
   — blocked sides, tables, rear and front parking, G1 headings, and detection limits.

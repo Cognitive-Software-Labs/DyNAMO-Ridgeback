@@ -225,16 +225,19 @@ them. Validate G1's reach into the opening before changing the 0.30-0.60 m band.
 
 ## G1 detection in parking scenes
 
-**Gap.** In Gazebo parking scenes the detector found G1 in under 8% of frames
-when G1 stood side-on to the robot or close to tall objects, against 28-36% with
-open surroundings. Localization then saw no detection in its 5 s window and the
-mission ended `MISSION_FAILED` before planning, without driving. Retry
-relocalization can time out the same way. The 2026-11-05 parking scenario record
-under archived evidence holds the runs.
+**Gap.** OWLv2 scores a Gazebo G1 at about 0.42-0.60 depending on the view, and a
+static view scores the same on every frame. The parking detector now runs at
+0.40, with search and first localization at 0.50 and relocalization hysteresis
+near the known G1, which let `heading_90` and `no_feasible` reach planning. A
+side-on G1 in front of a matching background (a steel column) still scored below
+0.40 at one observation pose, and that relocalization timed out. Gazebo's
+walking person scored at most 0.19; Isaac's demo world has no person, and no
+second humanoid robot was tested. The 2026-11-05 detection-gaps record under
+archived evidence holds the runs.
 
-**Completion criteria.** Measure detection recall over G1 headings and nearby
-objects in both simulators, decide whether detection or the localization
-window changes, and rerun the affected parking scenarios.
+**Completion criteria.** Measure detection over G1 headings, backgrounds and a
+humanoid distractor in both simulators, and decide whether relocalization needs a
+second viewpoint when a static view fails.
 
 ## Collision-envelope and navigation-footprint validation
 
@@ -305,6 +308,7 @@ in the reference that owns the fact or moved to the item that owns the work.
 ## Archived evidence
 
 - [Parking scenarios](../archive/engineering/2026-11-05-parking-scenarios.md) — G1 detection rates by layout and heading, and the localization timeouts they caused.
+- [Parking detection gaps](../archive/engineering/2026-11-05-parking-detection-gaps.md) — OWLv2 scores by view, the parking detector floor and relocalization hysteresis, and the `heading_90` and `no_feasible` reruns.
 - [LiDAR/closed-loop SLAM qualification](../archive/engineering/2026-09-17-isaac-lidar-qualification.md)
 - [paired results and interpretation](../archive/engineering/2026-09-17-isaac-lidar-qualification.md#interpretation)
 - [Isaac port history](../archive/engineering/port-history.md#lidars-detached-from-the-articulation-2026-09-11)

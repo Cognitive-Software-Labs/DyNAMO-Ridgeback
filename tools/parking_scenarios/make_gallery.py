@@ -1,9 +1,10 @@
 """Build docs/exploration/autonomous_parking_gallery.html from recorded scenario runs.
 
-Usage: make_gallery.py EVIDENCE_ROOT RUN_DIR [RUN_DIR ...]
-Each RUN_DIR holds a run_scenario.sh result. Screenshots are cropped and saved as
-small JPEGs beside the page; metrics come from scenario_metrics.py. EVIDENCE_ROOT
-is the repository-relative folder the runs were copied to, used for the links.
+Usage: make_gallery.py RUN_DIR [RUN_DIR ...]
+Each RUN_DIR holds a run_scenario.sh result under the repository. Screenshots are
+cropped and saved as small JPEGs beside the page; metrics come from scenario_metrics.py.
+Runs are grouped by the code they ran (CODE below); for a scenario the newest code
+comes first and older cards stay as historical evidence.
 """
 import glob, html, json, os, subprocess, sys
 
@@ -21,6 +22,13 @@ TITLES = {'standard': 'Standard scene', 'worktable': 'A - G1 at a worktable',
           'both_sides_blocked': 'D - both sides blocked', 'restricted': 'E - restricted space',
           'no_feasible': 'F - no feasible position', 'heading_90': 'G - G1 heading 90 deg',
           'heading_away': 'G - G1 facing away'}
+# Recorded HEAD -> (campaign, code that ran: HEAD plus the then-uncommitted changes).
+# A run folder's code.txt overrides the code text when the working tree differed.
+CODE = {'fe60a88': ('P7 scenarios, 2026-11-05',
+                    'fe60a88 plus the changes committed as 28769c2'),
+        '622a0c0': ('Validation gaps, 2026-11-05',
+                    '622a0c0 plus the detection and fallback changes committed as 2ecaecf')}
+CAMPAIGNS = [c[0] for c in CODE.values()]
 
 
 def largest(paths):
@@ -52,9 +60,26 @@ def fmt(v, unit=''):
     return '-' if v is None or v == [] else f'{v}{unit}'
 
 
-def card(m, run, evidence):
+def outcome_badge(m):
+    """Parked, refused to park safely, a perception failure, or another stop."""
+    reason = m.get('final_reason') or ''
+    back = ', returned' if m.get('returned_to_start') else ', stopped'
+    if m['outcome'] == 'MISSION_COMPLETE':
+        return 'ok', 'parked, returned'
+    if 'no_valid_candidate' in reason or 'no feasible' in reason:
+        return 'safe', 'refused to park' + back
+    if 'localization' in reason or 'not relocalized' in reason:
+        return 'bad', 'perception: G1 not localized' + back
+    return 'warn', 'stopped by a check' + back
+
+
+def tag_of(m):
+    return f"{m['scenario']}_{m['simulator']}_{m['commit']}_{m['run']}"
+
+
+def card(m, run, latest):
     name = m['scenario']
-    tag = f"{name}_{m['simulator']}"
+    tag = tag_of(m)
     imgs = []
     # RViz map pane (donut rays, footprint, route, legend) when the pose was selected and at the end.
     for stages, label in ((['NAVIGATING_TO_PREPARKING', 'G1_LOCALIZED'], 'selection'),
@@ -70,16 +95,12 @@ def card(m, run, evidence):
     if src:
         crop = None if app == 'ruby' else '957x584+48+24'   # the Isaac viewport pane
         imgs.append((save(src, f'{tag}_sim.jpg', crop), f'{sim}, {stage.replace("END_", "end: ").lower()}'))
-    ok = m['outcome'] == 'MISSION_COMPLETE'
-    if ok:
-        badge = ('ok', 'parked, returned')
-    elif m.get('returned_to_start'):
-        badge = ('safe', 'safe failure, returned')
-    elif not m.get('attempts') and 'localization' in (m.get('final_reason') or ''):
-        badge = ('bad', 'G1 not localized, stopped')
-    else:
-        badge = ('bad', 'not completed')
+    badge = outcome_badge(m)
+    campaign, code = CODE.get(m['commit'], ('-', m['commit']))
+    if os.path.exists(f'{run}/code.txt'):   # a run on an intermediate working tree says so
+        code = open(f'{run}/code.txt').readline().strip()
     rows = [('Simulator', 'Gazebo' if m['simulator'] == 'gz' else 'Isaac Sim'),
+            ('Campaign', campaign), ('Code', code), ('Run', m['run']),
             ('G1 (world)', m['g1_pose']), ('Objects', m['objects']),
             ('Intended', m['expected']), ('Outcome', m['outcome']),
             ('Sides tried (estimated)', ', '.join(m.get('selected_sides') or []) or '-'),
@@ -98,10 +119,13 @@ def card(m, run, evidence):
     table = ''.join(f'<tr><th>{html.escape(k)}</th><td>{html.escape(str(v))}</td></tr>' for k, v in rows)
     figs = ''.join(f'<figure><img loading="lazy" src="{html.escape(p)}" alt="{html.escape(c)}">'
                    f'<figcaption>{html.escape(c)}</figcaption></figure>' for p, c in imgs)
-    link = f'../../{evidence}/{os.path.basename(run)}'
-    return (f'<section class="card" id="{tag}"><header><h3>{html.escape(TITLES.get(name, name))}</h3>'
-            f'<span class="badge {badge[0]}">{badge[1]}</span><code>{html.escape(name)}</code>'
-            f'<span class="sim">{"Gazebo" if m["simulator"] == "gz" else "Isaac"} - {m["commit"]}</span></header>'
+    link = '../../' + os.path.relpath(os.path.abspath(run), ROOT)
+    old = '' if latest else '<span class="badge old">historical</span>'
+    return (f'<section class="card{"" if latest else " historical"}" id="{tag}"><header>'
+            f'<h3>{html.escape(TITLES.get(name, name))}</h3>'
+            f'<span class="badge {badge[0]}">{badge[1]}</span>{old}<code>{html.escape(name)}</code>'
+            f'<span class="sim">{"Gazebo" if m["simulator"] == "gz" else "Isaac"} - '
+            f'{html.escape(campaign)}</span></header>'
             f'<p class="desc">{html.escape(m["description"])}</p>'
             f'<div class="shots">{figs}</div><table>{table}</table>'
             f'<p class="links">Evidence: <a href="{html.escape(link)}/">run folder</a> '
@@ -110,26 +134,41 @@ def card(m, run, evidence):
 
 
 def main():
-    evidence, runs = sys.argv[1], sys.argv[2:]
+    runs = sys.argv[1:]
     data = []
     for run in runs:
         m = metrics(run)
         with open(f'{run}/metrics.json', 'w') as f:
             json.dump(m, f, indent=1)
         data.append((m, run))
+    def campaign(m):
+        return CAMPAIGNS.index(CODE[m['commit']][0]) if m['commit'] in CODE else -1
+
+    # Per scenario and simulator: newest code first, then in the order the runs ended.
     data.sort(key=lambda d: (ORDER.index(d[0]['scenario']) if d[0]['scenario'] in ORDER else 99,
-                             d[0]['simulator']))
-    summary = ''.join(
-        f"<tr><td><a href=\"#{m['scenario']}_{m['simulator']}\">{html.escape(TITLES.get(m['scenario'], m['scenario']))}</a></td>"
-        f"<td>{'Gazebo' if m['simulator'] == 'gz' else 'Isaac'}</td><td>{html.escape(m['outcome'])}</td>"
-        f"<td>{html.escape(', '.join(m.get('selected_sides') or []) or '-')}</td><td>{fmt(m.get('attempts'))}</td>"
-        f"<td>{fmt(m.get('reach_truth_m'), ' m')}</td><td>{fmt(m.get('min_truth_clearance_m'), ' m')}</td>"
-        f"<td>{fmt(m.get('mission_s'), ' s')}</td><td>{fmt(m.get('returned_to_start'))}</td></tr>"
-        for m, _ in data)
-    cards = ''.join(card(m, run, evidence) for m, run in data)
+                             d[0]['simulator'], -campaign(d[0]),
+                             os.path.getmtime(f'{d[1]}/result.txt')))
+    newest = {}
+    for m, _ in data:
+        key = (m['scenario'], m['simulator'])
+        newest[key] = max(newest.get(key, -1), campaign(m))
+    rows = []
+    for m, _ in data:
+        latest = campaign(m) == newest[(m['scenario'], m['simulator'])]
+        kind, label = outcome_badge(m)
+        rows.append(
+            f"<tr{'' if latest else ' class=\"historical\"'}><td><a href=\"#{tag_of(m)}\">"
+            f"{html.escape(TITLES.get(m['scenario'], m['scenario']))}</a></td>"
+            f"<td>{'Gazebo' if m['simulator'] == 'gz' else 'Isaac'}</td>"
+            f"<td>{html.escape(CODE.get(m['commit'], (m['commit'],))[0])}</td>"
+            f"<td><span class=\"badge {kind}\">{html.escape(label)}</span></td>"
+            f"<td>{html.escape(', '.join(m.get('selected_sides') or []) or '-')}</td><td>{fmt(m.get('attempts'))}</td>"
+            f"<td>{fmt(m.get('reach_truth_m'), ' m')}</td><td>{fmt(m.get('min_truth_clearance_m'), ' m')}</td>"
+            f"<td>{fmt(m.get('mission_s'), ' s')}</td></tr>")
+    cards = ''.join(card(m, run, campaign(m) == newest[(m['scenario'], m['simulator'])])
+                    for m, run in data)
     page = open(os.path.join(HERE, 'gallery_template.html')).read()
-    page = page.replace('{{SUMMARY}}', summary).replace('{{CARDS}}', cards)
-    page = page.replace('{{COMMITS}}', html.escape(', '.join(sorted({m['commit'] for m, _ in data}))))
+    page = page.replace('{{SUMMARY}}', ''.join(rows)).replace('{{CARDS}}', cards)
     with open(OUT, 'w') as f:
         f.write(page)
     print('wrote', OUT, len(data), 'runs')

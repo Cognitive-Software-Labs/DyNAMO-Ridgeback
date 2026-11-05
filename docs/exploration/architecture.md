@@ -275,12 +275,21 @@ vertical half view. Otherwise, and once if the turn, its view check or the local
 fails, it returns to the observation pose: the pose at which G1 was first
 localized, where the detector has already found it. The detector's score near
 its threshold depends on the exact view: a lateral shift of 0.1 m or an 18°
-turn can put the same, fully visible G1 just below it. Both goals apply a
+turn can put the same, fully visible G1 just below it, and a static simulated
+view scores the same on every frame. Relocalizing a G1 that already has a
+position therefore uses hysteresis: search confirmation (three of five frames)
+and the first localization keep the mission's G1 floor of 0.50, while a later
+relocalization also accepts the same label from 0.40 when that sample's map
+position lies within the 0.75 m sample jump of the known G1
+(`weak_detection_away_from_known_target` otherwise). The parking launch runs the
+detector at that 0.40 floor in local localization mode; generic exploration and
+benchmarking keep 0.55. Both goals apply a
 temporary goal checker of 0.03 m and 0.10 rad (`observation_xy_tolerance_m`,
 `observation_yaw_tolerance_rad`) through the same parameter call the parking
 legs use, and are sent only after the change is confirmed. If it is not
 confirmed, the turn falls back to the observation pose, and the observation
-return fails rather than return loosely. When Nav2 releases a goal, by
+return fails rather than return loosely. A turn cancelled at its deadline is
+released by Nav2 before the observation goal is sent. When Nav2 releases a goal, by
 success, failure or deadline, the shared checker is restored.
 
 Nav2 success alone does not start the localization. After fresh odometry
