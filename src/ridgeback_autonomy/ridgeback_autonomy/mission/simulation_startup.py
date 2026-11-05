@@ -45,20 +45,48 @@ FAILED_STATES = {'MISSION_FAILED', 'MISSION_CANCELED', 'MOTION_SETTLEMENT_FAILED
                  'PARKING_PLANNING_FAILED', 'PARKING_EXECUTION_FAILED'}
 
 
-def demo_specs(backend, *, share=get_package_share_directory):
+DEMO_PREFIX = 'bench_parking_demo_'
+SCENARIOS_RELATIVE_PATH = 'config/parking_scenarios.yaml'
+
+
+def load_scenarios(*, share=get_package_share_directory):
+    """The named demo scenes; `standard` is the original G1 and table."""
+    import yaml
+    with open(f"{share('ridgeback_autonomy')}/{SCENARIOS_RELATIVE_PATH}") as stream:
+        data = yaml.safe_load(stream)
+    if data.get('schema') != 'ridgeback_parking_scenarios/1':
+        raise ValueError('unsupported parking scenario schema')
+    return data['scenarios']
+
+
+def demo_specs(backend, scenario='standard', *, share=get_package_share_directory):
+    scenarios = load_scenarios(share=share)
+    if scenario not in scenarios:
+        raise ValueError(f'unknown demo scenario {scenario!r}; known: {", ".join(scenarios)}')
+    scene = scenarios[scenario]
+    if backend not in scene.get('backends', ('gz', 'isaac')):
+        raise ValueError(f'demo scenario {scenario!r} does not fit the {backend} world; '
+                         f'supported: {", ".join(scene["backends"])}')
     provider = benchmark_backend(backend)
     catalog = load_asset_catalog(asset_catalog_path(provider, package_share=share))
     # Origin heights follow the selected demo world's floor, not benchmark
     # calibration placement. The original SDF and ground-origin USD are reused.
     floor = 0.05 if backend == 'isaac' else 0.0
-    return [SpawnSpec(DEMO_G1, catalog.targets['g1'].uri,
-                      catalog.targets['g1'].resource_format, 3.0, 0.0, floor, math.pi),
-            SpawnSpec(DEMO_TABLE, catalog.objects['table'].uri,
-                      catalog.objects['table'].resource_format, 3.0, 1.05, floor, 0.0)]
+    g1 = scene['g1']
+    specs = [SpawnSpec(DEMO_G1, catalog.targets['g1'].uri, catalog.targets['g1'].resource_format,
+                       float(g1['x']), float(g1['y']), floor, math.radians(g1['yaw_deg']))]
+    for item in scene.get('objects') or []:
+        asset = catalog.objects[item['asset']]
+        specs.append(SpawnSpec(DEMO_PREFIX + item['name'], asset.uri, asset.resource_format,
+                               float(item['x']), float(item['y']), floor,
+                               math.radians(item['yaw_deg'])))
+    if len({spec.name for spec in specs}) != len(specs):
+        raise ValueError(f'duplicate object names in demo scenario {scenario!r}')
+    return specs
 
 
 def check_demo_entities(names):
-    conflicts = [name for name in names if 'g1' in name.lower() or name == DEMO_TABLE]
+    conflicts = [name for name in names if 'g1' in name.lower() or name.startswith(DEMO_PREFIX)]
     if conflicts:
         raise RuntimeError(f'demo refuses existing G1/table entities: {conflicts}; '
                            'start a fresh demo world; no existing entity was deleted')
@@ -254,14 +282,15 @@ class SimulationStartup(Node):
             self.get_logger().info('Waiting for simulator scene services and advancing /clock')
             self.scene.wait_for_services(self.remaining())
             self.scene.wait_for_advancing_clock(self.remaining())
-            specs = demo_specs(self.args.backend)
+            specs = demo_specs(self.args.backend, self.args.scenario)
             entities = self.create_client(GetEntities,
                 provider.scene_control_service_namespace + '/get_entities')
             response = self.call(entities, GetEntities.Request())
             if response.result.result != Result.RESULT_OK:
                 raise RuntimeError('cannot inspect scene for duplicate G1: ' + response.result.error_message)
             spawn_demo_scene(self.scene, specs, response.entities, self.spawned)
-            self.get_logger().info('Created and verified G1 and table: ' + ', '.join(self.spawned))
+            self.get_logger().info(f'Created and verified demo scenario {self.args.scenario}: '
+                                   + ', '.join(self.spawned))
         self.wait(self.readiness)
         if self.args.hold_explorer or self.guard[0].get('ownership_mode') == 'stationary_mock':
             response = self.call(self.pause, Trigger.Request())
@@ -313,6 +342,7 @@ def main():
     parser.add_argument('--odometry-topic', required=True)
     parser.add_argument('--timeout', type=float, default=300.0)
     parser.add_argument('--demo', action='store_true')
+    parser.add_argument('--scenario', default='standard')
     parser.add_argument('--hold-explorer', action='store_true')
     args, ros_args = parser.parse_known_args()
     if not math.isfinite(args.timeout) or args.timeout <= 0:

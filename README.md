@@ -257,7 +257,7 @@ every physical gate's status.
 `start_parking_demo.sh` runs the parking mission beside a G1 in one simulator on
 isolated CycloneDDS domain 83. `--plan-only` keeps the robot stationary; without
 it the robot explores, parks and returns, which is not yet qualified. Modes, the
-spawned scene and startup gates are in the [parking reference](docs/exploration/parking_demo.md).
+spawned scenes and startup gates are in the [parking reference](docs/exploration/parking_demo.md); results are in the [scenario gallery](docs/exploration/autonomous_parking_gallery.html).
 
 ```bash
 bash start_parking_demo.sh gz --plan-only      # then, after Ctrl-C: isaac --plan-only

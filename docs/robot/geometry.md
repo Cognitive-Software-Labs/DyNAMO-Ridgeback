@@ -215,11 +215,53 @@ These are focused integration checks, not full field-of-view, wall-contact,
 hardware-clearance or benchmark qualification. Neither benchmark results nor
 navigation-footprint parameters were updated by this change.
 
+## Photographed payload and the provisional basket
+
+Two photographs of the physical Ridgeback, provided on 2026-11-05, show the deck payload.
+They place parts relative to each other; no dimension below is read from them.
+
+![Physical Ridgeback from the front: the camera bar on the mast, the grey crate behind it.](assets/physical-ridgeback-front.jpg)
+![Physical Ridgeback from the front right: the crate on the rear deck, the mast forward of it.](assets/physical-ridgeback-oblique.jpg)
+
+| Photographed part | Gazebo and Isaac models | Status |
+|---|---|---|
+| Aluminium mast, centred, forward of the crate | [Shared support](#shared-camera-support) mast to 1.095 m above `base_link` | Modelled; model-derived dimensions |
+| Camera bar high on the mast, facing forward | D455 on the configured mount | Modelled; mount owned by the YAML |
+| Black enclosure on the mast top, above the camera | None | Not modelled; size and top height unknown |
+| Triangular mast base plate | None | Not modelled; low on the deck, inside the footprint |
+| Grey top-open crate with ribbed walls, on the rear deck centreline | Provisional basket, below | Added 2026-11-05; no measurement |
+| Bright green inserts inside the crate | None | Not modelled; they narrow the opening |
+| Two thin antennas on the deck | None | Not modelled |
+
+The provisional basket is five boxes in
+[`camera_support.urdf.xacro`](../../src/ridgeback_common/urdf/camera_support.urdf.xacro),
+fixed to `chassis_link` like the mast. Its only engineering source is the rear bin
+of the original thesis `~/clearpath/robot.yaml`: outside 0.40 x 0.38 m, walls
+0.04 m thick, centred at x = -0.28 m (the parking task point), rim 0.36 m and
+interior floor 0.15-0.18 m above the deck. The thesis walls floated above the
+deck; here they stand on it, because the photographs show a continuous crate
+side down to the deck. Each box has a nominal 0.20 kg. The basket lies above
+both LiDAR planes and behind the camera, so no sensor sees it.
+
+Isaac attaches the same boxes to its chassis body as colliders. They were
+applied to the committed USD with the importer's own `update_camera_support`
+step only. A full re-import with the installed URDF converter (v0.3.2) rewrote
+unrelated physics layers of the asset, which was built with v0.1.3, so that
+output was discarded.
+
+Missing measurements, all needed before the basket counts as verified: the
+crate's outside length, width and height; its x position and lateral offset on
+the deck; its rim height above the floor; wall thickness, interior floor height
+and the inserts' geometry; whether stacked containers are fixed together; the
+enclosure's size and top height; and the mast base plate's footprint. Until
+then the parking task point, reach band and footprint stay unchanged.
+
 ## Known representation differences
 
 Deck placements and chassis transforms remain different. Shared support
 geometry does not certify cross-backend contact behavior or hardware clearance.
-The retained beam top and simplified bracket have not been fully surveyed.
+The retained beam top and simplified bracket have not been fully surveyed. The
+deck basket is provisional and the mast-top enclosure is not modelled.
 The [shared support qualification](../BACKLOG.md#shared-camera-mast-and-bracket-geometry)
 retains broader sensor/contact, physical-dimension and affected-benchmark gates; the
 [envelope audit](../BACKLOG.md#collision-envelope-and-navigation-footprint-validation)

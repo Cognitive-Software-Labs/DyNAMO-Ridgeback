@@ -82,8 +82,10 @@ pose's side ([G1 heading](architecture.md#g1-heading)).
 The wrapper calls `ridgeback_mission.launch.py` with `demo_scene_enabled:=true`.
 The default Gazebo environment is `depot` (native world `warehouse`); Isaac
 uses `parking_demo`, a layer over `initial_test_world` that disables its distant
-authored G1. Startup creates exactly one demo G1 at `(3, 0)` and the existing
-table at `(3, 1.05)` through `/gzserver` or `/isaac_sim` standard scene services.
+authored G1. Startup creates exactly one demo G1 and the objects of the selected
+[parking scenario](parking_scenarios.md) (`demo_scenario`, default `standard`: G1
+at `(3, 0)` and a table at `(3, 1.05)`) through `/gzserver` or `/isaac_sim`
+standard scene services.
 Creation failures or existing G1 entities abort startup rather than renaming
 or deleting an existing target. Manual `gz service` calls and the removed
 `benchmarking.simulation.spawn_model_command` helper are not needed.

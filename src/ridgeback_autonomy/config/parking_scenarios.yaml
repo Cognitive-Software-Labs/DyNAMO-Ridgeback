@@ -1,0 +1,86 @@
+# Parking demo scenes: G1 and catalog objects spawned into the demo world by
+# parking_simulation_startup (launch argument demo_scenario). Poses are world x/y in
+# metres and yaw in degrees; heights follow the demo world's floor. Assets are the
+# logical names of each backend's sim/benchmark_assets.yaml, so Gazebo and Isaac
+# spawn the same collision geometry. G1's left is +90 degrees from the way it faces.
+# `backends` lists where a scene fits (default both): Isaac's demo world has corridor
+# walls at |y| 1.5-1.7 m, so scenes with objects beyond about 1.45 m are Gazebo-only.
+# `expected` states the intended outcome only; it is never used by the mission.
+schema: ridgeback_parking_scenarios/1
+scenarios:
+  standard:
+    description: G1 facing the robot's start; a table on G1's right
+    expected: parking beside G1, left preferred over the table side
+    g1: {x: 3.0, y: 0.0, yaw_deg: 180}
+    objects:
+      - {name: table, asset: table, x: 3.0, y: 1.05, yaw_deg: 0}
+  worktable:
+    # Back to the start: seen side-on (yaw 90) the detector found G1 in about 1% of
+    # frames and localization timed out before planning (2026-11-05).
+    description: G1 standing at a worktable 0.40 m ahead and facing it, its back to the start
+    expected: parking on G1's left or right, never under the tabletop
+    g1: {x: 3.0, y: 0.0, yaw_deg: 0}
+    objects:
+      - {name: table, asset: table, x: 3.75, y: 0.0, yaw_deg: 90}
+  right_blocked:
+    description: a 1.7 m panel along G1's right side
+    expected: parking on G1's left
+    g1: {x: 3.0, y: 0.0, yaw_deg: 180}
+    objects:
+      - {name: right_panel, asset: privacy_curtain, x: 3.0, y: 0.8, yaw_deg: 90}
+  left_blocked:
+    description: a 1.7 m panel along G1's left side
+    expected: parking on G1's right
+    g1: {x: 3.0, y: 0.0, yaw_deg: 180}
+    objects:
+      - {name: left_panel, asset: privacy_curtain, x: 3.0, y: -0.8, yaw_deg: 90}
+  both_sides_blocked:
+    description: panels along both sides of G1, open behind it
+    expected: parking behind G1
+    g1: {x: 3.0, y: 0.0, yaw_deg: 180}
+    objects:
+      - {name: right_panel, asset: privacy_curtain, x: 3.0, y: 0.8, yaw_deg: 90}
+      - {name: left_panel, asset: privacy_curtain, x: 3.0, y: -0.8, yaw_deg: 90}
+  restricted:
+    # Facing away: facing the start between the tables, G1 was detected in 0-20% of
+    # frames and none while localizing, so localization timed out (2026-11-05).
+    description: >-
+      G1 facing away from the start between two tables whose tops the base fits under
+      but the mast does not, a 0.5 m bed ahead of it and a 2.1 m wide entrance passage
+    expected: parking behind G1 (toward the start); no pose under a tabletop
+    backends: [gz]
+    g1: {x: 3.0, y: 0.0, yaw_deg: 0}
+    objects:
+      - {name: right_table, asset: table, x: 3.0, y: -1.2, yaw_deg: 0}
+      - {name: left_table, asset: table, x: 3.0, y: 1.2, yaw_deg: 0}
+      - {name: front_bed, asset: hospital_bed, x: 4.1, y: 0.0, yaw_deg: 90}
+      - {name: passage_right, asset: privacy_curtain, x: 1.5, y: 1.1, yaw_deg: 90}
+      - {name: passage_left, asset: privacy_curtain, x: 1.5, y: -1.1, yaw_deg: 90}
+  no_feasible:
+    # A closed pen keeps everything near G1 low or far: beds beside G1 with poles in
+    # front of it, or panels 0.38 m away, cut detection and localization timed out.
+    description: >-
+      G1 inside a closed pen about 1.5 m around it: 0.5 m beds in front and behind,
+      1.6 m panels along the sides. Poses exist inside, but no route reaches them
+    expected: no parking manoeuvre; bounded planning, return to start, clear reason
+    backends: [gz]
+    g1: {x: 3.0, y: 0.0, yaw_deg: 180}
+    objects:
+      - {name: front_bed_right, asset: hospital_bed, x: 1.6, y: 0.9, yaw_deg: 90}
+      - {name: front_bed_left, asset: hospital_bed, x: 1.6, y: -0.9, yaw_deg: 90}
+      - {name: rear_bed_right, asset: hospital_bed, x: 4.6, y: 0.9, yaw_deg: 90}
+      - {name: rear_bed_left, asset: hospital_bed, x: 4.6, y: -0.9, yaw_deg: 90}
+      - {name: right_panel_front, asset: privacy_curtain, x: 2.0, y: 1.83, yaw_deg: 90}
+      - {name: right_panel_rear, asset: privacy_curtain, x: 3.7, y: 1.83, yaw_deg: 90}
+      - {name: left_panel_front, asset: privacy_curtain, x: 2.0, y: -1.83, yaw_deg: 90}
+      - {name: left_panel_rear, asset: privacy_curtain, x: 3.7, y: -1.83, yaw_deg: 90}
+  heading_90:
+    description: G1 facing +y, side-on to the start, its left toward the start
+    expected: parking on G1's left (-x) or right (+x), preferences rotated with G1
+    g1: {x: 3.0, y: 0.0, yaw_deg: 90}
+    objects: []
+  heading_away:
+    description: G1 facing away from the start, forearms hidden behind its body
+    expected: G1 heading estimated from another view, or the fallback without a heading
+    g1: {x: 3.0, y: 0.0, yaw_deg: 0}
+    objects: []

@@ -44,4 +44,29 @@
     x="${(support_mast_front+support_camera_back_x)/2}" y="0" z="${support_camera_mid_z}"
     sx="${support_camera_back_x-support_mast_front}" sy="${support_bracket_size}" sz="${support_bracket_size}"
     mass="0.10" color="0.045 0.045 0.05 1"/>
+  <!-- PROVISIONAL top-open transport basket on the rear deck (see docs/robot/geometry.md).
+       No physical measurement exists. Plan size, wall thickness, centre and rim/floor
+       heights are the thesis bin of the original ~/clearpath/robot.yaml (centre x=-0.28,
+       the parking task point); walls are seated on the deck instead of floating.
+       The green inserts and the mast-top enclosure are not modelled. Masses are nominal. -->
+  <xacro:property name="basket_x" value="-0.28"/>
+  <xacro:property name="basket_rim" value="${support_deck_z + 0.36}"/>
+  <xacro:property name="basket_wall_mid" value="${(support_deck_z + basket_rim)/2}"/>
+  <xacro:property name="basket_wall_h" value="${basket_rim - support_deck_z}"/>
+  <xacro:property name="basket_grey" value="0.62 0.64 0.66 1"/>
+  <xacro:ridgeback_support_box name="basket_floor"
+    x="${basket_x}" y="0" z="${support_deck_z + 0.165}" sx="0.36" sy="0.34" sz="0.03"
+    mass="0.20" color="${basket_grey}"/>
+  <xacro:ridgeback_support_box name="basket_front_wall"
+    x="${basket_x + 0.18}" y="0" z="${basket_wall_mid}" sx="0.04" sy="0.34" sz="${basket_wall_h}"
+    mass="0.20" color="${basket_grey}"/>
+  <xacro:ridgeback_support_box name="basket_rear_wall"
+    x="${basket_x - 0.18}" y="0" z="${basket_wall_mid}" sx="0.04" sy="0.34" sz="${basket_wall_h}"
+    mass="0.20" color="${basket_grey}"/>
+  <xacro:ridgeback_support_box name="basket_left_wall"
+    x="${basket_x}" y="0.17" z="${basket_wall_mid}" sx="0.36" sy="0.04" sz="${basket_wall_h}"
+    mass="0.20" color="${basket_grey}"/>
+  <xacro:ridgeback_support_box name="basket_right_wall"
+    x="${basket_x}" y="-0.17" z="${basket_wall_mid}" sx="0.36" sy="0.04" sz="${basket_wall_h}"
+    mass="0.20" color="${basket_grey}"/>
 </robot>

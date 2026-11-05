@@ -532,6 +532,76 @@ def Xform "tn__r1000001_bC" (
                     double3 xformOp:translate = (0.236625, 0, 1.03449976682663)
                     uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:scale"]
                 }
+
+                def Cube "basket_floor" (
+                    prepend apiSchemas = ["PhysicsCollisionAPI", "MaterialBindingAPI"]
+                    customData = {
+                        string geometry_source = "ridgeback_common/urdf/camera_support.urdf.xacro"
+                    }
+                )
+                {
+                    rel material:binding = </tn__r1000001_bC/Materials/basket_grey>
+                    double size = 1
+                    float3 xformOp:scale = (0.36, 0.34, 0.03)
+                    double3 xformOp:translate = (-0.28, 0, 0.44500000000000006)
+                    uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:scale"]
+                }
+
+                def Cube "basket_front_wall" (
+                    prepend apiSchemas = ["PhysicsCollisionAPI", "MaterialBindingAPI"]
+                    customData = {
+                        string geometry_source = "ridgeback_common/urdf/camera_support.urdf.xacro"
+                    }
+                )
+                {
+                    rel material:binding = </tn__r1000001_bC/Materials/basket_grey>
+                    double size = 1
+                    float3 xformOp:scale = (0.04, 0.34, 0.36)
+                    double3 xformOp:translate = (-0.10000000000000003, 0, 0.46)
+                    uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:scale"]
+                }
+
+                def Cube "basket_rear_wall" (
+                    prepend apiSchemas = ["PhysicsCollisionAPI", "MaterialBindingAPI"]
+                    customData = {
+                        string geometry_source = "ridgeback_common/urdf/camera_support.urdf.xacro"
+                    }
+                )
+                {
+                    rel material:binding = </tn__r1000001_bC/Materials/basket_grey>
+                    double size = 1
+                    float3 xformOp:scale = (0.04, 0.34, 0.36)
+                    double3 xformOp:translate = (-0.46, 0, 0.46)
+                    uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:scale"]
+                }
+
+                def Cube "basket_left_wall" (
+                    prepend apiSchemas = ["PhysicsCollisionAPI", "MaterialBindingAPI"]
+                    customData = {
+                        string geometry_source = "ridgeback_common/urdf/camera_support.urdf.xacro"
+                    }
+                )
+                {
+                    rel material:binding = </tn__r1000001_bC/Materials/basket_grey>
+                    double size = 1
+                    float3 xformOp:scale = (0.36, 0.04, 0.36)
+                    double3 xformOp:translate = (-0.28, 0.17, 0.46)
+                    uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:scale"]
+                }
+
+                def Cube "basket_right_wall" (
+                    prepend apiSchemas = ["PhysicsCollisionAPI", "MaterialBindingAPI"]
+                    customData = {
+                        string geometry_source = "ridgeback_common/urdf/camera_support.urdf.xacro"
+                    }
+                )
+                {
+                    rel material:binding = </tn__r1000001_bC/Materials/basket_grey>
+                    double size = 1
+                    float3 xformOp:scale = (0.36, 0.04, 0.36)
+                    double3 xformOp:translate = (-0.28, -0.17, 0.46)
+                    uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:scale"]
+                }
             }
         }
     }
@@ -624,6 +694,20 @@ def Xform "tn__r1000001_bC" (
                 token outputs:surface
             }
         }
+
+        def Material "basket_grey"
+        {
+            token outputs:surface.connect = </tn__r1000001_bC/Materials/basket_grey/PreviewSurface.outputs:surface>
+
+            def Shader "PreviewSurface"
+            {
+                uniform token info:id = "UsdPreviewSurface"
+                color3f inputs:diffuseColor = (0.62, 0.64, 0.66)
+                float inputs:metallic = 0
+                float inputs:roughness = 0.7
+                token outputs:surface
+            }
+        }
     }
     variantSet "Physics" = {
         "mujoco" (
@@ -646,3 +730,4 @@ def Xform "tn__r1000001_bC" (
         }
     }
 }
+

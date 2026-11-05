@@ -71,6 +71,7 @@ troubleshooting, planning, and historical documentation.
     every `ridgeback_exploration.launch.py` argument
 - [Exploration evaluation](exploration/evaluation.md)
 - [Simulation parking demonstration](exploration/parking_demo.md) — `start_parking_demo.sh`
+- [Parking scenarios](exploration/parking_scenarios.md) — named G1 scenes, the provisional basket and the [scenario gallery](exploration/autonomous_parking_gallery.html)
   modes, spawned G1 scene and startup gates
 - [Ground-truth maps](../src/ridgeback_autonomy/sim/ground_truth_maps/README.md)
 

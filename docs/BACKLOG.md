@@ -208,6 +208,34 @@ supplies recorded offsets; mount photos were waived. Detailed
 attachment dimensions and qualifying the shared assets remain owned by
 this item, not prerequisites for the field visit.
 
+## Deck basket and mast-top payload measurements
+
+**Gap.** The simulated deck basket is provisional: the thesis bin's plan size,
+rim and floor heights, seated on the deck. The mast-top enclosure and the mast
+base plate are not modelled, and nothing models G1's hands reaching into the
+crate. See [photographed payload](robot/geometry.md#photographed-payload-and-the-provisional-basket).
+
+**Completion criteria.** Measure the crate's outside size, position and rim
+height on the deck, the inserts and the enclosure's size and top height, with
+their uncertainty. Update the shared Xacro and the Isaac colliders from them,
+and recheck the parking task point and the 0.25-1.15 m overhead band against
+them. Validate G1's reach into the opening before changing the 0.30-0.60 m band.
+
+**Context.** [Parking scenarios](exploration/parking_scenarios.md#robot-height-and-the-basket).
+
+## G1 detection in parking scenes
+
+**Gap.** In Gazebo parking scenes the detector found G1 in under 8% of frames
+when G1 stood side-on to the robot or close to tall objects, against 28-36% with
+open surroundings. Localization then saw no detection in its 5 s window and the
+mission ended `MISSION_FAILED` before planning, without driving. Retry
+relocalization can time out the same way. See the
+[scenario record](../archive/engineering/2026-11-05-parking-scenarios.md).
+
+**Completion criteria.** Measure detection recall over G1 headings and nearby
+objects in both simulators, decide whether detection or the localization
+window changes, and rerun the affected parking scenarios.
+
 ## Collision-envelope and navigation-footprint validation
 
 **Drive scope.** Retain the [Isaac planar drive](isaac/robot-model.md#why-this-abstraction-fits-the-current-work)

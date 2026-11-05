@@ -817,6 +817,11 @@ def _camera_mesh_bounds(stage):
     return (lo, hi) if found else None
 
 
+# Shared boxes on the chassis: the camera support, then the provisional deck basket.
+SHARED_SUPPORT_LINKS = ("camera_mast", "camera_standoff", "basket_floor", "basket_front_wall",
+                        "basket_rear_wall", "basket_left_wall", "basket_right_wall")
+
+
 def _take_shared_support(urdf_path: Path) -> list[dict]:
     """Read shared box geometry, then omit its bodies from the planar importer.
 
@@ -830,7 +835,7 @@ def _take_shared_support(urdf_path: Path) -> list[dict]:
     root = tree.getroot()
     support = []
     remove = []
-    for name in ("camera_mast", "camera_standoff"):
+    for name in SHARED_SUPPORT_LINKS:
         link = root.find(f"link[@name='{name}']")
         joint = root.find(f"joint[@name='{name}_joint']")
         if link is None or joint is None:
@@ -882,8 +887,11 @@ def update_camera_support(usd_path: Path, support: list[dict]) -> None:
     mats = str(stage.GetDefaultPrim().GetPath()) + "/Materials"
     for spec in support:
         mast = spec["name"] == "camera_mast"
-        material = _ensure_material(stage, f"{mats}/{'mast_aluminium' if mast else 'bracket_black'}",
-                                    tuple(spec["color"]), 0.85 if mast else 0.0, 0.32 if mast else 0.55)
+        if spec["name"].startswith("basket_"):
+            material = _ensure_material(stage, f"{mats}/basket_grey", tuple(spec["color"]), 0.0, 0.7)
+        else:
+            material = _ensure_material(stage, f"{mats}/{'mast_aluminium' if mast else 'bracket_black'}",
+                                        tuple(spec["color"]), 0.85 if mast else 0.0, 0.32 if mast else 0.55)
         cube = UsdGeom.Cube.Define(stage, chassis.GetPath().AppendChild(spec["name"]))
         cube.CreateSizeAttr(1.0)
         UsdGeom.XformCommonAPI(cube).SetTranslate(Gf.Vec3d(*spec["centre"]))

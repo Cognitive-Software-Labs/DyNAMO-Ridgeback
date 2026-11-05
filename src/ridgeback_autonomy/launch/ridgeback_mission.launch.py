@@ -122,7 +122,8 @@ def _startup_nodes(context):
     def gate(phase):
         return Node(package='ridgeback_autonomy', executable='parking_simulation_startup',
             name='parking_startup_' + phase, namespace=value('namespace'),
-            arguments=['--phase', phase, *common, *(['--demo'] if demo else [])],
+            arguments=['--phase', phase, *common,
+                       *(['--demo', '--scenario', value('demo_scenario')] if demo else [])],
             parameters=[{'use_sim_time': True}],
             remappings=[('/tf', 'tf'), ('/tf_static', 'tf_static')], output='screen')
     prepare, release = gate('prepare'), gate('release')
@@ -158,6 +159,8 @@ def generate_launch_description():
             'backend', default_value='gz', choices=['gz', 'isaac'],
             description='Simulation backend; hardware is intentionally excluded'),
         DeclareLaunchArgument('demo_scene_enabled', default_value='false', choices=['true', 'false']),
+        DeclareLaunchArgument('demo_scenario', default_value='standard',
+                              description='Demo scene from config/parking_scenarios.yaml'),
         DeclareLaunchArgument(
             'world', default_value=PythonExpression([
                 "'parking_demo' if '", backend, "' == 'isaac' and '",

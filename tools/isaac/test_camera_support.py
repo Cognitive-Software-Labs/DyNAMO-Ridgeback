@@ -24,17 +24,24 @@ def test_support_fits_retained_deck_and_housing(tmp_path, deck, length):
     path = expanded(tmp_path, deck)
     root = ET.parse(path).getroot()
     # Sensor frames must never become children of the visual support.
-    assert [j.find('parent').get('link') for j in root.findall('joint')] == ['chassis_link'] * 2
+    assert [j.find('parent').get('link') for j in root.findall('joint')] == ['chassis_link'] * 7
     for link in root.findall('link'):
         assert float(link.find('inertial/mass').get('value')) > 0
         assert all(float(link.find('inertial/inertia').get(a)) > 0 for a in ('ixx', 'iyy', 'izz'))
-    mast, bracket = IMPORTER._take_shared_support(path)
+    mast, bracket, *basket = IMPORTER._take_shared_support(path)
     assert mast['size'][2] == pytest.approx(length)
     assert mast['centre'][2] - mast['size'][2]/2 == pytest.approx(deck)
     assert mast['centre'][2] + mast['size'][2]/2 == pytest.approx(1.095)
     assert bracket['centre'][0] - bracket['size'][0]/2 == pytest.approx(mast['centre'][0] + mast['size'][0]/2)
     assert bracket['centre'][0] + bracket['size'][0]/2 == pytest.approx(0.259)
     assert bracket['centre'][2] == pytest.approx((1.02 + 1.04899953365326)/2)
+    # Provisional basket: seated on the deck, rim 0.36 m above it, centred on the task point.
+    walls = [b for b in basket if b['name'].endswith('_wall')]
+    assert len(walls) == 4 and len(basket) == 5
+    assert all(b['centre'][2] - b['size'][2]/2 == pytest.approx(deck) for b in walls)
+    assert all(b['centre'][2] + b['size'][2]/2 == pytest.approx(deck + 0.36) for b in walls)
+    xs = [b['centre'][0] + s*b['size'][0]/2 for b in walls for s in (-1, 1)]
+    assert (min(xs), max(xs)) == (pytest.approx(-0.48), pytest.approx(-0.08))
 
 
 def test_planar_import_removes_only_support_bodies(tmp_path):
@@ -47,7 +54,7 @@ def test_planar_import_removes_only_support_bodies(tmp_path):
         root.append(ET.fromstring(xml))
     preserved = [ET.tostring(e) for e in list(root)[-3:]]
     tree.write(path)
-    assert len(IMPORTER._take_shared_support(path)) == 2
+    assert len(IMPORTER._take_shared_support(path)) == 7
     assert [ET.tostring(e) for e in ET.parse(path).getroot()] == preserved
 
 

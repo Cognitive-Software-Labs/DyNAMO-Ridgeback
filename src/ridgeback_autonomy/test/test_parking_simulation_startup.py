@@ -5,6 +5,8 @@ from pathlib import Path
 from types import SimpleNamespace
 import xml.etree.ElementTree as ET
 
+import math
+
 import pytest
 import yaml
 
@@ -181,6 +183,35 @@ def test_real_asset_catalogs_supply_the_two_models_and_world_floor_heights():
         assert g1.z == table.z == floor
         assert Path(g1.uri).is_file() and Path(table.uri).is_file()
         assert table.y - g1.y == pytest.approx(1.05)
+
+
+def test_every_scenario_spawns_catalog_assets_in_both_simulators():
+    from ridgeback_autonomy.mission.simulation_startup import load_scenarios
+    names = load_scenarios(share=lambda package: str(ROOT/'src'/package))
+    assert {'standard', 'right_blocked', 'left_blocked', 'both_sides_blocked',
+            'no_feasible'} <= set(names)
+    for backend in ('gz', 'isaac'):
+        for name in names:
+            if backend not in names[name].get('backends', ('gz', 'isaac')):
+                with pytest.raises(ValueError, match='does not fit'):
+                    demo_specs(backend, name, share=lambda package: str(ROOT/'src'/package))
+                continue
+            spawned = demo_specs(backend, name, share=lambda package: str(ROOT/'src'/package))
+            assert spawned[0].name == DEMO_G1
+            assert all(Path(s.uri).is_file() for s in spawned)
+            assert len({s.name for s in spawned}) == len(spawned)
+            check_demo_entities([])          # names are owned, never pre-existing
+
+
+def test_the_standard_scenario_is_the_original_scene():
+    g1, table = specs('gz')
+    assert (g1.x, g1.y, g1.yaw) == (3.0, 0.0, pytest.approx(math.pi))
+    assert (table.x, table.y, table.yaw) == (3.0, 1.05, 0.0)
+
+
+def test_an_unknown_scenario_is_refused():
+    with pytest.raises(ValueError, match='unknown demo scenario'):
+        demo_specs('gz', 'nowhere', share=lambda package: str(ROOT/'src'/package))
 
 
 def test_successful_spawns_are_verified_in_order_and_never_renamed():
