@@ -1,0 +1,24 @@
+{
+  "source": "grass_medium_01.gltf",
+  "max_export_pose_deviation_m": 4.76837158203125e-07,
+  "source_polygon_count": 24730,
+  "triangle_budget": null,
+  "blender": "4.2.9 LTS",
+  "floor_center_translation": [
+    0.24969732761383057,
+    -0.0055709108710289,
+    -0.025613101199269295
+  ],
+  "dimensions_m": [
+    5.604983329772949,
+    0.32655882835388184,
+    0.34258151054382324
+  ],
+  "vertices": 26820,
+  "triangles": 24730,
+  "sha256": {
+    "mesh.npz": "8b173ea82f1d816f739083cbf2f4aadeda277142276e03a046e0e6c240df257a",
+    "model.dae": "0f956ae38c223c95186063d2d85bbcc9bb5599515bdc06648a1fc4371b023d70",
+    "materials.json": "9ad7fcbaa3087c79e9d8f590bfcf488a97db936876667452663dc7dcd12da9ce"
+  }
+}

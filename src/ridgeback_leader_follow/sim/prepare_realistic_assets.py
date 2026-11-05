@@ -7,6 +7,36 @@ import numpy as np
 sys.path.insert(0,str(Path(__file__).resolve().parent))
 
 
+def export_opacity(directory):
+    """Keep the publisher's separate grayscale mask in Collada without repacking pixels."""
+    from xml.etree import ElementTree as ET
+    masks=directory/'opacity_maps.json'
+    if not masks.exists():return
+    path=json.loads(masks.read_text()).get('all')
+    if path is None:return
+    namespace='http://www.collada.org/2005/11/COLLADASchema';ns={'c':namespace}
+    ET.register_namespace('',namespace);tree=ET.parse(directory/'model.dae');root=tree.getroot()
+    images=root.find('c:library_images',ns)
+    if images is None:images=ET.SubElement(root,'{'+namespace+'}library_images')
+    image=ET.SubElement(images,'{'+namespace+'}image',id='opacity_source')
+    ET.SubElement(image,'{'+namespace+'}init_from').text=path
+    for effect in root.findall('c:library_effects/c:effect',ns):
+        profile=effect.find('c:profile_COMMON',ns)
+        for tag,sid in [('surface','opacity-surface'),('sampler2D','opacity-sampler')]:
+            param=ET.SubElement(profile,'{'+namespace+'}newparam',sid=sid)
+            node=ET.SubElement(param,'{'+namespace+'}'+tag,**({'type':'2D'} if tag=='surface' else {}))
+            ET.SubElement(node,'{'+namespace+'}'+('init_from' if tag=='surface' else 'source')).text='opacity_source' if tag=='surface' else 'opacity-surface'
+        shader=profile.find('c:technique/c:lambert',ns)
+        if shader is None:shader=profile.find('c:technique/c:phong',ns)
+        if shader is None:continue
+        for old in shader.findall('c:transparent',ns):shader.remove(old)
+        transparent=ET.SubElement(shader,'{'+namespace+'}transparent',opaque='RGB_ONE')
+        ET.SubElement(transparent,'{'+namespace+'}texture',texture='opacity-sampler',texcoord='UVMap')
+        extra=ET.SubElement(effect,'{'+namespace+'}extra');technique=ET.SubElement(extra,'{'+namespace+'}technique',profile='GOOGLEEARTH')
+        ET.SubElement(technique,'{'+namespace+'}double_sided').text='1'
+    tree.write(directory/'model.dae',encoding='utf-8',xml_declaration=True)
+
+
 def main():
     args=sys.argv[sys.argv.index('--')+1:];directory=Path(args[0]).resolve()
     if len(args)>1 and args[1]=='human':
@@ -68,6 +98,7 @@ def main():
     np.savez_compressed(directory/'mesh.npz',points=points,normals=np.asarray(normals,np.float32),faces=np.asarray(faces,np.int32),uv=np.asarray(uvs,np.float32),materials=np.asarray(groups,np.int32))
     (directory/'materials.json').write_text(json.dumps(specs,indent=2)+'\n')
     bpy.ops.wm.collada_export(filepath=str(directory/'model.dae'),include_animations=False,triangulate=True,use_texture_copies=True,export_global_up_selection='Z',apply_global_orientation=False)
+    export_opacity(directory)
     receipt={'source':source.name,'max_export_pose_deviation_m':deviation,'source_polygon_count':source_triangles,'triangle_budget':180000 if source_triangles>250000 else None,'blender':bpy.app.version_string,'floor_center_translation':center.tolist(),'dimensions_m':(maximum-minimum).tolist(),'vertices':len(points),'triangles':len(faces),'sha256':{p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in [directory/'mesh.npz',directory/'model.dae',directory/'materials.json']}}
     (directory/'conversion.json').write_text(json.dumps(receipt,indent=2)+'\n')
     print('Prepared static asset',directory.name,receipt,flush=True)

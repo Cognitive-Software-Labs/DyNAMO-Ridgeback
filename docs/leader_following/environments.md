@@ -10,9 +10,9 @@ new worlds or characters. The observation robot remains stationary.
 
 | `--environment` | Contents |
 |---|---|
-| `office` | Wood floor, ceiling lights, glazed frontage, reception counter, desks, monitors, books, notebooks, lounge furniture, plants, bins and room signs |
-| `warehouse` | Concrete floor, roof/skylight, storage racks, crates, barrels, aisle markings, loading door and pedestrian signs |
-| `courtyard` | Paved walkways, planted beds, trees, benches, street lamps, bins, wayfinding and windowed building facades |
+| `office` | Wood floor, ceiling and cove lights, glazed frontage, reception counter, desks, monitors, books, notebooks, lounge furniture, plants, bins and room signs |
+| `warehouse` | Concrete floor, roof/skylight and clerestory windows, storage racks, crates, barrels, aisle markings, loading door and pedestrian signs |
+| `courtyard` | Paved walkways, planted grass/shrub beds, trees, benches, street lamps, bins, wayfinding and windowed building facades |
 
 Four source characters are available: Sam and Maya in casual clothing, Harper
 and Jordan in business clothing. Clothing colours and uniform stature scaling
@@ -24,9 +24,19 @@ Appearance assignments are rendering/evaluation metadata, never a recognition
 input. All routes are scripted rather than reactive pedestrian navigation.
 
 Both simulators consume the shared layout and cast. Isaac uses evaluated mesh
-animation and textured PreviewSurface materials; Gazebo uses native Collada
+animation and textured PreviewSurface materials with an OmniGlass surface for glazing; Gazebo uses native Collada
 actors with per-person gait speed. Fixture UVs keep wall textures horizontal
-and tile floor materials in metres. Rendering and material support differ.
+and tile floor materials in metres. Rendering and material support differ. Isaac preserves source normal strength,
+metallic/roughness texture channels and dielectric specular strength. Surface
+roughness maps break up uniform highlights. Cloth texture brightness is
+normalized before tinting so dark source suits retain the assigned colour.
+Gazebo uses a flat assigned colour for textured business garments; it does not
+reproduce Isaac's fabric shading. Source pixels remain unchanged.
+
+Reception counters and doors use wood-grain textures. Office cove lights
+illuminate the ceiling; warehouse clerestory openings admit daylight. Courtyard
+grass and shrub strips use separate publisher opacity maps in both renderers.
+These decorative plants have no collision geometry; trees retain trunk proxies.
 
 Trees use a 180,000-triangle visual mesh derived from the source and simple
 cylindrical trunk collisions in both backends. The proxy is approximate and
@@ -91,7 +101,7 @@ artifacts/leader-following/tools/blender-4.2.9-linux-x64/blender -b \
 
 Repeat conversion for each directory under `props/`. For each directory under
 `humans/`, append `human` after the directory argument. Blender evaluates the
-walk and exports the Gazebo skin; existing Maya assets are reused. Compare
+walk and exports the Gazebo skin; existing Maya assets are reused.
 Static conversion verifies the exported world-space pose against the vertex
 cache, and reduces source meshes above 250,000 polygons to a 180,000-triangle
 budget. Material names are normalized during import to disambiguate duplicate
@@ -114,6 +124,23 @@ The renderer closes after writing overview, human-height and cast PNGs and USD
 snapshots. Current checks cover static obstacle clearance across all six
 scenario families in all three layouts, cast assignment, turn geometry,
 Collada texture paths, actor scales and preservation of commanded paths.
+The scene/sensor qualifier also accepts `--scene-profile realistic`,
+`--environments office warehouse courtyard`, `--scenarios` and `--crowd-sizes`
+filters. It does not run recognition. For example:
+
+```bash
+ros2 run ridgeback_leader_follow qualify_crowd --scene-profile realistic \
+  --environments courtyard --scenarios crowd --crowd-sizes 8 \
+  --backends gz --ros-domain 210
+```
+
+Offline mesh annotations reconstruct the recorded route and use each person's
+recorded character, stature and gait speed. Realistic recordings require the
+saved animation cache and matching SHA-256; evaluation refuses missing or
+mismatched geometry. `benchmarking.annotations --stationary-base` uses recorded
+TF to remove odometry drift for a surveyed stationary observer. This option is
+not valid for a moving robot. These inputs are used only for scoring.
+
 Rendered previews are provided below. Short runtime checks cover sensor and
 ground-truth startup in both simulators. They do not measure recognition
 accuracy or establish successful full-length scenario execution; new
@@ -130,3 +157,5 @@ recognition qualification remains pending.
 ## Archived evidence
 
 - [Realistic worlds, asset conversion and startup validation](../../archive/engineering/2026-11-05-realistic-worlds.md) — tested population, tree/clock startup failures and verification limits.
+
+- [Material, lighting and vegetation review](../../archive/engineering/2026-11-05-visual-materials.md) — visual population and limited runtime evidence.

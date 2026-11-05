@@ -1,0 +1,14 @@
+[
+  {
+    "case": "gz-courtyard",
+    "exit_code": 0
+  },
+  {
+    "case": "isaac-courtyard",
+    "exit_code": 0
+  },
+  {
+    "case": "isaac-office",
+    "exit_code": 0
+  }
+]

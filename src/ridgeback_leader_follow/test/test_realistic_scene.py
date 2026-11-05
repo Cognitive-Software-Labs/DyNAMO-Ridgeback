@@ -19,6 +19,7 @@ def test_all_scenario_paths_clear_of_static_furniture(environment):
         if box.collision and box.position[2]+box.size[2]/2>.1 and box.position[2]-box.size[2]/2<1.9:
             obstacles.append((box.name,np.array(box.position[:2]),np.array(box.size[:2])/2))
     for prop in props:
+        if not prop.collision:continue
         dimensions=json.loads((asset_directory()/'props'/prop.asset/'conversion.json').read_text())['dimensions_m']
         if prop.position[2]>1.9:continue
         angle=np.deg2rad(prop.yaw);c,s=abs(np.cos(angle)),abs(np.sin(angle))

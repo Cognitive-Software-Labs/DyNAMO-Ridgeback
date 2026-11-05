@@ -10,9 +10,8 @@ from pathlib import Path
 import numpy as np
 from numba import njit
 from ridgeback_leader_follow.benchmarking.dataset import SensorBag
-from ridgeback_leader_follow.crowd_geometry import asset_directory
-from ridgeback_leader_follow.crowd_scenarios import load_scenario
 from ridgeback_leader_follow.fusion import rigid_matrix
+from .scene_geometry import recorded_scenario,projection_meshes
 
 
 @njit(cache=True)
@@ -43,19 +42,10 @@ def rasterize(vertices,faces,k,h,w):
 
 def annotate(bag, output, world_from_odom, stationary_base=False):
     manifest=json.loads((bag.run/'manifest.json').read_text())
-    if manifest['scenario']['name'] == 'leader_out_of_view' and manifest.get('scene_profile') == 'f3':
-        from ridgeback_leader_follow.recognition_scenarios import load_recognition_scenario
-        scenario=load_recognition_scenario(manifest['scenario']['name'])
-    else:
-        scenario=load_scenario(manifest['scenario']['name'],manifest['crowd_size'])
+    scenario=recorded_scenario(manifest)
+    meshes=projection_meshes(bag.run,manifest,scenario)
     with (bag.run/'ground_truth.csv').open() as stream: rows=list(csv.DictReader(stream))
     by_person={p.name:[r for r in rows if r['person'] == p.name] for p in scenario.people}
-    directory=asset_directory()
-    if manifest.get('scene_profile') in ('f3','lab'):
-        from ridgeback_leader_follow.lab_scene import asset_directory as maya_directory
-        directory=maya_directory()
-    with np.load(directory/'walk.npz') as cache:
-        data={key:cache[key] for key in cache.files}
     ox,oy,oz,yaw=world_from_odom
     world_odom=rigid_matrix((ox,oy,oz),(0,0,math.sin(yaw/2),math.cos(yaw/2)))
     output.parent.mkdir(parents=True,exist_ok=True)
@@ -70,16 +60,17 @@ def annotate(bag, output, world_from_odom, stationary_base=False):
             color_world=np.linalg.inv(anchor@odom_color)
             people=[]; masks=[]
             for person in scenario.people:
+                data,scale=meshes[person.name]
                 samples=by_person[person.name]; times=np.array([float(r['sim_time']) for r in samples])
                 pose=[float(np.interp(rt,times,[float(r[key]) for r in samples])) for key in ('x','y','z')]
                 # Unwrap yaw before interpolation across the -pi/pi boundary.
                 angle=float(np.interp(rt,times,np.unwrap([float(r['yaw']) for r in samples])))
                 command=float(np.interp(rt,times,[float(r['command_time']) for r in samples]))
-                speed=float(data['gait_speed_mps']) if 'gait_speed_mps' in data else .5
+                speed=(float(data['gait_speed_mps']) if 'gait_speed_mps' in data else .5)*scale
                 phase=(person.distance(command)/speed)%float(data['cycle_seconds'])
                 frame=int(phase*float(data['fps']))%len(data['points'])
                 world_person=rigid_matrix(pose,(0,0,math.sin(angle/2),math.cos(angle/2)))
-                xyz=np.column_stack((data['points'][frame],np.ones(len(data['points'][frame]))))
+                xyz=np.column_stack((data['points'][frame]*scale,np.ones(len(data['points'][frame]))))
                 vertices=(color_world@world_person@xyz.T).T[:,:3]
                 mesh_depth=rasterize(vertices,data['faces'],k,rgb.shape[0],rgb.shape[1])
                 mask=np.isfinite(mesh_depth); masks.append(mesh_depth)
@@ -99,7 +90,9 @@ def annotate(bag, output, world_from_odom, stationary_base=False):
         os.link(temporary,output)
     finally:
         temporary.unlink()
-    return {'world_anchor':('surveyed stationary base_link planar origin, recorded TF removes odometry drift' if stationary_base else 'constant supplied world-from-odom'),
+    return {'scene_profile':manifest.get('scene_profile','baseline'),
+            'geometry':'per-person recorded character cache and scale; recorded route manifest',
+            'world_anchor':('surveyed stationary base_link planar origin, recorded TF removes odometry drift' if stationary_base else 'constant supplied world-from-odom'),
             'method':'animated mesh rasterization; inter-person z-buffer and recorded-depth occlusion support',
             'scope':'in-image silhouette visible fraction estimate; excludes out-of-image area; 15 cm depth tolerance; sampled gait',
             'truth_access':'evaluation-only; never supplied to detector/tracker adapters'}
@@ -109,8 +102,11 @@ def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--run',type=Path,required=True);parser.add_argument('--output',type=Path,required=True)
     parser.add_argument('--world-from-odom',type=float,nargs=4,required=True)
+    parser.add_argument('--stationary-base',action='store_true',help='Evaluation-only surveyed stationary base; remove recorded odometry drift')
     args=parser.parse_args()
-    print(json.dumps(annotate(SensorBag(args.run),args.output,args.world_from_odom),indent=2))
+    result=annotate(SensorBag(args.run),args.output,args.world_from_odom,stationary_base=args.stationary_base)
+    args.output.with_suffix('.json').write_text(json.dumps(result,indent=2)+'\n')
+    print(json.dumps(result,indent=2))
 
 
 if __name__ == '__main__': main()

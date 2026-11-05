@@ -1,0 +1,24 @@
+{
+  "source": "shrub_01.gltf",
+  "max_export_pose_deviation_m": 1.1920928955078125e-07,
+  "source_polygon_count": 156012,
+  "triangle_budget": null,
+  "blender": "4.2.9 LTS",
+  "floor_center_translation": [
+    -0.5612542629241943,
+    0.00453341007232666,
+    -0.008752564899623394
+  ],
+  "dimensions_m": [
+    2.5866613388061523,
+    0.21856096386909485,
+    0.3959742784500122
+  ],
+  "vertices": 105235,
+  "triangles": 156012,
+  "sha256": {
+    "mesh.npz": "2c8e78dc55ab04287919ec53692c72100099257f6e3f25655403ec6fb946ae99",
+    "model.dae": "8e304fe898bfebbdf4da37f6b5a5f908ec4a88eaee6ad072c990655d648f73b2",
+    "materials.json": "4d41070c603a97ee744162cca88c9f24e1c61ff41a7563045559cc1d961a50d8"
+  }
+}

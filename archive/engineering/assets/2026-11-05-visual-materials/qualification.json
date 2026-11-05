@@ -1,0 +1,44 @@
+{
+  "status": "passed",
+  "scene_profile": "realistic",
+  "environment": "office",
+  "scope": "two diagnostic recordings only",
+  "results": [
+    {
+      "backend": "gz",
+      "scene_profile": "realistic",
+      "environment": "office",
+      "scenario": "lookalike_crossing",
+      "crowd_size": 4,
+      "people": 2,
+      "duration": 20.0,
+      "truth_rows": 800,
+      "maximum_pose_error": 0.0,
+      "status": "passed",
+      "run": "artifacts/leader-following/realistic-office-evaluation/gz-office-lookalike_crossing-4",
+      "sensors": {
+        "status": "passed",
+        "frames": 400,
+        "scope": "RGB-D registration, freshness and complete sensor-to-odom TF at every evaluation tick"
+      }
+    },
+    {
+      "backend": "isaac",
+      "scene_profile": "realistic",
+      "environment": "office",
+      "scenario": "lookalike_crossing",
+      "crowd_size": 4,
+      "people": 2,
+      "duration": 20.0,
+      "truth_rows": 800,
+      "maximum_pose_error": 7.091468162689907e-09,
+      "status": "passed",
+      "run": "artifacts/leader-following/realistic-office-evaluation/isaac-office-lookalike_crossing-4",
+      "sensors": {
+        "status": "passed",
+        "frames": 400,
+        "scope": "RGB-D registration, freshness and complete sensor-to-odom TF at every evaluation tick"
+      }
+    }
+  ]
+}

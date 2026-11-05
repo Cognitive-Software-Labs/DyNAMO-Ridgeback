@@ -41,6 +41,8 @@ install(DIRECTORY ridgeback_leader_follow/benchmarking/patches
 
 if(BUILD_TESTING)
   find_package(ament_cmake_pytest REQUIRED)
+  ament_add_pytest_test(test_material_assets test/test_material_assets.py)
+  ament_add_pytest_test(test_recorded_scene_annotations test/test_recorded_scene_annotations.py)
   ament_add_pytest_test(test_realistic_scene test/test_realistic_scene.py)
   ament_add_pytest_test(test_stationary_anchor test/test_stationary_anchor.py)
   ament_add_pytest_test(test_recognition_scenarios test/test_recognition_scenarios.py)

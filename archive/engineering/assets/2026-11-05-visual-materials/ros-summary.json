@@ -1,0 +1,71 @@
+{
+  "scope": "two realistic-office diagnostic cases; not full-population qualification",
+  "cases": {
+    "gz-office-lookalike_crossing-4": {
+      "identity_label_policy": "selected target nearest truth within 0.75 m, separated by 0.1 m; unselected duplicate tracks cannot steal its label",
+      "frames": 294,
+      "states": {
+        "SEARCHING": 1,
+        "LOCKED": 232,
+        "UNCERTAIN": 39,
+        "LOST": 22
+      },
+      "locked_frames": 232,
+      "correct_locked_frames": 232,
+      "wrong_locked_frames": 0,
+      "correct_lock_fraction": 0.7891156462585034,
+      "correct_locked_without_appearance_frames": 13,
+      "outside_camera_frames": 0,
+      "correct_locked_outside_camera_frames": 0,
+      "outside_camera_lock_fraction": null,
+      "recovery_seconds": [
+        0.1979999999999995,
+        0.16500000000000004,
+        0.23100000000000076,
+        0.6929999999999996,
+        1.8149999999999995,
+        0.26399999999999935,
+        0.1980000000000004
+      ],
+      "unrecovered_loss": false,
+      "passed_zero_wrong_lock": true,
+      "status": "passed",
+      "scope": "real ROS tracker plus identity node, recorded sensors, stationary observer; no driving or hardware timing claim"
+    },
+    "isaac-office-lookalike_crossing-4": {
+      "identity_label_policy": "selected target nearest truth within 0.75 m, separated by 0.1 m; unselected duplicate tracks cannot steal its label",
+      "frames": 350,
+      "states": {
+        "LOCKED": 302,
+        "UNCERTAIN": 45,
+        "LOST": 3
+      },
+      "locked_frames": 302,
+      "correct_locked_frames": 302,
+      "wrong_locked_frames": 0,
+      "correct_lock_fraction": 0.8628571428571429,
+      "correct_locked_without_appearance_frames": 45,
+      "outside_camera_frames": 0,
+      "correct_locked_outside_camera_frames": 0,
+      "outside_camera_lock_fraction": null,
+      "recovery_seconds": [
+        0.20000000000000018,
+        0.23333333300000003,
+        0.26666666699999997,
+        0.16666666700000032,
+        0.6999999999999993,
+        0.2999999999999998,
+        0.125,
+        0.13333333099999933,
+        0.16666666799999952,
+        0.16666666699999944,
+        0.20000000000000107,
+        0.26666666700000086
+      ],
+      "unrecovered_loss": false,
+      "passed_zero_wrong_lock": true,
+      "status": "passed",
+      "scope": "real ROS tracker plus identity node, recorded sensors, stationary observer; no driving or hardware timing claim"
+    }
+  }
+}

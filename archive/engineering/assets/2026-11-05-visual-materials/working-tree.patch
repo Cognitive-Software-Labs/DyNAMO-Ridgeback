@@ -1,0 +1,624 @@
+diff --git a/src/ridgeback_leader_follow/CMakeLists.txt b/src/ridgeback_leader_follow/CMakeLists.txt
+index aae8407..ced81d2 100644
+--- a/src/ridgeback_leader_follow/CMakeLists.txt
++++ b/src/ridgeback_leader_follow/CMakeLists.txt
+@@ -41,6 +41,8 @@ install(DIRECTORY ridgeback_leader_follow/benchmarking/patches
+ 
+ if(BUILD_TESTING)
+   find_package(ament_cmake_pytest REQUIRED)
++  ament_add_pytest_test(test_material_assets test/test_material_assets.py)
++  ament_add_pytest_test(test_recorded_scene_annotations test/test_recorded_scene_annotations.py)
+   ament_add_pytest_test(test_realistic_scene test/test_realistic_scene.py)
+   ament_add_pytest_test(test_stationary_anchor test/test_stationary_anchor.py)
+   ament_add_pytest_test(test_recognition_scenarios test/test_recognition_scenarios.py)
+diff --git a/src/ridgeback_leader_follow/ridgeback_leader_follow/benchmarking/annotations.py b/src/ridgeback_leader_follow/ridgeback_leader_follow/benchmarking/annotations.py
+index 273a215..310ba87 100644
+--- a/src/ridgeback_leader_follow/ridgeback_leader_follow/benchmarking/annotations.py
++++ b/src/ridgeback_leader_follow/ridgeback_leader_follow/benchmarking/annotations.py
+@@ -10,9 +10,8 @@ from pathlib import Path
+ import numpy as np
+ from numba import njit
+ from ridgeback_leader_follow.benchmarking.dataset import SensorBag
+-from ridgeback_leader_follow.crowd_geometry import asset_directory
+-from ridgeback_leader_follow.crowd_scenarios import load_scenario
+ from ridgeback_leader_follow.fusion import rigid_matrix
++from .scene_geometry import recorded_scenario,projection_meshes
+ 
+ 
+ @njit(cache=True)
+@@ -43,19 +42,10 @@ def rasterize(vertices,faces,k,h,w):
+ 
+ def annotate(bag, output, world_from_odom, stationary_base=False):
+     manifest=json.loads((bag.run/'manifest.json').read_text())
+-    if manifest['scenario']['name'] == 'leader_out_of_view' and manifest.get('scene_profile') == 'f3':
+-        from ridgeback_leader_follow.recognition_scenarios import load_recognition_scenario
+-        scenario=load_recognition_scenario(manifest['scenario']['name'])
+-    else:
+-        scenario=load_scenario(manifest['scenario']['name'],manifest['crowd_size'])
++    scenario=recorded_scenario(manifest)
++    meshes=projection_meshes(bag.run,manifest,scenario)
+     with (bag.run/'ground_truth.csv').open() as stream: rows=list(csv.DictReader(stream))
+     by_person={p.name:[r for r in rows if r['person'] == p.name] for p in scenario.people}
+-    directory=asset_directory()
+-    if manifest.get('scene_profile') in ('f3','lab'):
+-        from ridgeback_leader_follow.lab_scene import asset_directory as maya_directory
+-        directory=maya_directory()
+-    with np.load(directory/'walk.npz') as cache:
+-        data={key:cache[key] for key in cache.files}
+     ox,oy,oz,yaw=world_from_odom
+     world_odom=rigid_matrix((ox,oy,oz),(0,0,math.sin(yaw/2),math.cos(yaw/2)))
+     output.parent.mkdir(parents=True,exist_ok=True)
+@@ -70,16 +60,17 @@ def annotate(bag, output, world_from_odom, stationary_base=False):
+             color_world=np.linalg.inv(anchor@odom_color)
+             people=[]; masks=[]
+             for person in scenario.people:
++                data,scale=meshes[person.name]
+                 samples=by_person[person.name]; times=np.array([float(r['sim_time']) for r in samples])
+                 pose=[float(np.interp(rt,times,[float(r[key]) for r in samples])) for key in ('x','y','z')]
+                 # Unwrap yaw before interpolation across the -pi/pi boundary.
+                 angle=float(np.interp(rt,times,np.unwrap([float(r['yaw']) for r in samples])))
+                 command=float(np.interp(rt,times,[float(r['command_time']) for r in samples]))
+-                speed=float(data['gait_speed_mps']) if 'gait_speed_mps' in data else .5
++                speed=(float(data['gait_speed_mps']) if 'gait_speed_mps' in data else .5)*scale
+                 phase=(person.distance(command)/speed)%float(data['cycle_seconds'])
+                 frame=int(phase*float(data['fps']))%len(data['points'])
+                 world_person=rigid_matrix(pose,(0,0,math.sin(angle/2),math.cos(angle/2)))
+-                xyz=np.column_stack((data['points'][frame],np.ones(len(data['points'][frame]))))
++                xyz=np.column_stack((data['points'][frame]*scale,np.ones(len(data['points'][frame]))))
+                 vertices=(color_world@world_person@xyz.T).T[:,:3]
+                 mesh_depth=rasterize(vertices,data['faces'],k,rgb.shape[0],rgb.shape[1])
+                 mask=np.isfinite(mesh_depth); masks.append(mesh_depth)
+@@ -99,7 +90,9 @@ def annotate(bag, output, world_from_odom, stationary_base=False):
+         os.link(temporary,output)
+     finally:
+         temporary.unlink()
+-    return {'world_anchor':('surveyed stationary base_link planar origin, recorded TF removes odometry drift' if stationary_base else 'constant supplied world-from-odom'),
++    return {'scene_profile':manifest.get('scene_profile','baseline'),
++            'geometry':'per-person recorded character cache and scale; recorded route manifest',
++            'world_anchor':('surveyed stationary base_link planar origin, recorded TF removes odometry drift' if stationary_base else 'constant supplied world-from-odom'),
+             'method':'animated mesh rasterization; inter-person z-buffer and recorded-depth occlusion support',
+             'scope':'in-image silhouette visible fraction estimate; excludes out-of-image area; 15 cm depth tolerance; sampled gait',
+             'truth_access':'evaluation-only; never supplied to detector/tracker adapters'}
+@@ -109,8 +102,11 @@ def main():
+     parser=argparse.ArgumentParser(description=__doc__)
+     parser.add_argument('--run',type=Path,required=True);parser.add_argument('--output',type=Path,required=True)
+     parser.add_argument('--world-from-odom',type=float,nargs=4,required=True)
++    parser.add_argument('--stationary-base',action='store_true',help='Evaluation-only surveyed stationary base; remove recorded odometry drift')
+     args=parser.parse_args()
+-    print(json.dumps(annotate(SensorBag(args.run),args.output,args.world_from_odom),indent=2))
++    result=annotate(SensorBag(args.run),args.output,args.world_from_odom,stationary_base=args.stationary_base)
++    args.output.with_suffix('.json').write_text(json.dumps(result,indent=2)+'\n')
++    print(json.dumps(result,indent=2))
+ 
+ 
+ if __name__ == '__main__': main()
+diff --git a/src/ridgeback_leader_follow/ridgeback_leader_follow/crowd_qualify.py b/src/ridgeback_leader_follow/ridgeback_leader_follow/crowd_qualify.py
+index 844eb44..aa477f6 100644
+--- a/src/ridgeback_leader_follow/ridgeback_leader_follow/crowd_qualify.py
++++ b/src/ridgeback_leader_follow/ridgeback_leader_follow/crowd_qualify.py
+@@ -23,6 +23,12 @@ def validate_run(output, scene_profile='baseline'):
+     if manifest['scenario']['name'] == 'leader_out_of_view' and scene_profile == 'f3':
+         from ridgeback_leader_follow.recognition_scenarios import load_recognition_scenario
+         scenario = load_recognition_scenario(manifest['scenario']['name'])
++    elif scene_profile == 'realistic':
++        from ridgeback_leader_follow.realistic_scene import load_scenario as realistic_scenario,manifest_entry
++        scenario=realistic_scenario(manifest['scenario']['name'],manifest['crowd_size'])
++        expected=json.loads(json.dumps(manifest_entry(scenario,manifest['environment'])))
++        if manifest.get('appearance')!=expected['appearance']:
++            raise ValueError('Recorded realistic cast differs from its rendering contract')
+     else:
+         scenario = load_scenario(manifest['scenario']['name'], manifest['crowd_size'])
+     if scene_profile == 'f3':
+@@ -73,59 +79,78 @@ def validate_run(output, scene_profile='baseline'):
+               and abs(scan['angle_min'] + i*scan['angle_increment']) < .8]
+     if not nearby:
+         raise ValueError('Front lidar has no nearby returns in the initial pedestrian sector')
+-    return {'backend': manifest['backend'], 'scene_profile': scene_profile, 'scenario': scenario.name,
++    return {'backend': manifest['backend'], 'scene_profile': scene_profile,
++            **({'environment':manifest['environment']} if scene_profile=='realistic' else {}), 'scenario': scenario.name,
+             'crowd_size': manifest['crowd_size'], 'people': len(names),
+             'duration': manifest['duration'], 'truth_rows': len(rows),
+             'maximum_pose_error': max_error, 'status': 'passed', 'run': str(output)}
+ 
+ 
++def qualification_cases(backends,scene_profile,environments=None,scenarios=SCENARIOS,crowd_sizes=CROWD_SIZES):
++    """World names are part of realistic case keys so evidence cannot collide."""
++    from ridgeback_leader_follow.realistic_layout import ENVIRONMENTS
++    if scene_profile=='realistic':
++        worlds=environments or ('office',)
++        if any(world not in ENVIRONMENTS for world in worlds):raise ValueError('Unknown realistic environment')
++    else:
++        if environments:raise ValueError('Environment selection requires realistic profile')
++        worlds=(None,)
++    return [(backend,world,name,size) for backend in backends for world in worlds
++            for name in scenarios for size in (crowd_sizes if name=='crowd' else (4,))]
++
++
+ def main():
+     parser = argparse.ArgumentParser(description=__doc__)
+     parser.add_argument('--backends', nargs='+', choices=('gz','isaac'), default=['gz','isaac'])
+     parser.add_argument('--output-root', type=Path)
+     parser.add_argument('--ros-domain', type=int, default=87)
+     parser.add_argument('--record', action='store_true')
+-    parser.add_argument('--scene-profile', choices=('baseline', 'f3'), default='baseline',
+-                        help='f3 runs the same gates on the distinct-outfit F3 scenes')
++    parser.add_argument('--scene-profile', choices=('baseline', 'f3', 'realistic'), default='baseline',
++                        help='Scene/sensor gates only; recognition needs separate evaluation')
++    parser.add_argument('--environments',nargs='+',choices=('office','warehouse','courtyard'))
++    parser.add_argument('--scenarios',nargs='+',choices=SCENARIOS,default=SCENARIOS)
++    parser.add_argument('--crowd-sizes',nargs='+',type=int,choices=CROWD_SIZES,default=CROWD_SIZES)
+     args = parser.parse_args()
+-    label = 'F1' if args.scene_profile == 'baseline' else 'F3 appearance'
++    if args.environments and args.scene_profile!='realistic':parser.error('--environments requires --scene-profile realistic')
++    label = {'baseline':'F1','f3':'F3 appearance','realistic':'Realistic scenes'}[args.scene_profile]
+     root = (args.output_root or Path('artifacts/leader-following') /
+-            (('f1' if args.scene_profile == 'baseline' else 'f3-appearance') + '-qualification-' +
++            ({'baseline':'f1','f3':'f3-appearance','realistic':'realistic'}[args.scene_profile] + '-qualification-' +
+              datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S'))).resolve()
+     root.mkdir(parents=True,exist_ok=False)
+-    cases = [(name,size) for name in SCENARIOS
+-             for size in (CROWD_SIZES if name == 'crowd' else (4,))]
++    cases=qualification_cases(args.backends,args.scene_profile,args.environments,args.scenarios,args.crowd_sizes)
+     results = []
+-    for backend in args.backends:
++    for backend,environment,name,size in cases:
+         python = sys.executable if backend == 'gz' else os.environ.get('ISAAC_PYTHON',str(Path.cwd()/'isaac_venv/bin/python3'))
+-        for name,size in cases:
+-            output = root / f'{backend}-{name}-{size}'
+-            command = [python,'-m','ridgeback_leader_follow.crowd_runner','--backend',backend,
+-                       '--scenario',name,'--crowd-size',str(size),'--ros-domain',str(args.ros_domain),
+-                       '--output-dir',str(output),'--scene-profile',args.scene_profile]
+-            if args.record:
+-                command.append('--record')
+-            print(f'{label} {backend}: {name} ({size} bystanders for crowd)',flush=True)
+-            with (root / f'{output.name}.log').open('w') as log:
+-                process = subprocess.Popen(command,stdout=log,stderr=subprocess.STDOUT,start_new_session=True)
+-                try:
+-                    code = process.wait(timeout=360)
+-                finally:
+-                    stop_process(process)
+-            if code:
+-                (root / 'qualification.json').write_text(json.dumps({
+-                    'status': 'failed', 'failed_case': output.name, 'exit_code': code,
+-                    'results': results},indent=2)+'\n')
+-                raise RuntimeError(f'{output.name} failed (exit {code}); see {output.name}.log')
+-            results.append(validate_run(output, args.scene_profile))
++        key=f'{backend}-{environment}-{name}-{size}' if environment else f'{backend}-{name}-{size}'
++        output = root / key
++        command = [python,'-m','ridgeback_leader_follow.crowd_runner','--backend',backend,
++                   '--scenario',name,'--crowd-size',str(size),'--ros-domain',str(args.ros_domain),
++                   '--output-dir',str(output),'--scene-profile',args.scene_profile]
++        if environment:command.extend(['--environment',environment])
++        if args.record:
++            command.append('--record')
++        print(f'{label} {backend}: {name} ({size} bystanders for crowd)',flush=True)
++        with (root / f'{output.name}.log').open('w') as log:
++            process = subprocess.Popen(command,stdout=log,stderr=subprocess.STDOUT,start_new_session=True)
++            try:
++                code = process.wait(timeout=360)
++            finally:
++                stop_process(process)
++        if code:
+             (root / 'qualification.json').write_text(json.dumps({
+-                'status': 'running', 'results': results},indent=2)+'\n')
+-            print('  passed',flush=True)
++                'status': 'failed', 'failed_case': output.name, 'exit_code': code,
++                'results': results},indent=2)+'\n')
++            raise RuntimeError(f'{output.name} failed (exit {code}); see {output.name}.log')
++        results.append(validate_run(output, args.scene_profile))
++        (root / 'qualification.json').write_text(json.dumps({
++            'status': 'running', 'results': results},indent=2)+'\n')
++        print('  passed',flush=True)
+     scope = ('F1 scenes, sensors, animation and simulator truth; no F2-F4 claims'
+              if args.scene_profile == 'baseline' else
+-             'F3 appearance scenes: playback, sensors and simulator truth; no recognition claims')
++             f'{label}: playback, sensors and simulator truth; no recognition claims')
+     (root / 'qualification.json').write_text(json.dumps({
+         'status': 'passed', 'scene_profile': args.scene_profile, 'scope': scope,
++        'environments':args.environments or (['office'] if args.scene_profile=='realistic' else []),
+         'results': results},indent=2)+'\n')
+     print(f'{label} qualification passed; evidence: {root}',flush=True)
+ 
+diff --git a/src/ridgeback_leader_follow/ridgeback_leader_follow/realistic_layout.py b/src/ridgeback_leader_follow/ridgeback_leader_follow/realistic_layout.py
+index 8f8cd4c..43d0d4d 100644
+--- a/src/ridgeback_leader_follow/ridgeback_leader_follow/realistic_layout.py
++++ b/src/ridgeback_leader_follow/ridgeback_leader_follow/realistic_layout.py
+@@ -25,11 +25,12 @@ class Prop:
+     position: tuple
+     scale: float=1.
+     yaw: float=0.
++    collision: bool=True
+ 
+ 
+ PALETTE={
+  'plaster':((.76,.74,.69),.85,0.),'ivory':((.88,.86,.8),.75,0.),
+- 'oak':((.38,.23,.11),.55,0.),'charcoal':((.045,.055,.065),.45,.35),
++ 'wood_table_001':((.38,.23,.11),.55,0.),'charcoal':((.045,.055,.065),.45,.35),
+  'steel':((.24,.29,.32),.32,.8),'blue':((.05,.16,.24),.55,.15),
+  'orange':((.75,.22,.025),.45,.25),'yellow':((.9,.58,.025),.6,0.),
+  'glass':((.24,.46,.56),.08,.35),'white':((.9,.91,.89),.65,0.),
+@@ -45,13 +46,14 @@ def layout(environment):
+     boxes=[];props=[]
+     def box(name,pos,size,material,collision=True,yaw=0.):
+         boxes.append(Fixture(name,pos,size,material,collision,yaw))
+-    def prop(name,asset,x,y,z=0.,scale=1.,yaw=0.):
+-        props.append(Prop(name,asset,(x,y,z),scale,yaw))
++    def prop(name,asset,x,y,z=0.,scale=1.,yaw=0.,collision=True):
++        props.append(Prop(name,asset,(x,y,z),scale,yaw,collision))
+     floor={'office':'wood_floor','warehouse':'concrete_floor_02','courtyard':'brick_pavement_02'}[environment]
+     box('Ground',(6,0,-.12),(26,18,.24),floor)
+     if environment=='office':
+         box('NorthWall',(6,6.5,2.1),(24,.22,4.2),'plaster')
+         box('Ceiling',(6,0,4.2),(24,13,.16),'ivory')
++        for side in (-1,1):box('CoveLED'+str(side).replace('-','n'),(6,side*5.5,4.0),(23,.06,.025),'white',False)
+         box('EndBrickWall',(17,0,2.1),(.25,13,4.2),'brick_wall_001')
+         box('WestWall',(-5,0,2.1),(.22,13,4.2),'plaster')
+         box('EntranceLintel',(6,-6.5,3.8),(24,.22,.8),'plaster')
+@@ -76,7 +78,7 @@ def layout(environment):
+             box(f'MonitorStand{i}',(x,-4.8,.86),(.08,.15,.16),'steel',False)
+             prop(f'DeskNotebook{i}','binder_notebook',x+.42,-4.75,.78,scale=.8)
+             prop(f'DeskBooks{i}','book_encyclopedia_set_01',x-.5,-4.8,.78,scale=.5)
+-        box('ReceptionDesk',(11,-4.65,.6),(4,1.1,1.2),'oak')
++        box('ReceptionDesk',(11,-4.65,.6),(4,1.1,1.2),'wood_table_001')
+         box('ReceptionCounter',(11,-4.65,1.24),(4.2,1.25,.08),'white')
+         for i in range(24):box(f'ReceptionSlat{i}',(9.1+i*.165,-4.06,.6),(.07,.06,1.1),'charcoal',False)
+         box('ReceptionBackdrop',(11,-6.32,2.1),(4.2,.1,2.8),'blue')
+@@ -88,12 +90,22 @@ def layout(environment):
+         for i,x in enumerate((8,14)):
+             prop(f'ReceptionPlant{i}','potted_plant_02',x,-4.6,scale=1.25)
+         for i,x in enumerate((1,7,13)):
+-            box(f'RoomDoor{i}',(x,6.35,1.15),(1.12,.08,2.3),'oak')
++            box(f'RoomDoor{i}',(x,6.35,1.15),(1.12,.08,2.3),'wood_table_001')
+             box(f'DoorFrame{i}',(x,6.4,1.18),(1.3,.1,2.46),'charcoal')
+             box(f'DoorGlass{i}',(x,6.27,1.65),(.6,.02,.6),'glass',False)
+             box(f'DoorHandle{i}',(x+.37,6.23,1.),(.04,.07,.22),'steel',False)
+     elif environment=='warehouse':
+-        for y in (-7,7):box('Wall'+str(y).replace('-','n'),(6,y,2.7),(24,.25,5.4),'brick_wall_001')
++        for side,y in enumerate((-7,7)):
++            box(f'LowerWall{side}',(6,y,1.8),(24,.25,3.6),'brick_wall_001')
++            box(f'UpperWall{side}',(6,y,5.2),(24,.25,.4),'plaster')
++            for i,x in enumerate((-3,3,9,15)):
++                for j,dx in enumerate((-2.35,2.35)):
++                    box(f'ClerestoryJamb{side}_{i}_{j}',(x+dx,y,4.3),(.1,.2,1.4),'charcoal')
++                for j,z in enumerate((3.65,4.95)):
++                    box(f'ClerestoryRail{side}_{i}_{j}',(x,y,z),(4.8,.2,.1),'charcoal')
++                box(f'ClerestoryGlass{side}_{i}',(x,y-side*.15+.075,4.3),(4.55,.04,1.18),'glass',False)
++            for i,x in enumerate((-5.6,-.0,6.,12.,17.6)):
++                box(f'WallPier{side}_{i}',(x,y,4.3),(1.2,.25,1.4),'brick_wall_001')
+         box('LoadingEndWall',(17,0,2.7),(.25,14,5.4),'plaster')
+         for side in (-1,1):box('Roof'+str(side).replace('-','n'),(6,side*4.65,5.5),(24,4.7,.16),'plaster')
+         box('WarehouseSkylight',(6,0,5.5),(24,4.6,.08),'glass',False)
+@@ -125,6 +137,10 @@ def layout(environment):
+                 box(f'GardenBed{side}_{i}'.replace('-','n'),(x,side*5.4,.18),(4.5,3,.36),'brick')
+                 box(f'GardenGrass{side}_{i}'.replace('-','n'),(x,side*5.4,.37),(4.3,2.8,.04),'grass_ground',False)
+                 prop(f'Tree{side}_{i}'.replace('-','n'),'tree_small_02',x,side*5.4,.4,scale=.65)
++                for j,dx in enumerate((-1.25,1.25)):
++                    for row,dy in enumerate((-.65,0.,.65)):
++                        prop(f'Grass{side}_{i}_{j}_{row}'.replace('-','n'),'grass_medium_01',x+dx,side*(5.4+dy),.4,scale=.32,collision=False)
++                prop(f'Shrub{side}_{i}'.replace('-','n'),'shrub_01',x,side*4.8,.4,scale=.4,collision=False)
+                 prop(f'Bench{side}_{i}'.replace('-','n'),'painted_wooden_bench',x,side*3.3,yaw=180 if side==1 else 0)
+             for i,x in enumerate((2.5,10.5)):
+                 prop(f'StreetLamp{side}_{i}'.replace('-','n'),'street_lamp_01',x,side*3.9,scale=.8)
+diff --git a/src/ridgeback_leader_follow/ridgeback_leader_follow/realistic_scene.py b/src/ridgeback_leader_follow/ridgeback_leader_follow/realistic_scene.py
+index 07035db..93d573e 100644
+--- a/src/ridgeback_leader_follow/ridgeback_leader_follow/realistic_scene.py
++++ b/src/ridgeback_leader_follow/ridgeback_leader_follow/realistic_scene.py
+@@ -121,18 +121,20 @@ def create_scene(stage,scenario,environment='office'):
+     from pxr import Gf,Sdf,UsdGeom,UsdLux,UsdPhysics,UsdShade
+     UsdGeom.SetStageUpAxis(stage,UsdGeom.Tokens.z);UsdGeom.SetStageMetersPerUnit(stage,1.)
+     root=asset_directory();materials={};meshes={}
+-    def material(name,color=(.7,.7,.7),rough=.65,metal=0.,image=None,normal=None,masked=False,tint=None):
+-        key=(name,tuple(color),image,normal,masked,tint)
++    def material(name,color=(.7,.7,.7),rough=.65,metal=0.,image=None,normal=None,masked=False,tint=None,orm=None,normal_scale=1.,specular=1.,rough_map=None,opacity_image=None):
++        key=(name,tuple(color),rough,metal,image,normal,masked,tint,orm,normal_scale,specular,rough_map,opacity_image)
+         if key in materials:return materials[key]
+         path='/Realistic/Materials/m'+str(len(materials));mat=UsdShade.Material.Define(stage,path)
+         shader=UsdShade.Shader.Define(stage,path+'/Surface');shader.CreateIdAttr('UsdPreviewSurface')
+         shader.CreateInput('diffuseColor',Sdf.ValueTypeNames.Color3f).Set(Gf.Vec3f(*color))
+         shader.CreateInput('roughness',Sdf.ValueTypeNames.Float).Set(rough)
+         shader.CreateInput('metallic',Sdf.ValueTypeNames.Float).Set(metal)
++        reflectance=(.04*max(0.,min(float(specular),1.)))**.5
++        shader.CreateInput('ior',Sdf.ValueTypeNames.Float).Set((1+reflectance)/max(1-reflectance,1e-6))
+         if name=='glass':shader.CreateInput('opacity',Sdf.ValueTypeNames.Float).Set(.28)
+         uv=UsdShade.Shader.Define(stage,path+'/UV');uv.CreateIdAttr('UsdPrimvarReader_float2')
+         uv.CreateInput('varname',Sdf.ValueTypeNames.Token).Set('st')
+-        for field,file,color_space in [('Color',image,'sRGB'),('Normal',normal,'raw')]:
++        for field,file,color_space in [('Color',image,'sRGB'),('Normal',normal,'raw'),('Packed',orm,'raw'),('Roughness',rough_map,'raw'),('Opacity',opacity_image,'raw')]:
+             if file is None:continue
+             tex=UsdShade.Shader.Define(stage,path+'/'+field);tex.CreateIdAttr('UsdUVTexture')
+             tex.CreateInput('file',Sdf.ValueTypeNames.Asset).Set(Sdf.AssetPath(str(file)))
+@@ -145,14 +147,33 @@ def create_scene(stage,scenario,environment='office'):
+                 if masked:
+                     shader.CreateInput('opacity',Sdf.ValueTypeNames.Float).ConnectToSource(tex.ConnectableAPI(),'a')
+                     shader.CreateInput('opacityThreshold',Sdf.ValueTypeNames.Float).Set(.5)
++            elif field=='Packed':
++                tex.CreateInput('scale',Sdf.ValueTypeNames.Float4).Set(Gf.Vec4f(1.,rough,metal,1.))
++                shader.CreateInput('roughness',Sdf.ValueTypeNames.Float).ConnectToSource(tex.ConnectableAPI(),'g')
++                shader.CreateInput('metallic',Sdf.ValueTypeNames.Float).ConnectToSource(tex.ConnectableAPI(),'b')
++            elif field=='Opacity':
++                shader.CreateInput('opacity',Sdf.ValueTypeNames.Float).ConnectToSource(tex.ConnectableAPI(),'r')
++                shader.CreateInput('opacityThreshold',Sdf.ValueTypeNames.Float).Set(.5)
++            elif field=='Roughness':
++                shader.CreateInput('roughness',Sdf.ValueTypeNames.Float).ConnectToSource(tex.ConnectableAPI(),'r')
+             else:
+-                tex.CreateInput('scale',Sdf.ValueTypeNames.Float4).Set(Gf.Vec4f(2,2,2,1))
+-                tex.CreateInput('bias',Sdf.ValueTypeNames.Float4).Set(Gf.Vec4f(-1,-1,-1,0))
++                tex.CreateInput('scale',Sdf.ValueTypeNames.Float4).Set(Gf.Vec4f(2*normal_scale,2*normal_scale,2,1))
++                tex.CreateInput('bias',Sdf.ValueTypeNames.Float4).Set(Gf.Vec4f(-normal_scale,-normal_scale,-1,0))
+                 shader.CreateInput('normal',Sdf.ValueTypeNames.Normal3f).ConnectToSource(tex.ConnectableAPI(),'rgb')
+-        mat.CreateSurfaceOutput().ConnectToSource(shader.ConnectableAPI(),'surface');materials[key]=mat;return mat
++        mat.CreateSurfaceOutput().ConnectToSource(shader.ConnectableAPI(),'surface')
++        if name=='glass':
++            glass=UsdShade.Shader.Define(stage,path+'/Glass')
++            glass.CreateImplementationSourceAttr().Set('sourceAsset')
++            glass.SetSourceAsset(Sdf.AssetPath('OmniGlass.mdl'),'mdl');glass.SetSourceAssetSubIdentifier('OmniGlass','mdl')
++            glass.CreateInput('glass_color',Sdf.ValueTypeNames.Color3f).Set(Gf.Vec3f(.94,.98,1.))
++            glass.CreateInput('glass_ior',Sdf.ValueTypeNames.Float).Set(1.5)
++            glass.CreateInput('thin_walled',Sdf.ValueTypeNames.Bool).Set(True)
++            glass.CreateInput('frosting_roughness',Sdf.ValueTypeNames.Float).Set(.035)
++            mat.CreateSurfaceOutput('mdl').ConnectToSource(glass.ConnectableAPI(),'out')
++        materials[key]=mat;return mat
+     def surface(name):
+         color,rough,metal=PALETTE[name];directory=root/'surfaces'/name
+-        return material(name,color,rough,metal,directory/'Diffuse.jpg' if directory.exists() else None,directory/'nor_gl.jpg' if (directory/'nor_gl.jpg').exists() else None)
++        return material(name,color,rough,metal,directory/'Diffuse.jpg' if directory.exists() else None,directory/'nor_gl.jpg' if (directory/'nor_gl.jpg').exists() else None,rough_map=directory/'Rough.jpg' if (directory/'Rough.jpg').exists() else None)
+     def mesh(path,data,points):
+         obj=UsdGeom.Mesh.Define(stage,path);obj.CreatePointsAttr(points)
+         obj.CreateFaceVertexCountsAttr([3]*len(data['faces']));obj.CreateFaceVertexIndicesAttr(data['faces'].reshape(-1))
+@@ -161,12 +182,17 @@ def create_scene(stage,scenario,environment='office'):
+         UsdGeom.PrimvarsAPI(obj).CreatePrimvar('st',Sdf.ValueTypeNames.TexCoord2fArray,'faceVarying').Set(data['uv'])
+         return obj
+     def bind_asset(obj,data,directory,tint=None):
+-        specs=json.loads((directory/'materials.json').read_text())
++        from .material_assets import material_specs,texture_tint_scale
++        specs=material_specs(directory)
+         for i,spec in enumerate(specs):
+             pbr=spec.get('pbrMetallicRoughness',{});color=pbr.get('baseColorFactor',[.7,.7,.7,1])[:3]
+             clothing=tint if tint is not None and _clothing(spec.get('name','')) else None
+-            if clothing is not None and 'image' not in spec:color=clothing_color(spec.get('name',''),clothing)
+-            mat=material(str(directory)+str(i),color,pbr.get('roughnessFactor',.65),pbr.get('metallicFactor',0.),directory/spec['image'] if 'image' in spec else None,directory/spec['normal_image'] if 'normal_image' in spec else None,spec.get('alphaMode')=='MASK',clothing)
++            if clothing is not None:
++                target=clothing_color(spec.get('name',''),clothing)
++                if 'image' in spec:clothing=texture_tint_scale(directory/spec['image'],tuple(target))
++                else:color=target
++            roughness=max(pbr.get('roughnessFactor',.65),.78 if (directory/'walk.npz').exists() and _clothing(spec.get('name','')) else 0.)
++            mat=material(str(directory)+str(i),color,roughness,pbr.get('metallicFactor',0.),directory/spec['image'] if 'image' in spec else None,directory/spec['normal_image'] if 'normal_image' in spec else None,spec.get('alphaMode') in ('MASK','BLEND'),clothing,orm=directory/spec['orm_image'] if 'orm_image' in spec else None,normal_scale=spec.get('normal_scale',1.),specular=spec.get('specular_factor',1.),opacity_image=directory/spec['opacity_image'] if 'opacity_image' in spec else None)
+             faces=np.flatnonzero(data['materials']==i).tolist()
+             if not faces:continue
+             subset=UsdGeom.Subset.CreateGeomSubset(obj,'m'+str(i),'face',faces,'materialBind')
+@@ -179,7 +205,7 @@ def create_scene(stage,scenario,environment='office'):
+         obj=mesh('/Realistic/Fixtures/'+box.name,data,points);obj.AddTranslateOp().Set(Gf.Vec3d(*box.position))
+         if box.yaw:obj.AddRotateZOp().Set(box.yaw)
+         mat=surface(box.material)
+-        if box.name.startswith('LightHousing'):
++        if box.name.startswith(('LightHousing','CoveLED')):
+             mat=material('luminaire',(.95,.92,.84),.4)
+             UsdShade.Shader.Get(stage,str(mat.GetPath())+'/Surface').CreateInput('emissiveColor',Sdf.ValueTypeNames.Color3f).Set(Gf.Vec3f(3.,2.85,2.55))
+         UsdShade.MaterialBindingAPI.Apply(obj.GetPrim()).Bind(mat)
+@@ -191,6 +217,7 @@ def create_scene(stage,scenario,environment='office'):
+         data=meshes[prop.asset];obj=mesh('/Realistic/Props/'+prop.name,data,data['points'])
+         obj.AddTranslateOp().Set(Gf.Vec3d(*prop.position));obj.AddRotateZOp().Set(prop.yaw);obj.AddScaleOp().Set(Gf.Vec3f(prop.scale))
+         bind_asset(obj,data,directory)
++        if not prop.collision:continue
+         if prop.asset=='tree_small_02':
+             center=json.loads((directory/'conversion.json').read_text())['floor_center_translation']
+             collider=UsdGeom.Cylinder.Define(stage,str(obj.GetPath())+'/TrunkCollider')
+@@ -213,6 +240,13 @@ def create_scene(stage,scenario,environment='office'):
+             light.AddTranslateOp().Set(Gf.Vec3d(x,-5.8,2.8));light.AddRotateXYZOp().Set(Gf.Vec3f(70,0,0))
+             light.CreateWidthAttr(3.);light.CreateHeightAttr(2.);light.CreateIntensityAttr(4000.)
+             light.CreateColorAttr(Gf.Vec3f(.88,.94,1.))
++    if environment=='office':
++        for side in (-1,1):
++            for i,x in enumerate((-2,3,8,13)):
++                light=UsdLux.RectLight.Define(stage,f'/Realistic/Lighting/Cove{side}_{i}'.replace('-','n'))
++                light.AddTranslateOp().Set(Gf.Vec3d(x,side*5.5,4.02));light.AddRotateXOp().Set(180.)
++                light.CreateWidthAttr(4.8);light.CreateHeightAttr(.08);light.CreateIntensityAttr(1800.)
++                light.CreateColorAttr(Gf.Vec3f(1.,.93,.82))
+     roots={}
+     for person in scenario.people:
+         spec=assign_people(scenario)[person.name];directory=human_directory(spec.model)
+@@ -246,7 +280,12 @@ def gazebo_world(scenario,output,environment):
+             for effect in tree.findall('.//c:effect',ns):
+                 if any(word in effect.get('id','').lower() for word in ('original_top','original_bottom','business_fabric')):
+                     color=effect.find('.//c:diffuse/c:color',ns)
+-                    if color is not None:color.text=' '.join(map(str,(*clothing_color(effect.get('id',''),spec.clothing),1)))
++                    if color is None:
++                        diffuse=effect.find('.//c:diffuse',ns)
++                        if diffuse is None:continue
++                        for old in list(diffuse):diffuse.remove(old)
++                        color=ET.SubElement(diffuse,'{'+ns['c']+'}color',sid='diffuse')
++                    color.text=' '.join(map(str,(*clothing_color(effect.get('id',''),spec.clothing),1)))
+             text=ET.tostring(tree,encoding='unicode')
+         path=output/(person.name+'.dae');path.parent.mkdir(parents=True,exist_ok=True);path.write_text(text);skins[person.name]=path
+     tree=ET.fromstring(baseline(scenario,skins,1.345));world=tree.find('world')
+@@ -285,7 +324,7 @@ def gazebo_world(scenario,output,environment):
+                     if (texture/'nor_gl.jpg').exists():ET.SubElement(pbr,'normal_map').text=(texture/'nor_gl.jpg').as_uri()
+     for prop in props:
+         link=model(prop.name,prop.position,prop.yaw)
+-        for tag in ('visual','collision'):
++        for tag in ('visual','collision') if prop.collision else ('visual',):
+             item=ET.SubElement(link,tag,name=tag);geometry=ET.SubElement(item,'geometry')
+             if tag=='collision' and prop.asset=='tree_small_02':
+                 center=json.loads((root/'props'/prop.asset/'conversion.json').read_text())['floor_center_translation']
+diff --git a/src/ridgeback_leader_follow/sim/assets/realistic/sources.json b/src/ridgeback_leader_follow/sim/assets/realistic/sources.json
+index a6a3362..c9f282d 100644
+--- a/src/ridgeback_leader_follow/sim/assets/realistic/sources.json
++++ b/src/ridgeback_leader_follow/sim/assets/realistic/sources.json
+@@ -446,6 +446,66 @@
+       "sha256": "31a6269e98a3a8b2a2d6db8f58724e0151d5312b5137e6d59b5a2ba873989159",
+       "bytes": 620549
+     },
++    "props/grass_medium_01/grass_medium_01.gltf": {
++      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/1k/grass_medium_01/grass_medium_01_1k.gltf",
++      "sha256": "3e5e2a314c94e16de54fd7c28e41709731fbd2b1613ab539f1544f622ddb6a85",
++      "bytes": 27110
++    },
++    "props/grass_medium_01/textures/grass_medium_01_nor_gl_1k.jpg": {
++      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/grass_medium_01/grass_medium_01_nor_gl_1k.jpg",
++      "sha256": "cae298d3d1d7ff7c7e210ad8ac772b96706e356f9315a6b04fde373ce01ccf1e",
++      "bytes": 956166
++    },
++    "props/grass_medium_01/textures/grass_medium_01_diff_1k.jpg": {
++      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/grass_medium_01/grass_medium_01_diff_1k.jpg",
++      "sha256": "71495bd6a11fddcab0aaff38246fea1a7b802a705483f1c7cbca53955daa8050",
++      "bytes": 395673
++    },
++    "props/grass_medium_01/textures/grass_medium_01_arm_1k.jpg": {
++      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/grass_medium_01/grass_medium_01_arm_1k.jpg",
++      "sha256": "9a3a30f72bc02f4398967c5b08f2d20cce30bd423a2613b42a727034296fa3ae",
++      "bytes": 679518
++    },
++    "props/grass_medium_01/grass_medium_01.bin": {
++      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/grass_medium_01/grass_medium_01.bin",
++      "sha256": "f4587cabdb96a2e96d8be644923dc954a248edfaaa717a0ff224cacb898bee1f",
++      "bytes": 1006632
++    },
++    "props/grass_medium_01/textures/opacity.png": {
++      "url": "https://dl.polyhaven.org/file/ph-assets/Models/png/1k/grass_medium_01/grass_medium_01_alpha_1k.png",
++      "sha256": "711a8e49af758d6a6ce1f610db858899a27be19da6d1866bd35c13bc7b8ffeff",
++      "bytes": 648718
++    },
++    "props/shrub_01/shrub_01.gltf": {
++      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/1k/shrub_01/shrub_01_1k.gltf",
++      "sha256": "c3bb3340687d46c684b9dab82f5b2f92b7b0fe761842423d3c9e19f59a839393",
++      "bytes": 2895
++    },
++    "props/shrub_01/textures/shrub_01_nor_gl_1k.jpg": {
++      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/shrub_01/shrub_01_nor_gl_1k.jpg",
++      "sha256": "076870a39a4e21a364cf94566e6dd1852a29045fdf1f23393637235b19d1c2e8",
++      "bytes": 746497
++    },
++    "props/shrub_01/shrub_01.bin": {
++      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/4k/shrub_01/shrub_01.bin",
++      "sha256": "a8646f51386c84b12a6be8324dd0c2357c393c9108aac911847a203cf490b426",
++      "bytes": 5239664
++    },
++    "props/shrub_01/textures/shrub_01_arm_1k.jpg": {
++      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/shrub_01/shrub_01_arm_1k.jpg",
++      "sha256": "8faecdc28d8f03ba0ac139be16e617e8bfd0778780ec1d7850812230378b89be",
++      "bytes": 386309
++    },
++    "props/shrub_01/textures/shrub_01_diff_1k.jpg": {
++      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/shrub_01/shrub_01_diff_1k.jpg",
++      "sha256": "fe60e639d694e1807c0a3ae97dd1d5a7e7b3f84e5fc32d0610b868ce48f36331",
++      "bytes": 502162
++    },
++    "props/shrub_01/textures/opacity.png": {
++      "url": "https://dl.polyhaven.org/file/ph-assets/Models/png/1k/shrub_01/shrub_01_alpha_1k.png",
++      "sha256": "eb693835205913dfc705a08fb45f3e8d1c338332bd0097e9837773765b421603",
++      "bytes": 132597
++    },
+     "surfaces/wood_floor/Diffuse.jpg": {
+       "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/wood_floor/wood_floor_diff_1k.jpg",
+       "sha256": "2a1c07687b6dbb214c4b9213739c6d92d425f1f0fc8ab3ac157f105d78240789",
+@@ -521,6 +581,21 @@
+       "sha256": "7000e2ccd479bb7b66dcdf4faef7b47554324566886314ca620cbf03e274e826",
+       "bytes": 1310516
+     },
++    "surfaces/wood_table_001/Diffuse.jpg": {
++      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/wood_table_001/wood_table_001_diff_1k.jpg",
++      "sha256": "460dd08d240f4a1f02982415048c3c5c200f385db212da18dc7e2df68bf4d0be",
++      "bytes": 215573
++    },
++    "surfaces/wood_table_001/Rough.jpg": {
++      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/wood_table_001/wood_table_001_rough_1k.jpg",
++      "sha256": "a2ca9ae89dfe7b8e2e5e92f0aa43467845417de8a50205b5852ef0d57c7624f9",
++      "bytes": 237261
++    },
++    "surfaces/wood_table_001/nor_gl.jpg": {
++      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/wood_table_001/wood_table_001_nor_gl_1k.jpg",
++      "sha256": "9bf7ddf5721e225c20290f1772ae37f9bdfd49658f6d458259eb794e2149d3cf",
++      "bytes": 51927
++    },
+     "daylight.hdr": {
+       "url": "https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/kloofendal_48d_partly_cloudy_puresky_1k.hdr",
+       "sha256": "fd94c84997b8a3c353b62c2125a9b44e19509956986a126e472684432a02d798",
+diff --git a/src/ridgeback_leader_follow/sim/fetch_realistic_assets.py b/src/ridgeback_leader_follow/sim/fetch_realistic_assets.py
+index 4cd0765..7d02737 100644
+--- a/src/ridgeback_leader_follow/sim/fetch_realistic_assets.py
++++ b/src/ridgeback_leader_follow/sim/fetch_realistic_assets.py
+@@ -13,8 +13,8 @@ import requests
+ MODELS = ('modern_arm_chair_01','sofa_03','modern_coffee_table_01','potted_plant_02',
+           'metal_office_desk','wooden_crate_01','barrel_03','plastic_crate_01',
+           'painted_wooden_bench','street_lamp_01','tree_small_02',
+-          'binder_notebook','book_encyclopedia_set_01','metal_trash_can')
+-SURFACES = ('wood_floor','concrete_floor_02','brick_pavement_02','brick_wall_001','grass_ground')
++          'binder_notebook','book_encyclopedia_set_01','metal_trash_can','grass_medium_01','shrub_01')
++SURFACES = ('wood_floor','concrete_floor_02','brick_pavement_02','brick_wall_001','grass_ground','wood_table_001')
+ HUMANS = {
+     'sam':'relaxed-walk-sam-3d-person-animated-732f1206',
+     'jordan':'relaxed-walk-jordan-3d-person-animated-7ab9479d',
+@@ -41,6 +41,12 @@ def main():
+         files={str((base/(key+'.gltf')).relative_to(output)):fetch(spec['url'],base/(key+'.gltf'))}
+         for relative,data in spec['include'].items():
+             files[str((base/relative).relative_to(output))]=fetch(data['url'],base/relative)
++        opacity={}
++        if key in ('grass_medium_01','shrub_01'):
++            entry=meta.json()['Alpha']['1k']['png'];target=base/'textures/opacity.png'
++            files[str(target.relative_to(output))]=fetch(entry['url'],target)
++            opacity['all']='textures/opacity.png'
++            (base/'opacity_maps.json').write_text(json.dumps(opacity,indent=2)+'\n')
+         return files
+     with ThreadPoolExecutor(max_workers=5) as pool:
+         for files in pool.map(model,MODELS):receipt['files'].update(files)
+diff --git a/src/ridgeback_leader_follow/sim/prepare_realistic_assets.py b/src/ridgeback_leader_follow/sim/prepare_realistic_assets.py
+index abaa63b..66fec5f 100644
+--- a/src/ridgeback_leader_follow/sim/prepare_realistic_assets.py
++++ b/src/ridgeback_leader_follow/sim/prepare_realistic_assets.py
+@@ -7,6 +7,36 @@ import numpy as np
+ sys.path.insert(0,str(Path(__file__).resolve().parent))
+ 
+ 
++def export_opacity(directory):
++    """Keep the publisher's separate grayscale mask in Collada without repacking pixels."""
++    from xml.etree import ElementTree as ET
++    masks=directory/'opacity_maps.json'
++    if not masks.exists():return
++    path=json.loads(masks.read_text()).get('all')
++    if path is None:return
++    namespace='http://www.collada.org/2005/11/COLLADASchema';ns={'c':namespace}
++    ET.register_namespace('',namespace);tree=ET.parse(directory/'model.dae');root=tree.getroot()
++    images=root.find('c:library_images',ns)
++    if images is None:images=ET.SubElement(root,'{'+namespace+'}library_images')
++    image=ET.SubElement(images,'{'+namespace+'}image',id='opacity_source')
++    ET.SubElement(image,'{'+namespace+'}init_from').text=path
++    for effect in root.findall('c:library_effects/c:effect',ns):
++        profile=effect.find('c:profile_COMMON',ns)
++        for tag,sid in [('surface','opacity-surface'),('sampler2D','opacity-sampler')]:
++            param=ET.SubElement(profile,'{'+namespace+'}newparam',sid=sid)
++            node=ET.SubElement(param,'{'+namespace+'}'+tag,**({'type':'2D'} if tag=='surface' else {}))
++            ET.SubElement(node,'{'+namespace+'}'+('init_from' if tag=='surface' else 'source')).text='opacity_source' if tag=='surface' else 'opacity-surface'
++        shader=profile.find('c:technique/c:lambert',ns)
++        if shader is None:shader=profile.find('c:technique/c:phong',ns)
++        if shader is None:continue
++        for old in shader.findall('c:transparent',ns):shader.remove(old)
++        transparent=ET.SubElement(shader,'{'+namespace+'}transparent',opaque='RGB_ONE')
++        ET.SubElement(transparent,'{'+namespace+'}texture',texture='opacity-sampler',texcoord='UVMap')
++        extra=ET.SubElement(effect,'{'+namespace+'}extra');technique=ET.SubElement(extra,'{'+namespace+'}technique',profile='GOOGLEEARTH')
++        ET.SubElement(technique,'{'+namespace+'}double_sided').text='1'
++    tree.write(directory/'model.dae',encoding='utf-8',xml_declaration=True)
++
++
+ def main():
+     args=sys.argv[sys.argv.index('--')+1:];directory=Path(args[0]).resolve()
+     if len(args)>1 and args[1]=='human':
+@@ -68,6 +98,7 @@ def main():
+     np.savez_compressed(directory/'mesh.npz',points=points,normals=np.asarray(normals,np.float32),faces=np.asarray(faces,np.int32),uv=np.asarray(uvs,np.float32),materials=np.asarray(groups,np.int32))
+     (directory/'materials.json').write_text(json.dumps(specs,indent=2)+'\n')
+     bpy.ops.wm.collada_export(filepath=str(directory/'model.dae'),include_animations=False,triangulate=True,use_texture_copies=True,export_global_up_selection='Z',apply_global_orientation=False)
++    export_opacity(directory)
+     receipt={'source':source.name,'max_export_pose_deviation_m':deviation,'source_polygon_count':source_triangles,'triangle_budget':180000 if source_triangles>250000 else None,'blender':bpy.app.version_string,'floor_center_translation':center.tolist(),'dimensions_m':(maximum-minimum).tolist(),'vertices':len(points),'triangles':len(faces),'sha256':{p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in [directory/'mesh.npz',directory/'model.dae',directory/'materials.json']}}
+     (directory/'conversion.json').write_text(json.dumps(receipt,indent=2)+'\n')
+     print('Prepared static asset',directory.name,receipt,flush=True)
+diff --git a/src/ridgeback_leader_follow/test/test_realistic_scene.py b/src/ridgeback_leader_follow/test/test_realistic_scene.py
+index cf5021d..88a4b4b 100644
+--- a/src/ridgeback_leader_follow/test/test_realistic_scene.py
++++ b/src/ridgeback_leader_follow/test/test_realistic_scene.py
+@@ -19,6 +19,7 @@ def test_all_scenario_paths_clear_of_static_furniture(environment):
+         if box.collision and box.position[2]+box.size[2]/2>.1 and box.position[2]-box.size[2]/2<1.9:
+             obstacles.append((box.name,np.array(box.position[:2]),np.array(box.size[:2])/2))
+     for prop in props:
++        if not prop.collision:continue
+         dimensions=json.loads((asset_directory()/'props'/prop.asset/'conversion.json').read_text())['dimensions_m']
+         if prop.position[2]>1.9:continue
+         angle=np.deg2rad(prop.yaw);c,s=abs(np.cos(angle)),abs(np.sin(angle))

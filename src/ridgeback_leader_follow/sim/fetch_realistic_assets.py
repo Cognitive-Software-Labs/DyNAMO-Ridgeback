@@ -13,8 +13,8 @@ import requests
 MODELS = ('modern_arm_chair_01','sofa_03','modern_coffee_table_01','potted_plant_02',
           'metal_office_desk','wooden_crate_01','barrel_03','plastic_crate_01',
           'painted_wooden_bench','street_lamp_01','tree_small_02',
-          'binder_notebook','book_encyclopedia_set_01','metal_trash_can')
-SURFACES = ('wood_floor','concrete_floor_02','brick_pavement_02','brick_wall_001','grass_ground')
+          'binder_notebook','book_encyclopedia_set_01','metal_trash_can','grass_medium_01','shrub_01')
+SURFACES = ('wood_floor','concrete_floor_02','brick_pavement_02','brick_wall_001','grass_ground','wood_table_001')
 HUMANS = {
     'sam':'relaxed-walk-sam-3d-person-animated-732f1206',
     'jordan':'relaxed-walk-jordan-3d-person-animated-7ab9479d',
@@ -41,6 +41,12 @@ def main():
         files={str((base/(key+'.gltf')).relative_to(output)):fetch(spec['url'],base/(key+'.gltf'))}
         for relative,data in spec['include'].items():
             files[str((base/relative).relative_to(output))]=fetch(data['url'],base/relative)
+        opacity={}
+        if key in ('grass_medium_01','shrub_01'):
+            entry=meta.json()['Alpha']['1k']['png'];target=base/'textures/opacity.png'
+            files[str(target.relative_to(output))]=fetch(entry['url'],target)
+            opacity['all']='textures/opacity.png'
+            (base/'opacity_maps.json').write_text(json.dumps(opacity,indent=2)+'\n')
         return files
     with ThreadPoolExecutor(max_workers=5) as pool:
         for files in pool.map(model,MODELS):receipt['files'].update(files)

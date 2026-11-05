@@ -121,18 +121,20 @@ def create_scene(stage,scenario,environment='office'):
     from pxr import Gf,Sdf,UsdGeom,UsdLux,UsdPhysics,UsdShade
     UsdGeom.SetStageUpAxis(stage,UsdGeom.Tokens.z);UsdGeom.SetStageMetersPerUnit(stage,1.)
     root=asset_directory();materials={};meshes={}
-    def material(name,color=(.7,.7,.7),rough=.65,metal=0.,image=None,normal=None,masked=False,tint=None):
-        key=(name,tuple(color),image,normal,masked,tint)
+    def material(name,color=(.7,.7,.7),rough=.65,metal=0.,image=None,normal=None,masked=False,tint=None,orm=None,normal_scale=1.,specular=1.,rough_map=None,opacity_image=None):
+        key=(name,tuple(color),rough,metal,image,normal,masked,tint,orm,normal_scale,specular,rough_map,opacity_image)
         if key in materials:return materials[key]
         path='/Realistic/Materials/m'+str(len(materials));mat=UsdShade.Material.Define(stage,path)
         shader=UsdShade.Shader.Define(stage,path+'/Surface');shader.CreateIdAttr('UsdPreviewSurface')
         shader.CreateInput('diffuseColor',Sdf.ValueTypeNames.Color3f).Set(Gf.Vec3f(*color))
         shader.CreateInput('roughness',Sdf.ValueTypeNames.Float).Set(rough)
         shader.CreateInput('metallic',Sdf.ValueTypeNames.Float).Set(metal)
+        reflectance=(.04*max(0.,min(float(specular),1.)))**.5
+        shader.CreateInput('ior',Sdf.ValueTypeNames.Float).Set((1+reflectance)/max(1-reflectance,1e-6))
         if name=='glass':shader.CreateInput('opacity',Sdf.ValueTypeNames.Float).Set(.28)
         uv=UsdShade.Shader.Define(stage,path+'/UV');uv.CreateIdAttr('UsdPrimvarReader_float2')
         uv.CreateInput('varname',Sdf.ValueTypeNames.Token).Set('st')
-        for field,file,color_space in [('Color',image,'sRGB'),('Normal',normal,'raw')]:
+        for field,file,color_space in [('Color',image,'sRGB'),('Normal',normal,'raw'),('Packed',orm,'raw'),('Roughness',rough_map,'raw'),('Opacity',opacity_image,'raw')]:
             if file is None:continue
             tex=UsdShade.Shader.Define(stage,path+'/'+field);tex.CreateIdAttr('UsdUVTexture')
             tex.CreateInput('file',Sdf.ValueTypeNames.Asset).Set(Sdf.AssetPath(str(file)))
@@ -145,14 +147,33 @@ def create_scene(stage,scenario,environment='office'):
                 if masked:
                     shader.CreateInput('opacity',Sdf.ValueTypeNames.Float).ConnectToSource(tex.ConnectableAPI(),'a')
                     shader.CreateInput('opacityThreshold',Sdf.ValueTypeNames.Float).Set(.5)
+            elif field=='Packed':
+                tex.CreateInput('scale',Sdf.ValueTypeNames.Float4).Set(Gf.Vec4f(1.,rough,metal,1.))
+                shader.CreateInput('roughness',Sdf.ValueTypeNames.Float).ConnectToSource(tex.ConnectableAPI(),'g')
+                shader.CreateInput('metallic',Sdf.ValueTypeNames.Float).ConnectToSource(tex.ConnectableAPI(),'b')
+            elif field=='Opacity':
+                shader.CreateInput('opacity',Sdf.ValueTypeNames.Float).ConnectToSource(tex.ConnectableAPI(),'r')
+                shader.CreateInput('opacityThreshold',Sdf.ValueTypeNames.Float).Set(.5)
+            elif field=='Roughness':
+                shader.CreateInput('roughness',Sdf.ValueTypeNames.Float).ConnectToSource(tex.ConnectableAPI(),'r')
             else:
-                tex.CreateInput('scale',Sdf.ValueTypeNames.Float4).Set(Gf.Vec4f(2,2,2,1))
-                tex.CreateInput('bias',Sdf.ValueTypeNames.Float4).Set(Gf.Vec4f(-1,-1,-1,0))
+                tex.CreateInput('scale',Sdf.ValueTypeNames.Float4).Set(Gf.Vec4f(2*normal_scale,2*normal_scale,2,1))
+                tex.CreateInput('bias',Sdf.ValueTypeNames.Float4).Set(Gf.Vec4f(-normal_scale,-normal_scale,-1,0))
                 shader.CreateInput('normal',Sdf.ValueTypeNames.Normal3f).ConnectToSource(tex.ConnectableAPI(),'rgb')
-        mat.CreateSurfaceOutput().ConnectToSource(shader.ConnectableAPI(),'surface');materials[key]=mat;return mat
+        mat.CreateSurfaceOutput().ConnectToSource(shader.ConnectableAPI(),'surface')
+        if name=='glass':
+            glass=UsdShade.Shader.Define(stage,path+'/Glass')
+            glass.CreateImplementationSourceAttr().Set('sourceAsset')
+            glass.SetSourceAsset(Sdf.AssetPath('OmniGlass.mdl'),'mdl');glass.SetSourceAssetSubIdentifier('OmniGlass','mdl')
+            glass.CreateInput('glass_color',Sdf.ValueTypeNames.Color3f).Set(Gf.Vec3f(.94,.98,1.))
+            glass.CreateInput('glass_ior',Sdf.ValueTypeNames.Float).Set(1.5)
+            glass.CreateInput('thin_walled',Sdf.ValueTypeNames.Bool).Set(True)
+            glass.CreateInput('frosting_roughness',Sdf.ValueTypeNames.Float).Set(.035)
+            mat.CreateSurfaceOutput('mdl').ConnectToSource(glass.ConnectableAPI(),'out')
+        materials[key]=mat;return mat
     def surface(name):
         color,rough,metal=PALETTE[name];directory=root/'surfaces'/name
-        return material(name,color,rough,metal,directory/'Diffuse.jpg' if directory.exists() else None,directory/'nor_gl.jpg' if (directory/'nor_gl.jpg').exists() else None)
+        return material(name,color,rough,metal,directory/'Diffuse.jpg' if directory.exists() else None,directory/'nor_gl.jpg' if (directory/'nor_gl.jpg').exists() else None,rough_map=directory/'Rough.jpg' if (directory/'Rough.jpg').exists() else None)
     def mesh(path,data,points):
         obj=UsdGeom.Mesh.Define(stage,path);obj.CreatePointsAttr(points)
         obj.CreateFaceVertexCountsAttr([3]*len(data['faces']));obj.CreateFaceVertexIndicesAttr(data['faces'].reshape(-1))
@@ -161,12 +182,17 @@ def create_scene(stage,scenario,environment='office'):
         UsdGeom.PrimvarsAPI(obj).CreatePrimvar('st',Sdf.ValueTypeNames.TexCoord2fArray,'faceVarying').Set(data['uv'])
         return obj
     def bind_asset(obj,data,directory,tint=None):
-        specs=json.loads((directory/'materials.json').read_text())
+        from .material_assets import material_specs,texture_tint_scale
+        specs=material_specs(directory)
         for i,spec in enumerate(specs):
             pbr=spec.get('pbrMetallicRoughness',{});color=pbr.get('baseColorFactor',[.7,.7,.7,1])[:3]
             clothing=tint if tint is not None and _clothing(spec.get('name','')) else None
-            if clothing is not None and 'image' not in spec:color=clothing_color(spec.get('name',''),clothing)
-            mat=material(str(directory)+str(i),color,pbr.get('roughnessFactor',.65),pbr.get('metallicFactor',0.),directory/spec['image'] if 'image' in spec else None,directory/spec['normal_image'] if 'normal_image' in spec else None,spec.get('alphaMode')=='MASK',clothing)
+            if clothing is not None:
+                target=clothing_color(spec.get('name',''),clothing)
+                if 'image' in spec:clothing=texture_tint_scale(directory/spec['image'],tuple(target))
+                else:color=target
+            roughness=max(pbr.get('roughnessFactor',.65),.78 if (directory/'walk.npz').exists() and _clothing(spec.get('name','')) else 0.)
+            mat=material(str(directory)+str(i),color,roughness,pbr.get('metallicFactor',0.),directory/spec['image'] if 'image' in spec else None,directory/spec['normal_image'] if 'normal_image' in spec else None,spec.get('alphaMode') in ('MASK','BLEND'),clothing,orm=directory/spec['orm_image'] if 'orm_image' in spec else None,normal_scale=spec.get('normal_scale',1.),specular=spec.get('specular_factor',1.),opacity_image=directory/spec['opacity_image'] if 'opacity_image' in spec else None)
             faces=np.flatnonzero(data['materials']==i).tolist()
             if not faces:continue
             subset=UsdGeom.Subset.CreateGeomSubset(obj,'m'+str(i),'face',faces,'materialBind')
@@ -179,7 +205,7 @@ def create_scene(stage,scenario,environment='office'):
         obj=mesh('/Realistic/Fixtures/'+box.name,data,points);obj.AddTranslateOp().Set(Gf.Vec3d(*box.position))
         if box.yaw:obj.AddRotateZOp().Set(box.yaw)
         mat=surface(box.material)
-        if box.name.startswith('LightHousing'):
+        if box.name.startswith(('LightHousing','CoveLED')):
             mat=material('luminaire',(.95,.92,.84),.4)
             UsdShade.Shader.Get(stage,str(mat.GetPath())+'/Surface').CreateInput('emissiveColor',Sdf.ValueTypeNames.Color3f).Set(Gf.Vec3f(3.,2.85,2.55))
         UsdShade.MaterialBindingAPI.Apply(obj.GetPrim()).Bind(mat)
@@ -191,6 +217,7 @@ def create_scene(stage,scenario,environment='office'):
         data=meshes[prop.asset];obj=mesh('/Realistic/Props/'+prop.name,data,data['points'])
         obj.AddTranslateOp().Set(Gf.Vec3d(*prop.position));obj.AddRotateZOp().Set(prop.yaw);obj.AddScaleOp().Set(Gf.Vec3f(prop.scale))
         bind_asset(obj,data,directory)
+        if not prop.collision:continue
         if prop.asset=='tree_small_02':
             center=json.loads((directory/'conversion.json').read_text())['floor_center_translation']
             collider=UsdGeom.Cylinder.Define(stage,str(obj.GetPath())+'/TrunkCollider')
@@ -213,6 +240,13 @@ def create_scene(stage,scenario,environment='office'):
             light.AddTranslateOp().Set(Gf.Vec3d(x,-5.8,2.8));light.AddRotateXYZOp().Set(Gf.Vec3f(70,0,0))
             light.CreateWidthAttr(3.);light.CreateHeightAttr(2.);light.CreateIntensityAttr(4000.)
             light.CreateColorAttr(Gf.Vec3f(.88,.94,1.))
+    if environment=='office':
+        for side in (-1,1):
+            for i,x in enumerate((-2,3,8,13)):
+                light=UsdLux.RectLight.Define(stage,f'/Realistic/Lighting/Cove{side}_{i}'.replace('-','n'))
+                light.AddTranslateOp().Set(Gf.Vec3d(x,side*5.5,4.02));light.AddRotateXOp().Set(180.)
+                light.CreateWidthAttr(4.8);light.CreateHeightAttr(.08);light.CreateIntensityAttr(1800.)
+                light.CreateColorAttr(Gf.Vec3f(1.,.93,.82))
     roots={}
     for person in scenario.people:
         spec=assign_people(scenario)[person.name];directory=human_directory(spec.model)
@@ -246,7 +280,12 @@ def gazebo_world(scenario,output,environment):
             for effect in tree.findall('.//c:effect',ns):
                 if any(word in effect.get('id','').lower() for word in ('original_top','original_bottom','business_fabric')):
                     color=effect.find('.//c:diffuse/c:color',ns)
-                    if color is not None:color.text=' '.join(map(str,(*clothing_color(effect.get('id',''),spec.clothing),1)))
+                    if color is None:
+                        diffuse=effect.find('.//c:diffuse',ns)
+                        if diffuse is None:continue
+                        for old in list(diffuse):diffuse.remove(old)
+                        color=ET.SubElement(diffuse,'{'+ns['c']+'}color',sid='diffuse')
+                    color.text=' '.join(map(str,(*clothing_color(effect.get('id',''),spec.clothing),1)))
             text=ET.tostring(tree,encoding='unicode')
         path=output/(person.name+'.dae');path.parent.mkdir(parents=True,exist_ok=True);path.write_text(text);skins[person.name]=path
     tree=ET.fromstring(baseline(scenario,skins,1.345));world=tree.find('world')
@@ -285,7 +324,7 @@ def gazebo_world(scenario,output,environment):
                     if (texture/'nor_gl.jpg').exists():ET.SubElement(pbr,'normal_map').text=(texture/'nor_gl.jpg').as_uri()
     for prop in props:
         link=model(prop.name,prop.position,prop.yaw)
-        for tag in ('visual','collision'):
+        for tag in ('visual','collision') if prop.collision else ('visual',):
             item=ET.SubElement(link,tag,name=tag);geometry=ET.SubElement(item,'geometry')
             if tag=='collision' and prop.asset=='tree_small_02':
                 center=json.loads((root/'props'/prop.asset/'conversion.json').read_text())['floor_center_translation']

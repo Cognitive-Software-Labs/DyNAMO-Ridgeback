@@ -1,0 +1,22 @@
+[
+  {
+    "alphaCutoff": 0.5,
+    "alphaMode": "MASK",
+    "doubleSided": true,
+    "name": "shrub_01_material_0",
+    "normalTexture": {
+      "index": 0
+    },
+    "pbrMetallicRoughness": {
+      "baseColorTexture": {
+        "index": 1
+      },
+      "metallicFactor": 0,
+      "metallicRoughnessTexture": {
+        "index": 2
+      }
+    },
+    "image": "textures/shrub_01_diff_1k.jpg",
+    "normal_image": "textures/shrub_01_nor_gl_1k.jpg"
+  }
+]
