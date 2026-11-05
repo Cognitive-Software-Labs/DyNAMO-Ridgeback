@@ -84,12 +84,16 @@ def run(scenario, duration, output, writer, gui, finish, record=False, scene_pro
         _, depth_handle = attach_camera(stage, '/ridgeback', 'r100_0001',
                                          '640x480', 'ideal', depth_sink=ros.publish_d455_depth)
         rig = RidgebackRig(root, odom_noise=0., seed=0)
-        dt = .025
+        # One render per step. The realistic profile's RTX office makes each
+        # render costly, so it steps at the camera's 30 Hz instead of 40 Hz:
+        # about a third more scene time per second of wall time. Baseline and
+        # F3 runs keep their recorded 40 Hz timing.
+        dt = 1 / 30 if scene_profile == 'realistic' else .025
         loop = omni_loop.acquire_loop_interface()
         loop.set_manual_step_size(dt)
         loop.set_manual_mode(True, name='main')
         timeline = omni.timeline.get_timeline_interface()
-        timeline.set_time_codes_per_second(40.)
+        timeline.set_time_codes_per_second(round(1 / dt))
         timeline.set_end_time(1e9)
         timeline.set_looping(False)
         timeline.play()
@@ -137,7 +141,8 @@ def run(scenario, duration, output, writer, gui, finish, record=False, scene_pro
             rig.step(dt, now=timeline.get_current_time())
             app.update()
             publish_robot()
-            if index % 2 == 1:
+            # Truth stays on the 0.05 s grid whatever the step size.
+            if math.floor(elapsed / .05 + 1e-9) != math.floor((elapsed - dt) / .05 + 1e-9):
                 stamp = timeline.get_current_time()
                 cache = UsdGeom.XformCache(Usd.TimeCode.Default())
                 for person in scenario.people:
