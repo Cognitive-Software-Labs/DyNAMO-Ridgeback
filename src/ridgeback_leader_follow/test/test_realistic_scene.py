@@ -62,6 +62,27 @@ def test_gazebo_preserves_scenario_paths_and_actor_scales(environment,tmp_path):
         document=ET.parse(skin);ns={'c':'http://www.collada.org/2005/11/COLLADASchema'}
         for image in document.findall('.//c:library_images/c:image/c:init_from',ns):
             assert Path(image.text.removeprefix('file://')).is_file(),image.text
+    ns={'c':'http://www.collada.org/2005/11/COLLADASchema'}
+    material_ids=[]
+    for fixture in (tmp_path.parent/'fixtures').glob('*.dae'):
+        document=ET.parse(fixture)
+        ids={element.get('id') for element in document.iter() if element.get('id')}
+        for element in document.iter():
+            for key in ('url','source','target'):
+                reference=element.get(key,'')
+                if reference.startswith('#'):assert reference[1:] in ids
+        material_ids.extend(material.get('id') for material in document.findall('.//c:library_materials/c:material',ns))
+    assert material_ids and len(material_ids)==len(set(material_ids))
+    texture_paths=[Path(item.text.removeprefix('file://')) for item in world.findall('.//pbr/metal/albedo_map')]
+    by_basename={}
+    for path in texture_paths:
+        assert path.is_file()
+        assert by_basename.setdefault(path.name,path)==path
+        assert path.name!='Diffuse.jpg'
+    if environment!='courtyard':
+        assert len([light for light in world.findall('light') if light.get('type')=='point'])==4
+        luminous=[model for model in world.findall('model') if model.get('name','').startswith(('LightHousing','CoveLED'))]
+        assert luminous and all(model.find('link/visual/material/emissive') is not None for model in luminous)
     plugin=next(p for p in world.findall('plugin') if p.get('name')=='leader_follow::CrowdMotion')
     for person,config in zip(scenario.people,plugin.findall('person'),strict=True):
         assert [w.text for w in config.findall('waypoint')]==[f'{w.time} {w.x} {w.y}' for w in person.waypoints]
@@ -78,3 +99,14 @@ def test_wall_texture_u_axis_is_horizontal_and_signs_are_not_tiled():
             assert points[offset+2,2]>points[offset+1,2]
         sign,_=box_mesh_data(size,repeat=False)
         assert sign['uv'].min()==0 and sign['uv'].max()==1
+
+
+def test_static_props_have_no_wire_edges_and_textures_resolve():
+    """Gazebo renders Collada <lines> as unlit white strokes (seen as white tree foliage)."""
+    ns={'c':'http://www.collada.org/2005/11/COLLADASchema'}
+    for model in sorted((asset_directory()/'props').glob('*/model.dae')):
+        document=ET.parse(model)
+        assert not document.findall('.//c:lines',ns)+document.findall('.//c:linestrips',ns),model
+        for image in document.findall('.//c:library_images/c:image',ns):
+            reference=image.findtext('c:init_from',namespaces=ns).removeprefix('file://')
+            assert (model.parent/reference).is_file(),(model,reference)

@@ -14,11 +14,12 @@
     4.2956061363220215,
     4.564810276031494
   ],
-  "vertices": 402004,
+  "vertices": 402003,
   "triangles": 180000,
+  "removed_loose_edges": 87895,
   "sha256": {
-    "mesh.npz": "038ad01a92d84c381a3a1a7fec5f94fcac008c5f6fd307848f063d54c4aacd76",
-    "model.dae": "b45faa900fb2e54833d6586d5dd31db07ca4ec3a0aae7849400798cc8a72e470",
+    "mesh.npz": "49f5fd17fb63b11788d4be223d06a5229b7af10c0ae944c38423a9ff56accfb8",
+    "model.dae": "9e906b4712c8c64a56cbd285356e53aed8a859f76e687cb4d9548ee86125e77a",
     "materials.json": "31ba67376764334c850bb9614896c70616478055ca745aec5803e0a048b3ce77"
   }
 }

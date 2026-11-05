@@ -7,6 +7,18 @@ import numpy as np
 sys.path.insert(0,str(Path(__file__).resolve().parent))
 
 
+def remove_loose_edges(directory):
+    """Drop wire-only edges: Gazebo draws Collada <lines> as unlit white strokes."""
+    from xml.etree import ElementTree as ET
+    namespace='http://www.collada.org/2005/11/COLLADASchema';ns={'c':namespace}
+    ET.register_namespace('',namespace);tree=ET.parse(directory/'model.dae');removed=0
+    for mesh in tree.findall('.//c:mesh',ns):
+        for primitive in mesh.findall('c:lines',ns)+mesh.findall('c:linestrips',ns):
+            removed+=int(primitive.get('count',0));mesh.remove(primitive)
+    tree.write(directory/'model.dae',encoding='utf-8',xml_declaration=True)
+    return removed
+
+
 def export_opacity(directory):
     """Keep the publisher's separate grayscale mask in Collada without repacking pixels."""
     from xml.etree import ElementTree as ET
@@ -99,7 +111,8 @@ def main():
     (directory/'materials.json').write_text(json.dumps(specs,indent=2)+'\n')
     bpy.ops.wm.collada_export(filepath=str(directory/'model.dae'),include_animations=False,triangulate=True,use_texture_copies=True,export_global_up_selection='Z',apply_global_orientation=False)
     export_opacity(directory)
-    receipt={'source':source.name,'max_export_pose_deviation_m':deviation,'source_polygon_count':source_triangles,'triangle_budget':180000 if source_triangles>250000 else None,'blender':bpy.app.version_string,'floor_center_translation':center.tolist(),'dimensions_m':(maximum-minimum).tolist(),'vertices':len(points),'triangles':len(faces),'sha256':{p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in [directory/'mesh.npz',directory/'model.dae',directory/'materials.json']}}
+    loose_edges=remove_loose_edges(directory)
+    receipt={'source':source.name,'max_export_pose_deviation_m':deviation,'source_polygon_count':source_triangles,'triangle_budget':180000 if source_triangles>250000 else None,'blender':bpy.app.version_string,'floor_center_translation':center.tolist(),'dimensions_m':(maximum-minimum).tolist(),'vertices':len(points),'triangles':len(faces),'removed_loose_edges':loose_edges,'sha256':{p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in [directory/'mesh.npz',directory/'model.dae',directory/'materials.json']}}
     (directory/'conversion.json').write_text(json.dumps(receipt,indent=2)+'\n')
     print('Prepared static asset',directory.name,receipt,flush=True)
 

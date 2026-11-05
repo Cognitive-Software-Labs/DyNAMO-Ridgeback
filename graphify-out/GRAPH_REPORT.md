@@ -1,10 +1,10 @@
 # Graph Report - /home/pratham/Documents/ChatGPT/DyNAMO-Ridgeback  (2026-11-05)
 
 ## Corpus Check
-- Large corpus: 1040 files · ~5,032,005 words. Semantic extraction will be expensive (many Claude tokens). Consider running on a subfolder.
+- Large corpus: 1041 files · ~5,038,993 words. Semantic extraction will be expensive (many Claude tokens). Consider running on a subfolder.
 
 ## Summary
-- 8687 nodes · 16963 edges · 606 communities (539 shown, 67 thin omitted)
+- 8694 nodes · 16973 edges · 602 communities (533 shown, 69 thin omitted)
 - Extraction: 83% EXTRACTED · 17% INFERRED · 0% AMBIGUOUS · INFERRED: 2813 edges (avg confidence: 0.69)
 - Token cost: 0 input · 0 output
 
@@ -534,9 +534,9 @@
 - [[_COMMUNITY_Community 522|Community 522]]
 - [[_COMMUNITY_Community 523|Community 523]]
 - [[_COMMUNITY_Community 524|Community 524]]
-- [[_COMMUNITY_Community 525|Community 525]]
-- [[_COMMUNITY_Community 526|Community 526]]
 - [[_COMMUNITY_Community 527|Community 527]]
+- [[_COMMUNITY_Community 528|Community 528]]
+- [[_COMMUNITY_Community 529|Community 529]]
 - [[_COMMUNITY_Community 530|Community 530]]
 - [[_COMMUNITY_Community 531|Community 531]]
 - [[_COMMUNITY_Community 532|Community 532]]
@@ -546,30 +546,26 @@
 - [[_COMMUNITY_Community 536|Community 536]]
 - [[_COMMUNITY_Community 537|Community 537]]
 - [[_COMMUNITY_Community 538|Community 538]]
-- [[_COMMUNITY_Community 539|Community 539]]
 - [[_COMMUNITY_Community 540|Community 540]]
-- [[_COMMUNITY_Community 541|Community 541]]
-- [[_COMMUNITY_Community 542|Community 542]]
 - [[_COMMUNITY_Community 544|Community 544]]
+- [[_COMMUNITY_Community 545|Community 545]]
+- [[_COMMUNITY_Community 546|Community 546]]
 - [[_COMMUNITY_Community 548|Community 548]]
 - [[_COMMUNITY_Community 549|Community 549]]
 - [[_COMMUNITY_Community 550|Community 550]]
-- [[_COMMUNITY_Community 552|Community 552]]
-- [[_COMMUNITY_Community 553|Community 553]]
 - [[_COMMUNITY_Community 554|Community 554]]
+- [[_COMMUNITY_Community 556|Community 556]]
+- [[_COMMUNITY_Community 557|Community 557]]
 - [[_COMMUNITY_Community 558|Community 558]]
-- [[_COMMUNITY_Community 560|Community 560]]
-- [[_COMMUNITY_Community 561|Community 561]]
-- [[_COMMUNITY_Community 562|Community 562]]
-- [[_COMMUNITY_Community 563|Community 563]]
+- [[_COMMUNITY_Community 559|Community 559]]
+- [[_COMMUNITY_Community 564|Community 564]]
+- [[_COMMUNITY_Community 566|Community 566]]
+- [[_COMMUNITY_Community 567|Community 567]]
 - [[_COMMUNITY_Community 568|Community 568]]
+- [[_COMMUNITY_Community 569|Community 569]]
 - [[_COMMUNITY_Community 570|Community 570]]
 - [[_COMMUNITY_Community 571|Community 571]]
 - [[_COMMUNITY_Community 572|Community 572]]
-- [[_COMMUNITY_Community 573|Community 573]]
-- [[_COMMUNITY_Community 574|Community 574]]
-- [[_COMMUNITY_Community 575|Community 575]]
-- [[_COMMUNITY_Community 576|Community 576]]
 
 ## God Nodes (most connected - your core abstractions)
 1. `Time` - 129 edges
@@ -584,8 +580,8 @@
 10. `CameraIntrinsics` - 52 edges
 
 ## Surprising Connections (you probably didn't know these)
-- `test_aggregate_requires_repeatability_and_aabb_control()` --calls--> `row()`  [INFERRED]
-  src/ridgeback_autonomy/test/test_isaac_collider_validation.py → tools/intel_thor/test_observe_thor_failure.py
+- `test_ready_gate_rejects_empty_listener()` --calls--> `SimpleNamespace`  [INFERRED]
+  tools/intel_thor/test_repair_hardware_workflow.py → src/ridgeback_autonomy/test/test_markers.py
 - `test_missing_config_records_blocked_run_without_spawning()` --calls--> `SimpleNamespace`  [INFERRED]
   tools/tests/test_rviz_shutdown_probe.py → src/ridgeback_autonomy/test/test_markers.py
 - `main()` --calls--> `ThreadingHTTPServer`  [INFERRED]
@@ -598,27 +594,27 @@
 ## Import Cycles
 - None detected.
 
-## Communities (606 total, 67 thin omitted)
+## Communities (602 total, 69 thin omitted)
 
 ### Community 0 - "Community 0"
 Cohesion: 0.03
-Nodes (99): Collection, PreparedDepthRegion, One detection's depth selection, cut to its mask's storage window.      The sele, EuclideanReconstructionResult, Euclidean reconstruction -- deproject-then-aggregate (``docs/target_localization, Isolate the foreground and reduce it to one coordinate.      Steps 3 and 4, shar, One euclidean reconstruction localization plus the foreground set it was reduced, The 3D filtering policy: the one place the precision tag is read.      ``tight`` (+91 more)
+Nodes (87): One ffmpeg process, started and stopped around a run., Stop and finalize. ``True`` if a playable file was written.          Escalates r, ScreenRecorder, Write full-grid RGB/depth/context evidence, one compressed trial payload., SensorCaptureWriter, One compressed payload per benchmark trial plus a readable manifest., ReplayDatasetWriter, A named scene: the robots to score plus the objects that clutter/occlude them. (+79 more)
 
 ### Community 1 - "Community 1"
 Cohesion: 0.04
-Nodes (56): git_provenance(), Best-effort commit, branch, and dirty count for a repository., One ffmpeg process, started and stopped around a run., Stop and finalize. ``True`` if a playable file was written.          Escalates r, ScreenRecorder, BenchmarkCollageRenderer, PanelContext, The colour frame every estimator's panel is drawn on, or a placeholder. (+48 more)
+Nodes (121): box_within_frame_fraction(), Pure detector-box acceptance policy shared by live and replay paths., True if the detector box covers at most ``max_fraction`` of the frame., Crop a full-grid boolean blob to its own extent and take ownership.      The win, region_from_blob(), optical_to_base_planar(), Camera-optical point -> planar position and distance in the base frame., fill_path_measurements() (+113 more)
 
 ### Community 2 - "Community 2"
 Cohesion: 0.05
-Nodes (75): _artifact_identity(), _ArtifactWriter, CachedMaskOutcome, canonical_json_bytes(), dependency_versions(), load_artifact(), load_mask_trial(), load_replay_input() (+67 more)
+Nodes (87): mask_from_array(), masked_rgb(), rasterize_batch(), rasterize_bbox(), rasterize_detection(), Wrap a pre-computed ``H x W`` boolean region into the mask interface.      The f, Rasterize one ``(x1, y1, x2, y2)`` box into a full-grid ``rect`` mask., Rasterize a single detection's box into a ``rect`` mask. (+79 more)
 
 ### Community 3 - "Community 3"
-Cohesion: 0.04
-Nodes (57): compute_iou(), intersection_over_smaller(), non_maximum_suppression(), OwlV2Backend, OwlV2Detector, parse_owl_detections(), Adapt OWLv2's private pipeline dictionaries to shared DetectionBatch., resolve_torch_device() (+49 more)
+Cohesion: 0.06
+Nodes (47): Exact integer representations of ROS-shaped timestamps, without ROS imports., stamp_key(), Ground-truth display contract shared with the benchmark publisher., One trial's ground truth as the display surfaces consume it.      ``trial_id`` n, TruthReading, main(), The frame with the measurement's source stamp, else the newest one.          The, The benchmark ground truth while it is being republished, else None.          Ag (+39 more)
 
 ### Community 4 - "Community 4"
-Cohesion: 0.05
-Nodes (81): EventPreview, Store one preview in stamp order and bound the rolling buffer., The colour frame a trial's collage panels are drawn on.      One image for the w, store_buffered_preview(), evaluate_sensor_trial(), benchmark_display_name(), benchmark_output_name(), benchmark_run_folder_name() (+73 more)
+Cohesion: 0.04
+Nodes (65): as_mask_region(), clamp_box(), empty_region(), _fill_box(), MaskRegion, Mask component: the common front-end representation.  Every detector front-end e, Detector box -> the half-open pixel bounds ``[x1, x2) x [y1, y2)``.      Truncat, A boolean selector stored in its own rectangular window of the color grid. (+57 more)
 
 ### Community 5 - "Community 5"
 Cohesion: 0.03
@@ -626,127 +622,127 @@ Nodes (77): BoolProperty, ColorProperty, EnumProperty, FloatProperty, IntPropert
 
 ### Community 6 - "Community 6"
 Cohesion: 0.06
-Nodes (57): ObjectSpec, _parse_object(), _parse_robot(), parse_scenarios(), parse_scene(), Declarative benchmark scenario spec: robots + object occluders per scene.  The r, Parse a loaded YAML document (a mapping with ``scenes`` + optional ``defaults``), One static object occluder resolved through the selected asset catalog. (+49 more)
+Nodes (29): git_provenance(), Best-effort commit, branch, and dirty count for a repository., format_summary_log_row(), main(), One line separating simulator start-up delay from provider readiness., Begin recording the RViz window, if recording is on and it is there.          Ne, Read the warm detector's declared startup identity over ROS., Every ROS parameter this node declared, as text.          Read off the node rath (+21 more)
 
 ### Community 7 - "Community 7"
 Cohesion: 0.07
-Nodes (43): stamp_key(), main(), The frame with the measurement's source stamp, else the newest one.          The, The benchmark ground truth while it is being republished, else None.          Ag, Re-render when a per-frame artifact for the pending stamp arrives.          Both, Fill the batch with every pipeline's fields so the label block can         show, ``(uv, in_view, highlight)`` for the scan the measurement was made on., The per-beam states, or ``None`` if they cannot be trusted here. (+35 more)
+Nodes (65): PreparedDepthRegion, One detection's depth selection, cut to its mask's storage window.      The sele, EuclideanReconstructionResult, localize_euclidean_reconstruction(), Euclidean reconstruction -- deproject-then-aggregate (``docs/target_localization, Isolate the foreground and reduce it to one coordinate.      Steps 3 and 4, shar, Localize one full-grid mask against one aligned depth frame.      The standalone, One euclidean reconstruction localization plus the foreground set it was reduced (+57 more)
 
 ### Community 8 - "Community 8"
-Cohesion: 0.06
-Nodes (54): add_pointcloud_measurements(), compute_pointcloud_measurement(), extract_organized_xyz(), focus_bbox(), The ``pointcloud`` estimator: range straight off the organized ``PointCloud2``., active_label_lines(), draw_scan_points(), format_position_line() (+46 more)
+Cohesion: 0.05
+Nodes (69): EventPreview, Store one preview in stamp order and bound the rolling buffer., The colour frame a trial's collage panels are drawn on.      One image for the w, store_buffered_preview(), evaluate_sensor_trial(), benchmark_output_name(), Filesystem-safe self-describing name for a row's output CSV.      The snake_case, format_commit() (+61 more)
 
 ### Community 9 - "Community 9"
+Cohesion: 0.06
+Nodes (39): BaseException, CatalogResource, One resolved catalog resource.      ``declared`` is the catalog's own spelling;, _check_result(), _pose_from_state(), posix_ere_literal(), A scene-control operation that did not reach its contract outcome., The subset of ``rclpy.client.Client`` the scene-control client uses. (+31 more)
+
+### Community 10 - "Community 10"
 Cohesion: 0.10
 Nodes (34): aligned_script(), atomic_restore(), Controller, d455_serial(), detached_command(), digest(), dump(), ensure_independent_controller() (+26 more)
 
-### Community 10 - "Community 10"
-Cohesion: 0.08
-Nodes (62): Which estimators this evidence cannot feed at all, and why.      The test is abo, Split the requested estimators into the runnable ones and the refusals.      Ref, select_replay_estimators(), unavailable_estimators(), evaluate_dataset(), load_dataset(), Evaluate every variant over every trial, in deterministic input order., main() (+54 more)
-
 ### Community 11 - "Community 11"
-Cohesion: 0.07
-Nodes (57): assign_to_ground_truth(), Assignment, GtPoint, InstanceEstimate, _pair_cost(), Benchmark-only scoring assignment: pair each sensor-produced instance to a groun, One sensor-detected instance's estimated position (its locator).      ``forward_, One ground-truth robot's true planar position (the scoring reference). (+49 more)
+Cohesion: 0.06
+Nodes (50): expand_variants(), LayeredVariant, _measurement_event(), named_caches(), _optional_float(), Generalized measurement replay over sensor captures and mask caches., resolve_expanded_baseline(), _safe_name() (+42 more)
 
 ### Community 12 - "Community 12"
 Cohesion: 0.07
 Nodes (54): parse_sweep(), Parse and validate a loaded sweep document., Path, _document(), _environment(), The detector belongs to the layer that outlives every configuration.      Its ra, Adapter packages straight from the source tree, which holds their catalogs., Records the order of the sweep's readiness steps and scene operations. (+46 more)
 
 ### Community 13 - "Community 13"
-Cohesion: 0.06
-Nodes (36): detection_status(), event_has_panel_preview(), has_all_selected_estimates(), Pure value accessors shared by live capture and offline replay., Return one estimator's status code for one detection-like value., Whether this event's collage panels can be drawn at all., main(), Own a single benchmark's configuration and persistent environment sessions.  The (+28 more)
+Cohesion: 0.09
+Nodes (57): evaluate_dataset(), load_dataset(), Evaluate every variant over every trial, in deterministic input order., main(), _parser(), Repository containing the evaluator, independent of the caller's cwd., _source_repository(), _validated_v1_variants() (+49 more)
 
 ### Community 14 - "Community 14"
 Cohesion: 0.08
-Nodes (58): import_job(), Resolve the browser draft through the canonical replay-job validator., Validate, save the job server-side, and render the command that runs it.      Th, render_job(), discover_results(), Everything under ``artifacts/benchmarks`` an operator can open or rename., Rename one result directory, refusing the cases where the name is used., rename_result() (+50 more)
+Nodes (60): _archive_incomplete_output(), _clock_seconds(), _config_command(), _entry_by_name(), _environment_arguments(), _environment_command(), _file_sha256(), _find_resumable_sweep() (+52 more)
 
 ### Community 15 - "Community 15"
-Cohesion: 0.08
-Nodes (61): load_json(), Regenerate ``summary.md`` from ``sweep.json`` and completed runs., write_sweep_report(), _archive_incomplete_output(), _clock_seconds(), _config_command(), _entry_by_name(), _environment_arguments() (+53 more)
+Cohesion: 0.07
+Nodes (56): build_isolation_3d(), camera_floor_geometry(), HeightCrop, mad_outlier_removal(), NearestModeBand, point_ranges(), RangeBand, 3D foreground isolation for euclidean reconstruction's ``rect`` branch (plus tig (+48 more)
 
 ### Community 16 - "Community 16"
+Cohesion: 0.07
+Nodes (42): PreviewMatchResult, compute_iou(), intersection_over_smaller(), non_maximum_suppression(), OwlV2Backend, OwlV2Detector, parse_owl_detections(), Adapt OWLv2's private pipeline dictionaries to shared DetectionBatch. (+34 more)
+
+### Community 17 - "Community 17"
+Cohesion: 0.07
+Nodes (51): canonical_job_json(), command_argv(), load_job(), _load_sweep_value(), _mapping(), _materializations(), parse_job(), _positive_int() (+43 more)
+
+### Community 18 - "Community 18"
 Cohesion: 0.05
 Nodes (29): feedback_problem(), main(), motor_fault_problem(), motor_status_is_estop_fault(), motor_status_is_estop_fault_onset(), physical_stop_qualifies(), physical_stop_tail_deadline(), populate_command() (+21 more)
 
-### Community 17 - "Community 17"
+### Community 19 - "Community 19"
 Cohesion: 0.08
 Nodes (54): Path, adapter_lookups(), _declared_context(), _exploration_rviz_path(), _exploration_text(), _include_arguments(), _load_launch(), _package_root() (+46 more)
 
-### Community 18 - "Community 18"
-Cohesion: 0.07
-Nodes (44): evaluate_sensor_capture(), _evaluate_task(), expand_variants(), LayeredVariant, _measurement_event(), named_caches(), _optional_float(), Generalized measurement replay over sensor captures and mask caches. (+36 more)
-
-### Community 19 - "Community 19"
-Cohesion: 0.08
-Nodes (47): canonical_job_json(), command_argv(), load_job(), _load_sweep_value(), _mapping(), MaskMaterializationSpec, _materializations(), parse_job() (+39 more)
-
 ### Community 20 - "Community 20"
-Cohesion: 0.07
-Nodes (51): as_mask_region(), clamp_box(), empty_region(), Detector box -> the half-open pixel bounds ``[x1, x2) x [y1, y2)``.      Truncat, One ``(x1, y1, x2, y2)`` detector box as an all-``True`` ``rect`` region.      T, Crop a full-grid boolean blob to its own extent and take ownership.      The win, The canonical "selects nothing" region: a ``(0, 0)`` window at the origin., Accept either representation, return a region -- the compatibility crossing. (+43 more)
+Cohesion: 0.06
+Nodes (40): binarize_mask(), pad_prompt_box(), Segmentation component: the ``tight`` (silhouette) mask front-end.  A box-prompt, Box-prompted segmentation model behind one call: boxes in, blobs out.      Mirro, Segment one silhouette per box on one RGB frame.          ``rgb`` is the ``(H, W, Upscale predicted masks back to the original grid, as (N, K, H, W)., Torch tensor -> detached CPU tensor; anything else passes through., Inflate a prompt box by ``pad_rel`` of its size, clamped to the grid.      The i (+32 more)
 
 ### Community 21 - "Community 21"
 Cohesion: 0.08
-Nodes (48): config_data(), main(), parser(), publisher(), Require graph discovery and a working render system, plus subscriptions., One graceful signal, then one SIGKILL only if the deadline expires., readiness(), run_one() (+40 more)
+Nodes (40): active_label_lines(), draw_scan_points(), format_position_line(), pack_panels(), PanelSpec, One label line per selected estimator, in ``PUBLIC_ESTIMATOR_ORDER``.      Every, Label line for a ``(lateral_m, forward_m, distance_m)`` ground truth., Assembles the per-frame overlay grid for the configured estimator set. (+32 more)
 
 ### Community 22 - "Community 22"
-Cohesion: 0.06
-Nodes (38): binarize_mask(), pad_prompt_box(), Segmentation component: the ``tight`` (silhouette) mask front-end.  A box-prompt, Segment one silhouette per box on one RGB frame.          ``rgb`` is the ``(H, W, Upscale predicted masks back to the original grid, as (N, K, H, W)., Torch tensor -> detached CPU tensor; anything else passes through., Inflate a prompt box by ``pad_rel`` of its size, clamped to the grid.      The i, Collapse a segmenter mask (bool or float logits/probabilities) to bool.      Flo (+30 more)
+Cohesion: 0.07
+Nodes (49): _assets_directory(), _canonical_document(), capabilities(), ConfiguratorError, The field-oriented error shape shared by every configurator response.  It lives, One field-oriented error suitable for the browser response., _estimate(), _evidence_issues() (+41 more)
 
 ### Community 23 - "Community 23"
+Cohesion: 0.06
+Nodes (33): main(), VelocityOverlayNode, main(), query(), Find L1 release while the same forward stick remains displaced., read(), separate_release_evidence(), The stationary button check must distinguish L1 release from centring. (+25 more)
+
+### Community 24 - "Community 24"
 Cohesion: 0.11
 Nodes (45): _failed(), make_client(), _ok(), Scene-control client against an in-memory standard-services provider., spec(), test_a_canonical_name_outside_the_benchmark_namespace_is_rejected(), test_a_clean_scene_with_a_stuck_entity_raises_after_trying_every_removal(), test_a_failure_inside_the_scene_rolls_back_and_propagates() (+37 more)
 
-### Community 24 - "Community 24"
-Cohesion: 0.08
-Nodes (47): batch_from_detections_message(), batch_from_measurements_message(), build_bgr8_image_message(), build_detections_message(), build_float32_image_message(), build_measurements_message(), build_polar_beams_message(), decode_bbox_quads() (+39 more)
-
 ### Community 25 - "Community 25"
 Cohesion: 0.07
-Nodes (37): asset_catalog_path(), BackendSetting, benchmark_backend(), decode_backend_settings(), encode_backend_settings(), _gazebo_version(), _isaac_version(), normalize_backend_settings() (+29 more)
+Nodes (39): asset_catalog_path(), BackendSetting, benchmark_backend(), BenchmarkEnvironment, decode_backend_settings(), encode_backend_settings(), _gazebo_version(), _isaac_version() (+31 more)
 
 ### Community 26 - "Community 26"
-Cohesion: 0.09
-Nodes (25): _check_result(), posix_ere_literal(), A scene-control operation that did not reach its contract outcome., Poses of selected entities taken from one simulator update.      ``poses`` uses, Escape ``text`` so a POSIX ERE filter matches it literally., Benchmark scene control through the standard simulation services.      ``clients, Fail unless every standard service appears within one shared budget., Block until ``/clock`` advances; until then no scene operation is sent. (+17 more)
+Cohesion: 0.10
+Nodes (42): assign_to_ground_truth(), Assignment, GtPoint, InstanceEstimate, _pair_cost(), Benchmark-only scoring assignment: pair each sensor-produced instance to a groun, One sensor-detected instance's estimated position (its locator).      ``forward_, One ground-truth robot's true planar position (the scoring reference). (+34 more)
 
 ### Community 27 - "Community 27"
-Cohesion: 0.11
-Nodes (39): depth_image(), _mask_node(), The three recipe numbers are bound onto the callable the paths run.      Until t, The 3D recipe's numbers are configurable, same as the 2D ones.      They were im, A raised floor actually rejects a region the default would have kept.      The p, Injected in place of a real depth source: scripted produce(), no model., _StubDepthSource, subscribed_topics() (+31 more)
+Cohesion: 0.07
+Nodes (21): bounded_permit_window(), cancel_permit_on_input_loss(), changed_motion_axes(), connected_controller(), controller_neutral(), deadman_released_with_forward(), disconnect_due(), disconnected_stationary_tail() (+13 more)
 
 ### Community 28 - "Community 28"
+Cohesion: 0.09
+Nodes (45): batch_from_detections_message(), batch_from_measurements_message(), build_bgr8_image_message(), build_detections_message(), build_float32_image_message(), build_measurements_message(), build_polar_beams_message(), decode_bbox_quads() (+37 more)
+
+### Community 29 - "Community 29"
+Cohesion: 0.07
+Nodes (33): box_iou(), detection_metrics(), Bounding-box detector strata and official TrackEval HOTA/IDF1 integration., frames: [(truth [(id,xyxy)], prediction [(id,xyxy)])]; missing frames stay., Global IoU association then recall by truth distance/visible fraction.      In e, tracking_metrics(), AppearanceEncoder, benchmark() (+25 more)
+
+### Community 30 - "Community 30"
+Cohesion: 0.07
+Nodes (37): nearest_significant_mode(), prepare_depth_region(), Rules shared by every consumer of an aligned depth frame.  Three of them, all de, Cut one shared frame-wide depth validity image down to one mask's window.      `, Distance of the nearest significant mode in ``values``, meters.      Histograms, Gate parameter as written by an operator -> the ceiling to clean against.      N, Boolean selector of the usable depth values: finite, positive, in range., resolve_depth_gate() (+29 more)
+
+### Community 31 - "Community 31"
 Cohesion: 0.10
 Nodes (30): build_depth_source(), camera depth stream -> aligned depth frame.      In sim the gz render is co-regi, Dispatch the configured depth source by name.      ``now_fn`` drives the monocul, StereoDepthSource, MonocularDepthSource, ndarray, _FakeConfig, _FakeCv2 (+22 more)
 
-### Community 29 - "Community 29"
-Cohesion: 0.08
-Nodes (38): mesh(), Material, load_scenario(), All six F1 families; crowd is qualified at 2, 4 and 8 bystanders., Waypoint, material_specs(), Preserve source PBR channels when rendering the realistic character/prop assets., Normalize a dark cloth texture to its assigned colour without replacing its pixe (+30 more)
-
-### Community 30 - "Community 30"
-Cohesion: 0.09
-Nodes (30): main(), annotate(), main(), rasterize(), main(), image_array(), Offline sensor access; evaluation annotations stay outside candidate adapters., SensorBag (+22 more)
-
-### Community 31 - "Community 31"
-Cohesion: 0.08
-Nodes (41): _assets_directory(), _canonical_document(), capabilities(), ConfiguratorError, The field-oriented error shape shared by every configurator response.  It lives, One field-oriented error suitable for the browser response., _estimate(), _inspect_job_inputs() (+33 more)
-
 ### Community 32 - "Community 32"
 Cohesion: 0.09
-Nodes (40): load_asset_catalog(), Every logical object model the scenes place., Load a catalog file, recording the SHA-256 of its exact bytes., scene_object_models(), load_scenarios(), Load and validate a scenario YAML file into a tuple of :class:`Scene`., _packaged_object_models(), The Gazebo benchmark asset catalog serves every packaged scenario. (+32 more)
+Nodes (42): artifact_summary(), classify(), describe(), discover_artifacts(), discover_results(), inspect_path(), _jobs_referencing(), _load_json() (+34 more)
 
 ### Community 33 - "Community 33"
 Cohesion: 0.06
 Nodes (37): Boolean, Empty, Entity, EntityComponentManager, EventManager, Pose3d, Publisher, shared_ptr (+29 more)
 
 ### Community 34 - "Community 34"
-Cohesion: 0.08
-Nodes (41): localize_polar_profiling(), localize_projected_polar_profiling(), merge_near_band(), PolarProfilingResult, One polar profiling localization: a planar point in the camera optical frame., Per-scan work: validity clean + polar->Cartesian + extrinsic transform.      ``s, Split the selected rays into contiguous runs (doc Section 2.5 step 1).      ``pl, Merge the runs reaching within a range band of the nearest point (step 2). (+33 more)
+Cohesion: 0.10
+Nodes (34): build_nodes(), build_nodes(), generate_launch_description(), Stationary Intel result viewer: no sensor bringup, navigation, or inference., build_gated_target_localization(), build_target_localization_nodes(), _camera_inputs(), The measurement and display stack for the estimator rows this run selected. (+26 more)
 
 ### Community 35 - "Community 35"
-Cohesion: 0.06
-Nodes (22): main(), evaluate(), main(), main(), summarize(), evaluate(), main(), check() (+14 more)
+Cohesion: 0.16
+Nodes (41): localize_prepared_euclidean_reconstruction(), Localize one prepared mask region -- the ROI-native production path.      The se, deproject_masked(), Vectorized inverse pinhole over the masked pixels only.      ``rows`` / ``cols``, localize_prepared_projective_ranging(), Localize one prepared mask region -- the ROI-native production path.      ``isol, Mask, ndarray (+33 more)
 
 ### Community 36 - "Community 36"
-Cohesion: 0.09
-Nodes (24): CatalogResource, One resolved catalog resource.      ``declared`` is the catalog's own spelling;, Normalized failure categories, independent of the providing simulator., Simulation time as published on ``/clock``.      The clock counts as advancing o, SceneControlFailure, SimulationClockObserver, Clock, SimulationClockObserver (+16 more)
+Cohesion: 0.06
+Nodes (18): Compatibility dispatcher for the optional backend adapter packages.  New callers, _configure_camera_profile(), generate_launch_description(), F1-only Gazebo world plus the existing Clearpath robot/sensor bringup., CameraProfile, Named D455 simulation profiles shared by the Gazebo and Isaac adapters.  The phy, One centred, square-pixel colour/aligned-depth render profile., Nominal D455 stereo-imager focal length at this resolution. (+10 more)
 
 ### Community 37 - "Community 37"
 Cohesion: 0.10
@@ -761,256 +757,256 @@ Cohesion: 0.05
 Nodes (4): Offline safety checks; every deployment path/service operation is isolated., scan_events(), test_scan_capture_missing_stream_or_empty_window_fails(), test_scan_capture_windows_do_not_dilute_traffic_with_warmup()
 
 ### Community 40 - "Community 40"
-Cohesion: 0.09
-Nodes (38): localize_euclidean_reconstruction(), Localize one full-grid mask against one aligned depth frame.      The standalone, mask_from_array(), masked_rgb(), rasterize_batch(), rasterize_bbox(), Wrap a pre-computed ``H x W`` boolean region into the mask interface.      The f, Rasterize one ``(x1, y1, x2, y2)`` box into a full-grid ``rect`` mask. (+30 more)
+Cohesion: 0.10
+Nodes (37): load_asset_catalog(), Every logical object model the scenes place., Load a catalog file, recording the SHA-256 of its exact bytes., scene_object_models(), _packaged_object_models(), The Gazebo benchmark asset catalog serves every packaged scenario., test_catalog_resolves_every_packaged_scenario(), _packaged_object_models() (+29 more)
 
 ### Community 41 - "Community 41"
-Cohesion: 0.10
-Nodes (36): configure_environment(), endpoint_record(), error_record(), graph_snapshot(), in_namespace(), known_qos_incompatibilities(), main(), node_roles() (+28 more)
+Cohesion: 0.11
+Nodes (36): Validate, save the job server-side, and render the command that runs it.      Th, render_job(), Path, _dataset(), _job(), _live_draft(), Focused contract and safety tests for the local benchmark configurator., The one variant a draft renders, after unreachable settings are dropped. (+28 more)
 
 ### Community 42 - "Community 42"
 Cohesion: 0.08
-Nodes (16): _Command, A bounded hand-off from service callbacks to the simulation main loop.      :met, Requests waiting for the main loop., Run the requests queued before this call, in arrival order., Refuse new requests and cancel every queued one., Serves the standard services from a dedicated executor thread.      The runner c, Main loop: run the queued requests against this update., SceneCommandQueue (+8 more)
+Nodes (10): Client, Clock, DrivingAuditTests, GetParameters, ListParameters, Node, Offline tests for stationary graph evidence; never import or invoke ROS., Only graph and read-only client methods exist on this fake. (+2 more)
 
 ### Community 43 - "Community 43"
-Cohesion: 0.12
-Nodes (36): aggregate_boots(), _angle_span(), body_to_world(), case_specs(), CaseResult, CaseSpec, ContactEvidence, convex_hull_2d() (+28 more)
+Cohesion: 0.08
+Nodes (27): main(), annotate(), main(), rasterize(), main(), SensorBag, main(), Resumable F3 appearance-corpus evaluation; each model runs in isolation. (+19 more)
 
 ### Community 44 - "Community 44"
+Cohesion: 0.08
+Nodes (22): Normalized failure categories, independent of the providing simulator., Simulation time as published on ``/clock``.      The clock counts as advancing o, SceneControlFailure, SimulationClockObserver, Clock, SimulationClockObserver, SceneControlClient, SpawnSpec (+14 more)
+
+### Community 45 - "Community 45"
+Cohesion: 0.10
+Nodes (28): _artifact_identity(), _ArtifactWriter, canonical_json_bytes(), load_artifact(), load_replay_input(), producer_signature(), Typed immutable artifacts for layered replay.  Legacy ``schema_version: 1`` meas, Remove an unexposed temporary directory when setup fails pre-payload. (+20 more)
+
+### Community 46 - "Community 46"
+Cohesion: 0.10
+Nodes (36): configure_environment(), endpoint_record(), error_record(), graph_snapshot(), in_namespace(), known_qos_incompatibilities(), main(), node_roles() (+28 more)
+
+### Community 47 - "Community 47"
 Cohesion: 0.09
 Nodes (19): BaseBattery, Battery, DTM8A31, ES20_12C, HE2410, HE2411, HE2613, LiION (+11 more)
 
-### Community 45 - "Community 45"
+### Community 48 - "Community 48"
+Cohesion: 0.12
+Nodes (30): config_data(), main(), parser(), publisher(), Require graph discovery and a working render system, plus subscriptions., One graceful signal, then one SIGKILL only if the deadline expires., readiness(), run_one() (+22 more)
+
+### Community 49 - "Community 49"
 Cohesion: 0.14
 Nodes (24): box_triangles(), furniture_boxes(), Glb, _jamb_pairs(), main(), Node -> Z-up CAD frame., [(POSITION accessor, Nx3 points in ``frame`` coordinates)] for a node., Mesh nodes reachable from the default scene. (+16 more)
 
-### Community 46 - "Community 46"
-Cohesion: 0.11
-Nodes (28): _added(), dated(), _deleted_estimators(), _dot_xy(), _marker_estimators(), _mask_reading(), _place(), _published_markers() (+20 more)
-
-### Community 47 - "Community 47"
-Cohesion: 0.20
-Nodes (35): localize_prepared_euclidean_reconstruction(), Localize one prepared mask region -- the ROI-native production path.      The se, localize_prepared_projective_ranging(), Localize one prepared mask region -- the ROI-native production path.      ``isol, Mask, ndarray, build_rect_mask(), build_scene() (+27 more)
-
-### Community 48 - "Community 48"
-Cohesion: 0.09
-Nodes (25): main(), Resumable F3 appearance-corpus evaluation; each model runs in isolation., AppearanceEncoder, benchmark(), main(), Replay F3 recognition on cached detections; truth is used only for scoring., dinov2_encoder(), official_encoder() (+17 more)
-
-### Community 49 - "Community 49"
-Cohesion: 0.11
-Nodes (32): cell_for(), format_metres(), format_percent(), markdown_table(), Human-readable markdown report for one benchmark run.  The readable view of a ru, One bullet per estimator that failed anything, worst reason first.      Replaces, Scene x instance down the rows, estimators across the columns.      The view tha, A scored estimate, or the marked reason it is missing. (+24 more)
-
 ### Community 50 - "Community 50"
+Cohesion: 0.10
+Nodes (33): mesh(), load_scenario(), All six F1 families; crowd is qualified at 2, 4 and 8 bystanders., Waypoint, material_specs(), Preserve source PBR channels when rendering the realistic character/prop assets., Normalize a dark cloth texture to its assigned colour without replacing its pixe, texture_tint_scale() (+25 more)
+
+### Community 51 - "Community 51"
+Cohesion: 0.12
+Nodes (34): _artifact_dir(), _cadence(), capture(), _command(), contract_plot(), _counter_delta(), _geometry_ok(), _host_sample() (+26 more)
+
+### Community 52 - "Community 52"
+Cohesion: 0.12
+Nodes (30): candidate_base_frames(), _first_available_transform(), lookup_transform_components(), Shared base-frame resolution and transform extraction for perception nodes., ``(rotation, translation, last_fallback_frame)`` at ``timestamp``.      Candidat, rotation_matrix_from_quaternion(), Duration, ndarray (+22 more)
+
+### Community 53 - "Community 53"
 Cohesion: 0.12
 Nodes (29): build(), digest(), apply_patch_checked(), build(), verify_applied_patches(), versions(), apply(), cap_mode() (+21 more)
 
-### Community 51 - "Community 51"
-Cohesion: 0.09
-Nodes (9): Clock, DrivingAuditTests, GetParameters, ListParameters, Node, Offline tests for stationary graph evidence; never import or invoke ROS., Only graph and read-only client methods exist on this fake., Request (+1 more)
-
-### Community 52 - "Community 52"
+### Community 54 - "Community 54"
 Cohesion: 0.09
 Nodes (26): analyze(), analyze_reader(), main(), split_gap(), counter_rates(), exact_matches(), image_callback(), image_metadata() (+18 more)
 
-### Community 53 - "Community 53"
+### Community 55 - "Community 55"
 Cohesion: 0.11
 Nodes (34): add_planar_rig(), add_sensor_prims(), attach_visual_meshes(), _author_chassis_collider(), _bind(), _camera_mesh_bounds(), clearpath_package_paths(), _ensure_material() (+26 more)
 
-### Community 54 - "Community 54"
+### Community 56 - "Community 56"
+Cohesion: 0.08
+Nodes (27): generate_launch_description(), build_readiness_gate(), generate_launch_description(), Per-configuration measurement, visualization, and runner benchmark layer., Start the config stack only after the persistent layer is genuinely ready., The persistent environment this layer measures in, resolved once.      Read when, resolve_environment(), _resolved_topic() (+19 more)
+
+### Community 57 - "Community 57"
 Cohesion: 0.10
 Nodes (34): chain_to(), expand_description(), expand_description_xml(), expand_robot_yaml(), gazebo_sensor(), generate_setup(), joint(), matrix_rpy() (+26 more)
 
-### Community 55 - "Community 55"
-Cohesion: 0.09
-Nodes (24): main(), main(), replay_fusion(), compare(), main(), main(), run(), box_measurement() (+16 more)
-
-### Community 56 - "Community 56"
-Cohesion: 0.07
-Nodes (15): Compatibility dispatcher for the optional backend adapter packages.  New callers, _configure_camera_profile(), generate_launch_description(), F1-only Gazebo world plus the existing Clearpath robot/sensor bringup., Named D455 simulation profiles shared by the Gazebo and Isaac adapters.  The phy, Return a supported nominal profile or reject the launch value., resolve_camera_profile(), Gazebo provider for the backend-neutral Ridgeback autonomy stack.  Besides the s (+7 more)
-
-### Community 57 - "Community 57"
-Cohesion: 0.12
-Nodes (29): candidate_base_frames(), _first_available_transform(), lookup_transform_components(), ``(rotation, translation, last_fallback_frame)`` at ``timestamp``.      Candidat, rotation_matrix_from_quaternion(), Duration, ndarray, make_transform() (+21 more)
-
 ### Community 58 - "Community 58"
-Cohesion: 0.08
-Nodes (19): main(), main(), validate(), main(), main(), qualification_cases(), World names are part of realistic case keys so evidence cannot collide., validate_run() (+11 more)
-
-### Community 59 - "Community 59"
 Cohesion: 0.09
 Nodes (24): build_ffmpeg_command(), find_window_id(), Screen-record the RViz window for the length of a benchmark run.  A run is ~90 t, The largest visible window whose class matches ``class_hint``.      Size is the, The x11grab invocation, as a list so nothing goes through a shell., Pixel area of a window, or 0 if it cannot be measured., _window_area(), ScreenRecorder (+16 more)
 
+### Community 59 - "Community 59"
+Cohesion: 0.07
+Nodes (15): main(), evaluate(), main(), main(), summarize(), evaluate(), main(), check() (+7 more)
+
 ### Community 60 - "Community 60"
-Cohesion: 0.12
-Nodes (31): build_nodes(), build_nodes(), build_target_localization_nodes(), The measurement and display stack for the estimator rows this run selected., build_benchmark_nodes(), build_detector(), Resolve the compatibility color override before starting the detector., distance_hud_node() (+23 more)
+Cohesion: 0.10
+Nodes (23): main(), replay_fusion(), compare(), main(), main(), run(), box_measurement(), depth_in_color() (+15 more)
 
 ### Community 61 - "Community 61"
 Cohesion: 0.09
-Nodes (32): colour_at_luminance(), hud_line(), hud_rows(), hud_rows_from_readings(), hud_section_from_readings(), hud_section_text(), hud_text_colour(), _hud_wide_cell() (+24 more)
+Nodes (19): fetch(), main(), parse_args(), clock_point(), drop(), failed(), good(), Criteria of the camera contract check, on synthetic observations. (+11 more)
 
 ### Community 62 - "Community 62"
-Cohesion: 0.09
-Nodes (19): Evaluation-only recorded route and character geometry; no inference inputs., Evaluation uses the route actually recorded, including custom/turn routes., recorded_scenario(), CrowdScenario, PersonPath, Deterministic F1 motion fixtures; metres, seconds, world frame, floor at z=0., Clamped linear position and travel heading; retain heading at a stop., Travelled arc length drives gait and freezes it while standing. (+11 more)
+Cohesion: 0.12
+Nodes (24): image_array(), Offline sensor access; evaluation annotations stay outside candidate adapters., Evaluation-only leader lock diagnostics; never imported by recognition nodes., score_locks(), main(), Review F3 case evidence; missing camera-exit coverage is never a pass., Consolidate a named profile, including real ROS and camera-exit evidence., review() (+16 more)
 
 ### Community 63 - "Community 63"
-Cohesion: 0.10
-Nodes (23): align_grids(), compute_stats(), occupancy_msg_to_grid(), pgm_to_grid(), Coverage comparison helpers: SLAM occupancy grid vs a ground-truth map.  Both gr, Crop both grids to their overlapping world region at the ground-truth     resolu, Compare two normalised grids cell-by-cell. Returns a dict of statistics.      Tw, Load a PGM + companion YAML and return a normalised int8 grid + meta dict. (+15 more)
+Cohesion: 0.08
+Nodes (26): Per-scan work: validity clean + polar->Cartesian + extrinsic transform.      ``s, scan_points_optical(), BatteryTests, Execute matching source update_cells before/after the maintained patch., SimpleNamespace, test_replay_capture_backfills_late_exact_camera_context(), test_replay_capture_keeps_exact_depth_that_arrives_before_its_detection(), test_replay_capture_waits_for_context_depth_and_live_measurement() (+18 more)
 
 ### Community 64 - "Community 64"
 Cohesion: 0.11
-Nodes (21): Future, liveness_input(), LocalizationHealthNode, main(), (type, topic) that proves an image stream is advancing, without its payload., PipelineHealth, Progress-based health, independent of ROS and inference frameworks., StreamProgress (+13 more)
-
-### Community 65 - "Community 65"
-Cohesion: 0.09
-Nodes (19): fetch(), main(), parse_args(), clock_point(), drop(), failed(), good(), Criteria of the camera contract check, on synthetic observations. (+11 more)
-
-### Community 66 - "Community 66"
-Cohesion: 0.08
-Nodes (22): BaseException, create_scene_control_client(), is_benchmark_entity(), _pose_from_state(), _quaternion_from_yaw(), Simulator-neutral benchmark scene control over ROS ``simulation_interfaces``.  T, The subset of ``rclpy.client.Client`` the scene-control client uses., What the provider advertised through ``GetSimulatorFeatures``. (+14 more)
-
-### Community 67 - "Community 67"
-Cohesion: 0.12
-Nodes (30): project_points(), Forward pinhole projection of camera-optical-frame points (polar profiling §2.3), beams_in_bbox(), project_scan_to_image(), Polar profiling -- project-then-segment (``docs/target_localization/polar_profil, One scan's camera-image mapping, prepared for one detection batch.      ``points, Return immutable scan-frame unit directions for one beam geometry., Project one scan once and retain its full and compact image mappings.      This (+22 more)
-
-### Community 68 - "Community 68"
-Cohesion: 0.11
 Nodes (16): main(), summarize(), check(), field_receive_gaps(), main(), Return a recognized RX field and whether its speed-mode payload is valid., Return only valid RX fields for the historical flag-model comparison., Report per-wheel RX gaps; missing fields remain explicit. (+8 more)
 
-### Community 69 - "Community 69"
+### Community 65 - "Community 65"
 Cohesion: 0.12
 Nodes (27): _body_vel(), main(), Does the LIDAR prim's world transform keep up with the chassis body?      The de, Step n render frames, refreshing cmd every frame like teleop would., Check authored robot heights using USD composition only., run(), run_battery(), run_spin_transforms() (+19 more)
 
-### Community 70 - "Community 70"
+### Community 66 - "Community 66"
 Cohesion: 0.14
 Nodes (30): _apply(), check_usd(), compose_pose(), emit_usd(), _floats(), _freeze_include_dynamics(), Geom, Include (+22 more)
 
-### Community 71 - "Community 71"
+### Community 67 - "Community 67"
 Cohesion: 0.06
 Nodes (30): attributes, omni:sensor:Core:accumulateOutputs, omni:sensor:Core:azimuthErrorStd, omni:sensor:Core:elementsCoordsType, omni:sensor:Core:elevationErrorStd, omni:sensor:Core:emitterState:s001:azimuthDeg, omni:sensor:Core:emitterState:s001:channelId, omni:sensor:Core:emitterState:s001:elevationDeg (+22 more)
 
+### Community 68 - "Community 68"
+Cohesion: 0.12
+Nodes (22): _dot_xy(), hud_wide_text_from(), _place(), Markers from the shipped construction helper, with no node to stand up., The wide renderer, same discipline. No truth argument: it has no truth row., Each line's cells with their padding intact, markup stripped.      One ``<span>`, test_a_column_nothing_reported_prints_a_dash_over_a_blank_age(), test_a_fresh_column_carries_an_age_too() (+14 more)
+
+### Community 69 - "Community 69"
+Cohesion: 0.19
+Nodes (29): evaluate_sensor_capture(), _evaluate_task(), load_sensor_trial(), _box_cache(), _event(), The capture is lossless for polar's inputs, which is what replay adds.      The, A scan carrying a target at 2 m against a wall, across the detection box.      U, _scan() (+21 more)
+
+### Community 70 - "Community 70"
+Cohesion: 0.15
+Nodes (15): decide(), main(), policy(), driver_process(), guard_resume(), main(), wait_hardware_processes(), main() (+7 more)
+
+### Community 71 - "Community 71"
+Cohesion: 0.16
+Nodes (28): aggregate_boots(), _angle_span(), body_to_world(), case_specs(), CaseResult, CaseSpec, ContactEvidence, convex_hull_2d() (+20 more)
+
 ### Community 72 - "Community 72"
 Cohesion: 0.16
-Nodes (30): fill_path_measurements(), Run every enabled path for each index-aligned detection and region, in place., build_fill_batch(), build_fill_depth(), build_fill_scan(), The floor is threaded through the pipeline, not dropped on the way in.      ``fi, One floor, both rows -- they guard the same prepared selection.      The two pre, A floor the region cannot clear is the floor's shortfall on either tag.      Thi (+22 more)
+Nodes (21): ModelGeometry, Part, _auditor(), _beams_on_disc(), _box_model(), _cylinder_part(), _front_face_uv(), _legged_target() (+13 more)
 
 ### Community 73 - "Community 73"
-Cohesion: 0.13
-Nodes (21): Exception, compile_entity_filter(), InvalidResource, The robot's exact world-frame pose and twist in one update., What one main-loop update offers the queued requests., The name filter, or None for all entities; other filters are unsupported., The entity registry and the operations the main loop runs on it.      Every meth, A request refused with a standard result code. (+13 more)
+Cohesion: 0.11
+Nodes (29): colour_at_luminance(), hud_line(), hud_rows(), hud_rows_from_readings(), hud_section_from_readings(), hud_text_colour(), _hud_wide_cell(), hud_wide_section_text() (+21 more)
 
 ### Community 74 - "Community 74"
-Cohesion: 0.14
-Nodes (13): addresses(), candidate(), command(), main(), save(), write_profile(), FeedbackBootTest, dump() (+5 more)
-
-### Community 75 - "Community 75"
 Cohesion: 0.16
 Nodes (26): drawPlot(), onEnable(), onInitialize(), PieChartDisplay(), processMessage(), setPosition(), update(), updateAutoColorChange() (+18 more)
 
+### Community 75 - "Community 75"
+Cohesion: 0.08
+Nodes (21): EntityState, _CommandState, compile_entity_filter(), _entity_state(), EntityPose, NativeScene, Standard ``simulation_interfaces`` scene control for the Isaac runner.  Serves t, Rotate a planar body twist (vx, vy, wz) into the world frame. (+13 more)
+
 ### Community 76 - "Community 76"
-Cohesion: 0.14
-Nodes (26): apply_preview_match(), attach_exact_preview(), _copy_estimator_fields(), ensure_measurement_event(), extract_estimator_statuses(), extract_public_estimator_values(), find_exact_preview_match(), measurement_message_key() (+18 more)
-
-### Community 77 - "Community 77"
-Cohesion: 0.19
-Nodes (23): validate_spawn_request(), code_of(), FakeNativeScene, plan(), Isaac scene-control request validation, entity registry, and poses., Records stage operations; resources listed in ``invalid`` fail to load., spawn_request(), test_delete_unregisters_only_after_the_prim_is_gone() (+15 more)
-
-### Community 78 - "Community 78"
-Cohesion: 0.13
-Nodes (27): artifact_summary(), classify(), describe(), discover_artifacts(), inspect_path(), _jobs_referencing(), _load_json(), Read and rename what benchmarks leave under ``artifacts/benchmarks``.  Two unlik (+19 more)
-
-### Community 79 - "Community 79"
-Cohesion: 0.10
-Nodes (24): compute_status_histogram(), dominant_miss_reason(), format_status_tally(), merge_status_histograms(), Per-estimator count of status codes over every captured BOX.      The unit is on, The reason that best explains why an estimator produced nothing.      A specific, Fold one trial's histogram into a running aggregate, in place., A compact ``projective 20/20, polar 0/20 (SCAN_INVALID)`` line naming the     cu (+16 more)
-
-### Community 80 - "Community 80"
-Cohesion: 0.11
-Nodes (13): FrontierExplorerNode, main(), Get robot position in map frame., Main exploration loop., Tally a navigation failure for goal, merging nearby entries.          Returns th, Drop failure tallies near goal (called on success or blacklist)., Count a failure; blacklist the goal once it keeps failing., Cancel the active Nav2 goal, if any. (+5 more)
-
-### Community 81 - "Community 81"
 Cohesion: 0.10
 Nodes (10): LidarScanAssembler, _quat_from_yaw(), In-process ROS 2 I/O for the Isaac runner (rclpy side).  Owns the ordinary ROS b, Return and clear the newest cmd (vx, vy, wz), or None., True once if a reset was requested since the last call (consumed         by the, Raw IMU (no orientation estimate, like a real driver's         data_raw): body-f, Publish one matched D455-like stereo-depth image/cloud pair., Identity base_link -> <ns>/robot/base_link (perception default). (+2 more)
 
-### Community 82 - "Community 82"
+### Community 77 - "Community 77"
 Cohesion: 0.16
 Nodes (26): Marker, beam_polar(), build_polar_ray_markers(), build_ray_marker(), build_wedge_marker(), _color(), _point(), RViz markers for the LiDAR beams polar profiling reduces to a distance.  Answers (+18 more)
 
-### Community 83 - "Community 83"
+### Community 78 - "Community 78"
 Cohesion: 0.07
 Nodes (25): MaterialPtr, Overlay, PanelOverlayElement, QImage, OverlayObject, getBuffer, getName, getTextureHeight (+17 more)
 
-### Community 85 - "Community 85"
+### Community 79 - "Community 79"
+Cohesion: 0.13
+Nodes (12): Truth-free F2 adapter boundary and the planned scan-clustering baseline., ScanDetector, ScanInput, main(), Replay cached embeddings through actual fusion and leader-lock cores., replay(), ImageAssociation, ByteTrack image identity cues for the selected CV Kalman fusion runtime. (+4 more)
+
+### Community 80 - "Community 80"
+Cohesion: 0.15
+Nodes (24): apply_preview_match(), attach_exact_preview(), _copy_estimator_fields(), ensure_measurement_event(), extract_estimator_statuses(), extract_public_estimator_values(), find_exact_preview_match(), measurement_message_key() (+16 more)
+
+### Community 82 - "Community 82"
 Cohesion: 0.17
 Nodes (13): ang_norm(), closure_counts(), correction_events(), dilate(), main(), map_metrics(), pose_errors(), Probe (+5 more)
 
-### Community 86 - "Community 86"
+### Community 83 - "Community 83"
 Cohesion: 0.11
 Nodes (11): DetectorDiagnostics, Time one diagnostic stage. A no-op while the diagnostic is off., Record one already-measured stage duration., Make the optional GPU stage timing honest, and account for its cost.          In, Process one frame, surviving any inference/publish failure.          Only image-, Warn (throttled) that a detection frame failed., Bounded cold/warm accounting for the detector's own cadence and stages.      The, Account for one published batch and the gap since the previous one. (+3 more)
 
-### Community 87 - "Community 87"
+### Community 84 - "Community 84"
 Cohesion: 0.22
 Nodes (25): onDisable(), onEnable(), onInitialize(), OverlayTextDisplay(), processMessage(), reset(), updateAlignBottom(), updateBGAlpha() (+17 more)
 
-### Community 88 - "Community 88"
+### Community 85 - "Community 85"
 Cohesion: 0.21
 Nodes (26): context_for(), executables(), gate_cmd(), load(), _node_parameters(), overlay_parameters(), rviz_layout_argument(), test_benchmark_wrapper_forwards_detector_settings_to_both_layers() (+18 more)
 
-### Community 89 - "Community 89"
+### Community 86 - "Community 86"
+Cohesion: 0.11
+Nodes (17): main(), main(), validate(), main(), main(), qualification_cases(), World names are part of realistic case keys so evidence cannot collide., validate_run() (+9 more)
+
+### Community 87 - "Community 87"
 Cohesion: 0.13
 Nodes (19): evaluate(), main(), assemble(), leader_only(), main(), missing_inputs(), read_lines(), truth_frames() (+11 more)
 
-### Community 90 - "Community 90"
+### Community 88 - "Community 88"
+Cohesion: 0.15
+Nodes (24): cell_for(), format_metres(), format_percent(), markdown_table(), Human-readable markdown report for one benchmark run.  The readable view of a ru, One bullet per estimator that failed anything, worst reason first.      Replaces, Scene x instance down the rows, estimators across the columns.      The view tha, A scored estimate, or the marked reason it is missing. (+16 more)
+
+### Community 89 - "Community 89"
 Cohesion: 0.18
 Nodes (24): attach(), boundary(), cancelRun(), defaultDraft(), describeEvidence(), elapsed(), estimates(), exportJob() (+16 more)
 
-### Community 91 - "Community 91"
-Cohesion: 0.14
-Nodes (25): build_isolation_3d(), Build the named recipe at a specific camera pose and set of settings.      The o, corridor_points(), floor_points(), level_height_crop(), object_points(), Background receding well past the object, as a corridor's walls do.      Deliber, A bound value reaches the step, and the axis moves the result.      A point 0.06 (+17 more)
+### Community 90 - "Community 90"
+Cohesion: 0.10
+Nodes (16): Latched localization interlock around the mission owner's Nav2 action client., init_owned(), SIGINT and SIGTERM handling owned by the process instead of by rclpy.  rclpy's d, Whether rclpy's own handlers are installed, without importing rclpy.      ``sign, Hold owned signals for the block, then raise one KeyboardInterrupt for them., Initialise rclpy without its signal handlers; both signals raise KeyboardInterru, Spin until the context shuts down or an owned signal raises KeyboardInterrupt., _rclpy_handles_signals() (+8 more)
 
-### Community 92 - "Community 92"
+### Community 91 - "Community 91"
 Cohesion: 0.08
 Nodes (25): backends, certified_on, map_kind, map_sha256, npz, pgm, png, yaml (+17 more)
 
-### Community 93 - "Community 93"
+### Community 92 - "Community 92"
 Cohesion: 0.14
 Nodes (24): capture_observer(), command_for_observer(), main(), Do not arm the observer on an empty or failed CAN capture., stop_process(), wait_for_capture(), count_path(), evaluate() (+16 more)
 
-### Community 94 - "Community 94"
-Cohesion: 0.13
-Nodes (16): Path, catalog(), GazeboProvider, no_benchmark_entities_remain(), provider(), Benchmark scene control against a real Gazebo server.  The Gazebo provider of th, Owned entities from an unfiltered query, selected client-side., One ``gzserver`` node plus a client node in an isolated ROS context. (+8 more)
-
-### Community 95 - "Community 95"
+### Community 93 - "Community 93"
 Cohesion: 0.18
 Nodes (18): AssetCatalog, AssetCatalogError, AssetSelection, CatalogWorld, _logical_name(), parse_asset_catalog(), _parse_spawnables(), Benchmark asset catalogs: logical scenario names to simulator resources.  Scenar (+10 more)
 
-### Community 96 - "Community 96"
-Cohesion: 0.13
-Nodes (9): CameraDetector, Lazy camera candidate adapters; all return xyxy, confidence in source pixels., PersonCrop, ImageAssociation, ByteTrack image identity cues for the selected CV Kalman fusion runtime., main(), PeopleTrackerNode, Publish observed scan tracks while RGB-D/TF synchronization catches up. (+1 more)
-
-### Community 97 - "Community 97"
-Cohesion: 0.10
-Nodes (22): compute_ground_truth_instances(), normalize_pose(), Simulator-neutral pose normalization and benchmark ground-truth helpers., Normalize optional pose components to concrete floats., Compute front-referenced planar truth from one simulator pose snapshot., apply_vehicle_front_offset(), planar_measurement_from_vehicle_front(), Planar frame math shared by every path that reports against the robot.  No estim (+14 more)
-
-### Community 98 - "Community 98"
+### Community 94 - "Community 94"
 Cohesion: 0.16
 Nodes (23): bgr_frame_to_pil(), convert_color_image_message(), convert_depth_to_meters_message(), decode_buffer(), decode_color_to_rgb(), decode_image_message(), normalize_to_uint8(), Decode a color Image message into an RGB uint8 array.      The explicit whitelis (+15 more)
 
-### Community 99 - "Community 99"
+### Community 95 - "Community 95"
+Cohesion: 0.10
+Nodes (19): launch_setup(), _resolve_hardware_namespace(), Set one namespace before any backend or shared nodes are expanded., resolve_launch_namespace(), namespace_from_robot_yaml(), normalize_namespace(), Resolve the ROS namespace shared by an exploration launch., Return the slash-free namespace form expected by this repository. (+11 more)
+
+### Community 96 - "Community 96"
 Cohesion: 0.10
 Nodes (7): ContractTest, DeadlineTest, DirectDiscoveryTest, FakeClock, HttpBudgetTest, Offline readiness checks; no live ROS graph, network, or services are touched., state()
 
-### Community 100 - "Community 100"
+### Community 97 - "Community 97"
 Cohesion: 0.08
 Nodes (25): sha256, hair/black/hair_roots.png, hair/black/ponytail.png, hair/blonde/hair_roots.png, hair/blonde/ponytail.png, outfits/black_tan/top.png, outfits/black_tan/trousers.png, outfits/cobalt_khaki/top.png (+17 more)
 
-### Community 101 - "Community 101"
+### Community 98 - "Community 98"
 Cohesion: 0.19
 Nodes (20): _color_message(), _make_node(), The cadence must not stretch by however long inference took.      The clock used, Injected in place of OwlV2Detector: no torch, scripted detect().      ``load()``, Poll until the worker thread has made the expected progress., _StubDetector, test_configured_labels_reach_detector_without_threshold_changes(), test_default_rate_and_period_agree() (+12 more)
 
-### Community 102 - "Community 102"
+### Community 99 - "Community 99"
 Cohesion: 0.12
 Nodes (15): _archive(), Offline docs gate plus parser fixtures independent of ROS and simulators., _structure(), test_archive_cannot_link_back_to_live_contract(), test_archive_opt_in_navigation_and_honest_missing_provenance(), test_archive_repository_source_links_require_full_immutable_revision(), test_archive_stays_validated_even_when_search_ignores_it(), test_backlog_items_need_criteria_and_stay_short() (+7 more)
 
-### Community 103 - "Community 103"
+### Community 100 - "Community 100"
+Cohesion: 0.12
+Nodes (22): dominant_miss_reason(), The reason that best explains why an estimator produced nothing.      A specific, Result of scoring one scene's capture window.      ``medians[gt_index][estimator, Per-outcome tally for one estimator across the scene's instances.          The s, SceneScore, build_box_annotations(), build_trial_result(), build_trials() (+14 more)
+
+### Community 101 - "Community 101"
+Cohesion: 0.12
+Nodes (11): FrontierExplorerNode, main(), Tally a navigation failure for goal, merging nearby entries.          Returns th, Drop failure tallies near goal (called on success or blacklist)., Count a failure; blacklist the goal once it keeps failing., Cancel the active Nav2 goal, if any., Best-effort clear of both costmaps (fire-and-forget) on a stall., Cancel the goal if the robot has made no progress toward it.          Stall-base (+3 more)
+
+### Community 102 - "Community 102"
 Cohesion: 0.19
 Nodes (19): apply(), dropin(), load(), main(), manifest(), restore(), running_plugin(), save() (+11 more)
+
+### Community 103 - "Community 103"
+Cohesion: 0.12
+Nodes (8): _Command, Run the requests queued before this call, in arrival order., Serves the standard services from a dedicated executor thread.      The runner c, Main loop: run the queued requests against this update., SceneControlService, _set_result(), Any, Thread
 
 ### Community 104 - "Community 104"
 Cohesion: 0.08
@@ -1021,68 +1017,68 @@ Cohesion: 0.08
 Nodes (23): blender, cycle_seconds, faces, fps, frames, gait_speed_mps, height_m, sha256 (+15 more)
 
 ### Community 106 - "Community 106"
+Cohesion: 0.14
+Nodes (24): hud_section_text(), collect_readings(), Return the single estimator snapshot every surface renders.      A fresh reading, _added(), dated(), _deleted_estimators(), _marker_estimators(), _mask_reading() (+16 more)
+
+### Community 107 - "Community 107"
+Cohesion: 0.15
+Nodes (15): catalog(), GazeboProvider, no_benchmark_entities_remain(), provider(), Benchmark scene control against a real Gazebo server.  The Gazebo provider of th, Owned entities from an unfiltered query, selected client-side., One ``gzserver`` node plus a client node in an isolated ROS context., test_a_duplicate_name_is_refused_without_a_renamed_copy() (+7 more)
+
+### Community 108 - "Community 108"
 Cohesion: 0.17
 Nodes (7): main(), Probe, Clear per-run accumulators and re-base the clock for the next run., Preemption: another goal accepted within PREEMPT_WINDOW of abort., Return the robot to spawn + clear SLAM/costmaps for a fresh run., Observe one exploration cycle; returns when it completes (+10 s settle,     hono, _run_once()
 
-### Community 107 - "Community 107"
+### Community 109 - "Community 109"
 Cohesion: 0.12
 Nodes (11): Contiguous scan clusters; centroids are candidates, not confirmed people.      R, ScanClustering, DrowDetector, LegDetector, LfeDetector, lidar_detector(), PetraDetector, Learned lidar adapters using upstream inference and published checkpoints. (+3 more)
 
-### Community 108 - "Community 108"
-Cohesion: 0.12
-Nodes (22): format_commit(), gl_renderer_provenance(), parse_gl_renderer(), Small subprocess/provenance helpers shared by benchmark executables., Best-effort GL renderer, and whether it is a CPU rasterizer.      This belongs b, The operator-facing warning for a software-rasterized run, or ``None``.      The, One line naming the code state that produced a result., Run a command and turn timeouts into the benchmark's RuntimeError form. (+14 more)
+### Community 110 - "Community 110"
+Cohesion: 0.15
+Nodes (18): CachedMaskOutcome, dependency_versions(), load_mask_trial(), MaskCacheWriter, Resolve package versions without importing the packages themselves., One index-aligned materializer result for one parent detection., Write packed ``MaskRegion`` children with exact sensor-parent lineage., _box_outcomes() (+10 more)
 
-### Community 109 - "Community 109"
+### Community 111 - "Community 111"
 Cohesion: 0.15
 Nodes (11): approach(), Bridge, clamp(), Gauge, load_state(), main(), Advance the gauge to now; returns the new estimate in %., Atomic write: a power cut mid-save leaves the previous file intact. (+3 more)
 
-### Community 110 - "Community 110"
+### Community 112 - "Community 112"
 Cohesion: 0.12
 Nodes (19): condition_variable, mutex, main(), SensorsShutdownProtocol, renderCv, renderMutex, renderThread, renderUtilMutex (+11 more)
 
-### Community 111 - "Community 111"
-Cohesion: 0.09
-Nodes (18): EntityState, _CommandState, _entity_state(), EntityPose, NativeScene, Standard ``simulation_interfaces`` scene control for the Isaac runner.  Serves t, Rotate a planar body twist (vx, vy, wz) into the world frame., Split sim time exactly as the runner stamps /clock and ground truth. (+10 more)
-
-### Community 112 - "Community 112"
+### Community 113 - "Community 113"
 Cohesion: 0.12
 Nodes (8): CliTests, EvaluateTests, MotionStartTests, Run the real cleanup loop against a fake iptables that keeps rule state in a fil, series(), SustainedStopTests, WatchdogBehaviourTests, WatchdogTests
 
-### Community 113 - "Community 113"
+### Community 114 - "Community 114"
 Cohesion: 0.09
 Nodes (22): blender, cycle_seconds, faces, fps, frames, gait_speed_mps, height_m, sha256 (+14 more)
 
-### Community 114 - "Community 114"
+### Community 115 - "Community 115"
 Cohesion: 0.17
 Nodes (14): LeaderStateName, Proposal, Proposer, cosine_similarity(), find_track(), LeaderLock, LockUpdate, Leader identity over time: lock on once, never hand the lock to someone else.  S (+6 more)
 
-### Community 115 - "Community 115"
+### Community 116 - "Community 116"
 Cohesion: 0.11
 Nodes (15): assign_outfits(), delta_e(), Outfit, Deterministic F3 outfit assignment; rendering input only, never a perception inp, CIE L*a*b* (D65) of an sRGB colour in [0, 1]., Map person name to outfit: leader first, look-alikes copy, others distinct., srgb_to_lab(), manifest_entry() (+7 more)
 
-### Community 116 - "Community 116"
+### Community 117 - "Community 117"
+Cohesion: 0.11
+Nodes (14): parse_hud_layout(), Validate the ``rows`` or ``wide`` HUD parameter., append_delete_markers(), Remove an estimator's ring and dot without waiting for their lifetime., main(), Return live benchmark truth, with age judged from its stamp., Publish every selected estimator from one shared reading snapshot.          Each, Read the cache once and render both HUD and markers from it. (+6 more)
+
+### Community 118 - "Community 118"
 Cohesion: 0.09
 Nodes (22): blender, cycle_seconds, faces, fps, frames, gait_speed_mps, height_m, sha256 (+14 more)
 
-### Community 117 - "Community 117"
+### Community 119 - "Community 119"
 Cohesion: 0.15
 Nodes (15): _bare_merger(), _load_repo_module(), _Publisher, _scan(), test_capture_cadence_allows_only_nanosecond_rounding(), test_equal_stamp_and_motion_compensated_paths_are_counted_separately(), test_front_sensor_maximum_ray_remains_valid_after_base_transform(), test_matrix_summary_rejects_incomplete_or_nonfinite_trials() (+7 more)
 
-### Community 118 - "Community 118"
+### Community 120 - "Community 120"
 Cohesion: 0.12
 Nodes (13): default_output_directory(), Filesystem policy shared by benchmark launch, runner, sweep, and configurator., Keep child ROS logs with their output, honoring an explicit override., subprocess_log_environment(), _environment(), Exercise real shell control flow with inert ROS setup/cleanup/commands., script_workspace(), test_benchmark_launch_uses_shared_output_default() (+5 more)
 
-### Community 119 - "Community 119"
+### Community 121 - "Community 121"
 Cohesion: 0.09
 Nodes (21): backends, certified_on, free_space_seed_xy_m, map_kind, map_sha256, npz, pgm, png (+13 more)
-
-### Community 120 - "Community 120"
-Cohesion: 0.12
-Nodes (16): box(), F1 Gazebo backend: native actors, production robot sensors, observed truth., animate_isaac_person(), asset_directory(), _box(), create_isaac_scene(), fixtures(), gazebo_world() (+8 more)
-
-### Community 121 - "Community 121"
-Cohesion: 0.15
-Nodes (18): generate_launch_description(), Standalone, headless-by-default localization on explicit sensor/TF inputs., generate_launch_description(), Stationary Intel result viewer: no sensor bringup, navigation, or inference., CameraInputs, Pure launch-time contract for camera inputs shared across backends.  The contrac, Resolve a backend mapping, applying compatibility overrides last.      Compatibi, Backend-normalized camera input topics.      ``organized_points_topic`` is optio (+10 more)
 
 ### Community 122 - "Community 122"
 Cohesion: 0.15
@@ -1097,52 +1093,52 @@ Cohesion: 0.19
 Nodes (21): CompletedProcess, Path, _check(), _git(), _nested_repository(), _package(), tools/check_dependencies against a throwaway workspace of fixture checkouts.  Th, src/plain carries two recorded patches; the second rewrites the line the     fir (+13 more)
 
 ### Community 125 - "Community 125"
-Cohesion: 0.11
-Nodes (9): BaseHTTPRequestHandler, CameraMjpegNode, Handler, main(), LocalizationStatusNode, main(), Node, DepthToMono (+1 more)
+Cohesion: 0.23
+Nodes (5): BenchmarkCollageRenderer, PanelContext, The colour frame every estimator's panel is drawn on, or a placeholder., MeasurementEvent, ndarray
 
 ### Community 126 - "Community 126"
-Cohesion: 0.15
-Nodes (19): BenchmarkEnvironment, One resolved persistent benchmark environment., estimate_trials(), _launch_value(), load_sweep(), _path_safe_name(), ROS-free loader and validator for benchmark sweep YAML files., How many trials one config runs, honoring each scene's repeats override.      Ke (+11 more)
+Cohesion: 0.17
+Nodes (19): _bbox(), box_triangles(), cylinder_triangles(), _geometry_triangles(), load_sdf_model(), load_world_models(), _model_parts(), Part (+11 more)
 
 ### Community 127 - "Community 127"
 Cohesion: 0.13
-Nodes (14): desktop_env(), Guard, GuardNode, main(), notify(), Returns None, "warn" or "shutdown" (the latter at most once)., DISPLAY / DBUS address of the logged-in desktop session (both vary per session)., Desktop pop-up plus wall. Never fatal -- the journal is the reliable channel. (+6 more)
+Nodes (16): Canvas, clip_near(), Intrinsics, profile_intrinsics(), project(), rasterize(), Pixels the sensor robot's own body covers, per camera profile., Pinhole camera on a ``width x height`` pixel grid. (+8 more)
 
 ### Community 128 - "Community 128"
+Cohesion: 0.13
+Nodes (14): desktop_env(), Guard, GuardNode, main(), notify(), Returns None, "warn" or "shutdown" (the latter at most once)., DISPLAY / DBUS address of the logged-in desktop session (both vary per session)., Desktop pop-up plus wall. Never fatal -- the journal is the reliable channel. (+6 more)
+
+### Community 129 - "Community 129"
 Cohesion: 0.18
 Nodes (8): main(), Points from a raw LaserScan, in the frame `lidar_pose` (x,y,yaw)         is expr, Try to resolve every buffered, not-yet-published front scan.         Called from, Project base-frame Cartesian points onto the merged angular grid., ScanMergerNode, stamp_s(), yaw_of(), LaserScan
 
-### Community 129 - "Community 129"
-Cohesion: 0.15
-Nodes (20): prepare_depth_region(), Cut one shared frame-wide depth validity image down to one mask's window.      `, MaskRegion, encode_mask_debug_image(), Union of the frame's mask regions as a ``mono8`` Image (255 = object).      Each, test_encode_mask_debug_image_unions_masks_and_skips_none(), build_batch(), build_depth() (+12 more)
-
 ### Community 130 - "Community 130"
-Cohesion: 0.22
-Nodes (16): angle_error(), CaseResult, CaseSpec, evaluate(), GroundTruthDriver, main(), parse_args(), parse_speed_list() (+8 more)
-
-### Community 131 - "Community 131"
-Cohesion: 0.11
-Nodes (3): controller_neutral(), held_forward_input(), ArmingTests
-
-### Community 132 - "Community 132"
 Cohesion: 0.17
 Nodes (11): FeedbackSafety, active_, devices_, expected_, fault_, receipt_, timeout_, map (+3 more)
 
-### Community 133 - "Community 133"
-Cohesion: 0.13
-Nodes (15): load_schedule(), main(), Use only evaluation time columns; annotations never reach adapters., replay(), digest(), main(), run_candidate(), ConstantVelocityTracker (+7 more)
+### Community 131 - "Community 131"
+Cohesion: 0.16
+Nodes (18): detection_status(), event_has_panel_preview(), has_all_selected_estimates(), Pure value accessors shared by live capture and offline replay., Return one estimator's status code for one detection-like value., Whether this event's collage panels can be drawn at all., compute_status_histogram(), merge_status_histograms() (+10 more)
 
-### Community 134 - "Community 134"
+### Community 132 - "Community 132"
 Cohesion: 0.23
 Nodes (18): One static entity to create at a world-frame pose., Place a catalog resource; its ground-origin metadata sets the height., SpawnSpec, CatalogResource, classify_log(), finish_owned(), loaded_maps(), main() (+10 more)
 
-### Community 135 - "Community 135"
+### Community 133 - "Community 133"
+Cohesion: 0.22
+Nodes (18): collect_comparison_rows(), _config_output_path(), _format_duration(), _format_rtf(), load_json(), Cross-configuration markdown report for a benchmark sweep., Render the regenerable comparison report for one sweep directory., Regenerate ``summary.md`` from ``sweep.json`` and completed runs. (+10 more)
+
+### Community 134 - "Community 134"
 Cohesion: 0.16
 Nodes (5): BlackBox, fmt(), main(), Store a value, noting it as an event when it changes., wheel_of()
 
-### Community 136 - "Community 136"
+### Community 135 - "Community 135"
 Cohesion: 0.16
 Nodes (10): MonocularDepthSource, RGB stream -> Depth-Anything V2 metric depth -> aligned depth frame.      Aligne, Construct the Depth-Anything pipeline (seam for tests)., Resolve Pillow once as part of the retryable model-load lifecycle., Resize with a lazily resolved, per-source OpenCV reference., Drop the pipeline and arm the cooldown, warning on each occurrence., The checkpoint's usable ceiling, and the guard that it is metric at all., Produce depth from one prepared RGB frame.          ``rgb`` is normally the batc (+2 more)
+
+### Community 136 - "Community 136"
+Cohesion: 0.13
+Nodes (8): OdomState, Kinematic-holonomic drive rig control + odometry for the Ridgeback.  The importe, Exact planar pose (x, y, yaw) from the rig joints., Integrate noisy odometry from true pose increments; return         (OdomState, b, odom_noise scales the default drift model (0 = perfect odom)., Call once ready() is true (physics playing, backend attached)., Accel-limit toward the commanded body twist, write joint targets., RidgebackRig
 
 ### Community 137 - "Community 137"
 Cohesion: 0.16
@@ -1157,88 +1153,88 @@ Cohesion: 0.10
 Nodes (19): backends, certified_on, map_kind, map_sha256, npz, pgm, png, yaml (+11 more)
 
 ### Community 140 - "Community 140"
-Cohesion: 0.15
-Nodes (11): main(), decide(), main(), policy(), driver_process(), guard_resume(), main(), wait_hardware_processes() (+3 more)
-
-### Community 141 - "Community 141"
-Cohesion: 0.16
-Nodes (14): bounded_permit_window(), cancel_permit_on_input_loss(), changed_motion_axes(), connected_controller(), disconnect_due(), disconnected_stationary_tail(), feedback_fault_due(), held_direction_input() (+6 more)
-
-### Community 142 - "Community 142"
-Cohesion: 0.12
-Nodes (14): BatteryTests, Execute matching source update_cells before/after the maintained patch., test_ready_gate_rejects_empty_listener(), SimpleNamespace, test_replay_capture_backfills_late_exact_camera_context(), test_replay_capture_waits_for_context_depth_and_live_measurement(), Regression for the asynchronous RGB-D/TF backlog seen in bag playback., test_empty_heartbeat_waits_for_configured_observation_timeout() (+6 more)
-
-### Community 143 - "Community 143"
 Cohesion: 0.12
 Nodes (6): CdrTest, GuardTest, image_cdr(), MetricTest, Pure sensor observer checks; no ROS graph or robot processes are touched., RosOfflineTest
 
-### Community 144 - "Community 144"
-Cohesion: 0.13
-Nodes (12): parse_hud_layout(), Validate the ``rows`` or ``wide`` HUD parameter., main(), Return live benchmark truth, with age judged from its stamp., Publish every selected estimator from one shared reading snapshot.          Each, Read the cache once and render both HUD and markers from it., Look up the base pose at an observation stamp without blocking., TargetVisualizationNode (+4 more)
+### Community 141 - "Community 141"
+Cohesion: 0.18
+Nodes (18): run(), asset_directory(), create_isaac_scene(), gait_speed(), gazebo_actor_skins(), hair_directory(), maya_directory(), outfit_directory() (+10 more)
 
-### Community 145 - "Community 145"
+### Community 142 - "Community 142"
 Cohesion: 0.20
 Nodes (18): Element, Path, _expand(), gazebo_sdf(), hardware_urdf(), 2D LiDAR description: Gazebo simulates the same UST-10LX scan as Isaac.  The pat, Gazebo, the Isaac spec and the shared contract cannot drift apart., Scan geometry and noise live only in the ``<gazebo>`` block, which     hardware (+10 more)
 
-### Community 146 - "Community 146"
+### Community 143 - "Community 143"
 Cohesion: 0.11
 Nodes (18): deim, revision, url, drow, revision, url, leg, revision (+10 more)
 
-### Community 147 - "Community 147"
-Cohesion: 0.22
-Nodes (11): _bbox(), _fraction(), ProfileRender, Image column span of each object's parts that cross the laser plane., Fill object entries with clearance/shadow/column-span data., Buffers kept for previews., Computes the camera and LiDAR metrics for scenes., Optical Z where each pixel ray meets the floor's top face (inf if never). (+3 more)
-
-### Community 148 - "Community 148"
+### Community 144 - "Community 144"
 Cohesion: 0.15
-Nodes (15): Canvas, clip_near(), Intrinsics, profile_intrinsics(), project(), rasterize(), Pixels the sensor robot's own body covers, per camera profile., Pinhole camera on a ``width x height`` pixel grid. (+7 more)
+Nodes (18): gl_renderer_provenance(), parse_gl_renderer(), Small subprocess/provenance helpers shared by benchmark executables., Best-effort GL renderer, and whether it is a CPU rasterizer.      This belongs b, The operator-facing warning for a software-rasterized run, or ``None``.      The, Run a command and turn timeouts into the benchmark's RuntimeError form., Run a command and require a successful exit., Pull vendor/renderer out of ``glxinfo`` output and classify it.      Split from (+10 more)
 
-### Community 149 - "Community 149"
-Cohesion: 0.13
-Nodes (10): Entity, leg_side(), ModelGeometry, Part, Apply a 4x4 rigid transform to ``(N, 3, 3)`` triangles., One visual of a model, triangulated in the model frame., Turns scenario scenes into triangle soups using loaded asset geometry., SceneBuilder (+2 more)
+### Community 145 - "Community 145"
+Cohesion: 0.17
+Nodes (15): counts(), main(), observations(), Calibrate only selected finalists on Gazebo; report Isaac separately., AppearanceMatch, match_gallery(), normalize_embedding(), Model-independent F3 appearance matching; no simulator identity inputs. (+7 more)
 
-### Community 150 - "Community 150"
+### Community 146 - "Community 146"
+Cohesion: 0.18
+Nodes (18): load_scenarios(), parse_scenarios(), Parse a loaded YAML document (a mapping with ``scenes`` + optional ``defaults``), Load and validate a scenario YAML file into a tuple of :class:`Scene`., test_bad_object_model_rejected(), test_bool_coordinate_rejected(), test_defaults_block_overrides_robot_yaw(), test_duplicate_scene_id_rejected() (+10 more)
+
+### Community 147 - "Community 147"
 Cohesion: 0.16
 Nodes (13): CameraTrack, Embedder, CameraPeopleTracker, parse_tracks(), Every person in the camera image, detected by YOLO and associated over time by B, Detect every person (not only the leader) and associate with BoT-SORT., Turn BoT-SORT rows (xyxy, id, score, class, detection index) into tracks., CameraTrack (+5 more)
 
-### Community 151 - "Community 151"
+### Community 148 - "Community 148"
 Cohesion: 0.11
 Nodes (18): backends, certified_on, free_space_seed_xy_m, map_kind, map_sha256, npz, pgm, png (+10 more)
 
-### Community 152 - "Community 152"
-Cohesion: 0.14
-Nodes (11): isolated_policy(), main(), Keep deployed policy values and connect only its e-stop to the fake guard., evaluate(), main(), nonzero(), parse_connected(), Return True/False only for a successful, explicit bluetoothctl report. (+3 more)
+### Community 150 - "Community 150"
+Cohesion: 0.26
+Nodes (14): The entity registry and the operations the main loop runs on it.      Every meth, SceneEntities, FakeNativeScene, plan(), Records stage operations; resources listed in ``invalid`` fail to load., test_delete_unregisters_only_after_the_prim_is_gone(), test_duplicate_names_are_refused_without_touching_the_stage(), test_filters_select_by_search_so_anchors_select_whole_names() (+6 more)
 
-### Community 154 - "Community 154"
+### Community 151 - "Community 151"
 Cohesion: 0.15
 Nodes (12): yaw_quaternion(), freeze_dynamics(), USD operations behind benchmark scene control (main loop only).  Each spawned en, Disable articulations and rigid bodies under ``prim`` and deactivate     its joi, Spawns, removes, and reads static entities on one stage., UsdScene, Stage operations behind Isaac scene control, against the packaged G1.  Needs pxr, test_delete_removes_the_whole_entity() (+4 more)
 
-### Community 155 - "Community 155"
+### Community 152 - "Community 152"
 Cohesion: 0.16
 Nodes (16): _align_d455_depth(), attach_camera(), _attach_d455_ros_writer(), attach_lidars(), _create_d455_depth(), _D455DepthHandle, _find_prim_by_name(), Runtime ROS wiring for the robot package's GPU sensor prims (P4).  The sensor PR (+8 more)
 
-### Community 156 - "Community 156"
-Cohesion: 0.15
-Nodes (18): _array_value(), collect_readings(), estimator_reading(), EstimatorReading, merged_distance_reader(), nearest_detection_index(), Select one coherent estimator snapshot for every visualization surface.  This mo, One estimator answer rendered by both the HUD and marker layers.      ``stamp`` (+10 more)
+### Community 153 - "Community 153"
+Cohesion: 0.18
+Nodes (16): generate_launch_description(), Standalone, headless-by-default localization on explicit sensor/TF inputs., CameraInputs, Pure launch-time contract for camera inputs shared across backends.  The contrac, Resolve a backend mapping, applying compatibility overrides last.      Compatibi, Backend-normalized camera input topics.      ``organized_points_topic`` is optio, resolve_camera_inputs(), _validate() (+8 more)
 
-### Community 157 - "Community 157"
+### Community 154 - "Community 154"
+Cohesion: 0.14
+Nodes (13): F1 Gazebo backend: native actors, production robot sensors, observed truth., animate_isaac_person(), asset_directory(), _box(), create_isaac_scene(), fixtures(), gazebo_world(), Matching F1 corridor and licensed, skinned pedestrians in both simulators. (+5 more)
+
+### Community 155 - "Community 155"
 Cohesion: 0.14
 Nodes (16): Path, _imports_from(), _imports_in_source(), Keep common <- perception <- benchmarking as a one-way dependency chain., Resolve absolute, parent-package, and relative static import edges., Keep pure/reusable target layers below their ROS orchestration modules., Keep the benchmark runner as the top orchestration layer., Keep every generic target topic literal in the contracts module. (+8 more)
 
+### Community 157 - "Community 157"
+Cohesion: 0.14
+Nodes (13): stamp(), load_schedule(), main(), Use only evaluation time columns; annotations never reach adapters., replay(), ConstantVelocityTracker, Deterministic constant-velocity association baseline for replay plumbing., Apply a TF sensor->odom transform, then an explicit surveyed world anchor. (+5 more)
+
+### Community 158 - "Community 158"
+Cohesion: 0.17
+Nodes (17): MaskMaterializationSpec, estimate_trials(), _launch_value(), load_sweep(), _path_safe_name(), ROS-free loader and validator for benchmark sweep YAML files., How many trials one config runs, honoring each scene's repeats override.      Ke, Load and validate a sweep YAML file. (+9 more)
+
 ### Community 159 - "Community 159"
+Cohesion: 0.16
+Nodes (10): align_grids(), compute_stats(), occupancy_msg_to_grid(), Coverage comparison helpers: SLAM occupancy grid vs a ground-truth map.  Both gr, Crop both grids to their overlapping world region at the ground-truth     resolu, Compare two normalised grids cell-by-cell. Returns a dict of statistics.      Tw, Convert a nav_msgs/OccupancyGrid to a normalised int8 grid + meta dict.      Occ, world_extent() (+2 more)
+
+### Community 160 - "Community 160"
 Cohesion: 0.11
 Nodes (17): acquire_distance_tolerance, acquire_interval, acquire_lateral_tolerance, acquire_range, appearance_association_weight, appearance_candidate, checkpoint, checkpoint_sha256 (+9 more)
 
-### Community 160 - "Community 160"
-Cohesion: 0.16
-Nodes (15): nearest_significant_mode(), Rules shared by every consumer of an aligned depth frame.  Three of them, all de, Distance of the nearest significant mode in ``values``, meters.      Histograms, Boolean selector of the usable depth values: finite, positive, in range., valid_depth(), nearest_mode_histogram(), otsu_foreground(), 2D foreground isolation recipes for projective ranging's ``rect`` branch.  Contr (+7 more)
-
 ### Community 161 - "Community 161"
-Cohesion: 0.16
-Nodes (16): deproject_masked(), deproject_pixel(), intrinsics_from_camera_info(), Camera intrinsics and inverse pinhole deprojection for the localization paths., Vectorized inverse pinhole over the masked pixels only.      ``rows`` / ``cols``, Read the intrinsics out of a ``sensor_msgs/CameraInfo``-shaped object.      Duck, Inverse pinhole projection of one pixel (projective ranging Section 2.4).      `, ndarray (+8 more)
+Cohesion: 0.21
+Nodes (16): create_detector_backend(), The single registration point. ``factories`` permits model-free test backends., _finite_number(), parse_target_labels(), ROS-free startup contract for the target detector.  Only the implementation sele, Validate and return canonical effective settings without model imports., Use live detector parameters as producer identity, refusing stale config., require_matching_detector_settings() (+8 more)
 
 ### Community 162 - "Community 162"
-Cohesion: 0.14
-Nodes (9): Constant-space cold/warm timing summaries, shared by the perception nodes.  The, Constant-space cold/warm timing summary in nanoseconds., Nearest-rank percentile for a non-empty sample., The retained samples with the earliest calls excluded.          Early calls may, One warm percentile, or ``None`` before any warm sample exists.          Prefer, TimingStats, DepthMissRecord, One bounded stamp-only record for a failed exact lookup. (+1 more)
+Cohesion: 0.16
+Nodes (16): deproject_pixel(), intrinsics_from_camera_info(), project_points(), Camera intrinsics and inverse pinhole deprojection for the localization paths., Read the intrinsics out of a ``sensor_msgs/CameraInfo``-shaped object.      Duck, Inverse pinhole projection of one pixel (projective ranging Section 2.4).      `, Forward pinhole projection of camera-optical-frame points (polar profiling §2.3), ndarray (+8 more)
 
 ### Community 163 - "Community 163"
 Cohesion: 0.18
@@ -1249,32 +1245,32 @@ Cohesion: 0.25
 Nodes (8): desired_files(), dump(), main(), Evidence paths never authorize arbitrary privileged file changes., Persist write-ahead intent before changing a system file., Repair, sync_directory(), write_file()
 
 ### Community 165 - "Community 165"
-Cohesion: 0.20
-Nodes (16): run(), asset_directory(), gait_speed(), gazebo_actor_skins(), hair_directory(), maya_directory(), outfit_directory(), F3 appearance profile: F1 corridor and paths, Maya pedestrians in distinct outfi (+8 more)
+Cohesion: 0.14
+Nodes (11): liveness_input(), LocalizationHealthNode, main(), (type, topic) that proves an image stream is advancing, without its payload., PipelineHealth, Progress-based health, independent of ROS and inference frameworks., StreamProgress, test_health_node_reports_selected_contract_and_dead_worker_without_inference() (+3 more)
 
 ### Community 166 - "Community 166"
-Cohesion: 0.16
-Nodes (13): client(), native(), Isaac scene-control services driven through the common benchmark client.  The se, raw_call(), spec(), test_catalog_g1_spawns_and_reads_back_with_the_robot_in_one_update(), test_discovery_and_delete_touch_only_benchmark_entities(), test_duplicate_name_is_a_name_conflict() (+5 more)
+Cohesion: 0.20
+Nodes (11): _Logger, Runner integration with the simulator-neutral scene-control contract., _scene(), test_capture_interrupt_leaves_no_owned_entity(), test_catalog_resources_resolve_into_target_first_spawn_order(), test_missing_truth_state_leaves_no_owned_entity(), test_runner_waits_for_an_advancing_clock_before_its_first_scene_operation(), test_spawn_rejection_leaves_no_owned_entity() (+3 more)
 
 ### Community 167 - "Community 167"
 Cohesion: 0.22
 Nodes (18): hud_labels(), hud_text_from(), measurements(), The shipped section renderer, with no ROS context to stand up.      ``hud_sectio, The estimator label from each row, in the order the panel prints them.      Ever, test_a_current_reading_wins_over_an_aged_one_for_the_same_estimator(), test_a_nan_reading_still_renders_a_miss_distinct_from_an_aged_one(), test_a_selected_estimator_that_reported_nothing_still_reads_as_a_miss() (+10 more)
 
 ### Community 168 - "Community 168"
-Cohesion: 0.17
-Nodes (13): box_iou(), detection_metrics(), Bounding-box detector strata and official TrackEval HOTA/IDF1 integration., frames: [(truth [(id,xyxy)], prediction [(id,xyxy)])]; missing frames stay., Global IoU association then recall by truth distance/visible fraction.      In e, tracking_metrics(), counts(), main() (+5 more)
+Cohesion: 0.29
+Nodes (17): Validate a draft and hand the resulting job to the run supervisor., start_run(), RunSupervisor, fixed_command(), Replace the rendered benchmark command with a controllable one., A workspace whose job refers to its evidence and output relatively., _settled(), test_a_failing_run_settles_as_failed() (+9 more)
 
 ### Community 169 - "Community 169"
-Cohesion: 0.23
-Nodes (15): create_detector_backend(), The single registration point. ``factories`` permits model-free test backends., _finite_number(), parse_target_labels(), ROS-free startup contract for the target detector.  Only the implementation sele, Validate and return canonical effective settings without model imports., Use live detector parameters as producer identity, refusing stale config., require_matching_detector_settings() (+7 more)
+Cohesion: 0.16
+Nodes (13): _axis_clearance(), cast_rays(), planar_pose(), pose_matrix(), SDF/URDF fixed-axis roll-pitch-yaw: ``Rz(yaw) @ Ry(pitch) @ Rx(roll)``., Everything the audit needs to know about the sensor robot., Horizontal distance from a vertical axis to a mesh within ``z_span``.      The n, Intersect triangles with ``z = z_plane``: ``(M, 2, 2)`` xy segments + codes. (+5 more)
 
 ### Community 170 - "Community 170"
-Cohesion: 0.15
-Nodes (13): build_isolation_2d(), Build the named recipe with runtime values in place of its own defaults.      Th, ndarray, build_scene(), One launch argument spans every recipe, so an unaccepted one is dropped.      ``, A bound value reaches the recipe, and the axis moves the result.      Two surfac, Bimodal ROI: object plate at 2 m over a 4 m background, plus invalids.      Retu, test_build_binds_only_the_kwargs_the_recipe_accepts() (+5 more)
+Cohesion: 0.20
+Nodes (15): add_pointcloud_measurements(), compute_pointcloud_measurement(), extract_organized_xyz(), focus_bbox(), The ``pointcloud`` estimator: range straight off the organized ``PointCloud2``., DetectionBatch, ndarray, PointCloud2 (+7 more)
 
 ### Community 171 - "Community 171"
 Cohesion: 0.21
-Nodes (15): Chain, HeightCrop, NearestModeBand, RangeBand, 3D foreground isolation for euclidean reconstruction's ``rect`` branch (plus tig, Catalogue #2b: nearest-mode anchor + inlier window -- a background-separator., Compose isolators: each step sees only the survivors of the previous one., Catalogue #1: extrinsic ground-plane crop -- a floor-remover.      The camera's (+7 more)
+Nodes (14): Exception, InvalidResource, The robot's exact world-frame pose and twist in one update., What one main-loop update offers the queued requests., A request refused with a standard result code., A spawn resource the native scene could not load., RobotState, SceneRequestError (+6 more)
 
 ### Community 172 - "Community 172"
 Cohesion: 0.17
@@ -1285,12 +1281,12 @@ Cohesion: 0.27
 Nodes (16): desired_files(), digest(), identity(), install(), main(), probe(), Fail before stopping the platform if its clock gate may outlast start., Read-only ROS worker: stop, raw odometry, graph and controller states. (+8 more)
 
 ### Community 174 - "Community 174"
-Cohesion: 0.15
-Nodes (7): OdomState, Kinematic-holonomic drive rig control + odometry for the Ridgeback.  The importe, Exact planar pose (x, y, yaw) from the rig joints., Integrate noisy odometry from true pose increments; return         (OdomState, b, odom_noise scales the default drift model (0 = perfect odom)., Call once ready() is true (physics playing, backend attached)., RidgebackRig
+Cohesion: 0.20
+Nodes (13): apply(), isolated(), Offline transaction and desktop dependency tests; never call real systemd., test_atomic_replace_failure_cleans_temporary_and_keeps_original(), test_changed_listener_identity_fails_repair(), test_partial_write_intent_recovers_original(), test_ready_gate_rejects_empty_listener(), test_recovery_rejects_applied_path_outside_allowlist() (+5 more)
 
 ### Community 175 - "Community 175"
 Cohesion: 0.15
-Nodes (14): _resolve_hardware_namespace(), Set one namespace before any backend or shared nodes are expanded., resolve_launch_namespace(), namespace_from_robot_yaml(), normalize_namespace(), Resolve the ROS namespace shared by an exploration launch., Return the slash-free namespace form expected by this repository., Read the Clearpath namespace, failing with an operator-facing message. (+6 more)
+Nodes (10): box(), hull(), origin(), outlines(), pose(), transform(), Material, asset_directory() (+2 more)
 
 ### Community 176 - "Community 176"
 Cohesion: 0.21
@@ -1305,100 +1301,100 @@ Cohesion: 0.18
 Nodes (15): hardware_layout(), hardware_rviz_process(), RViz layouts derived from the shared exploration layout.  Hardware uses the simu, The layout with every tool of ``tool_class`` removed, text otherwise kept., The layout with its global ``Frame Rate`` set, text otherwise kept., Write the hardware copy of ``source_path`` and return its path., Launch prefix and environment that keep software RViz off the sensors.      RViz, with_frame_rate() (+7 more)
 
 ### Community 179 - "Community 179"
+Cohesion: 0.20
+Nodes (16): encode_mask_debug_image(), Union of the frame's mask regions as a ``mono8`` Image (255 = object).      Each, test_encode_mask_debug_image_unions_masks_and_skips_none(), build_batch(), build_depth(), peak_bytes(), Structural proof that production stays region-sized.  These are allocation-size, Peak bytes allocated during ``call``, numpy data buffers included. (+8 more)
+
+### Community 180 - "Community 180"
+Cohesion: 0.18
+Nodes (6): main(), TargetPointcloudMeasurementNode, Image, ndarray, PointCloud2, TargetDetections
+
+### Community 181 - "Community 181"
+Cohesion: 0.15
+Nodes (16): _array_value(), estimator_reading(), EstimatorReading, merged_distance_reader(), nearest_detection_index(), Select one coherent estimator snapshot for every visualization surface.  This mo, One estimator answer rendered by both the HUD and marker layers.      ``stamp``, Return ``(forward, lateral, distance)`` for one estimator detection. (+8 more)
+
+### Community 182 - "Community 182"
 Cohesion: 0.32
 Nodes (13): SceneCommandQueue, Caller, The hand-off from scene-control callbacks to the simulation main loop., Calls the queue from its own thread, as the executor thread does., test_capacity_must_be_positive(), test_close_cancels_waiting_requests_and_refuses_new_ones(), test_full_queue_refuses_immediately(), test_operation_error_reaches_the_caller_not_the_main_loop() (+5 more)
 
-### Community 180 - "Community 180"
+### Community 183 - "Community 183"
+Cohesion: 0.17
+Nodes (12): SpawnSpec, native(), Isaac scene-control services driven through the common benchmark client.  The se, raw_call(), spec(), test_catalog_g1_spawns_and_reads_back_with_the_robot_in_one_update(), test_discovery_and_delete_touch_only_benchmark_entities(), test_duplicate_name_is_a_name_conflict() (+4 more)
+
+### Community 184 - "Community 184"
 Cohesion: 0.24
 Nodes (16): archive_metadata(), check(), heading_ids(), heading_slug(), heading_title(), link_contexts(), links(), main() (+8 more)
 
-### Community 181 - "Community 181"
-Cohesion: 0.32
-Nodes (16): Validate a draft and hand the resulting job to the run supervisor., start_run(), RunSupervisor, fixed_command(), Replace the rendered benchmark command with a controllable one., A workspace whose job refers to its evidence and output relatively., _settled(), test_a_failing_run_settles_as_failed() (+8 more)
-
-### Community 182 - "Community 182"
+### Community 185 - "Community 185"
 Cohesion: 0.17
-Nodes (13): _axis_clearance(), cast_rays(), planar_pose(), pose_matrix(), SDF/URDF fixed-axis roll-pitch-yaw: ``Rz(yaw) @ Ry(pitch) @ Rx(roll)``., Everything the audit needs to know about the sensor robot., Horizontal distance from a vertical axis to a mesh within ``z_span``.      The n, Intersect triangles with ``z = z_plane``: ``(M, 2, 2)`` xy segments + codes. (+5 more)
+Nodes (8): Entity, leg_side(), ModelGeometry, Apply a 4x4 rigid transform to ``(N, 3, 3)`` triangles., Turns scenario scenes into triangle soups using loaded asset geometry., SceneBuilder, torso_centre_height(), transform_triangles()
 
-### Community 183 - "Community 183"
-Cohesion: 0.21
-Nodes (3): MissionGuard, Latched localization interlock around the mission owner's Nav2 action client., guard()
+### Community 186 - "Community 186"
+Cohesion: 0.28
+Nodes (9): _fraction(), ProfileRender, Image column span of each object's parts that cross the laser plane., Fill object entries with clearance/shadow/column-span data., Buffers kept for previews., Computes the camera and LiDAR metrics for scenes., _round(), SceneAuditor (+1 more)
 
-### Community 184 - "Community 184"
+### Community 187 - "Community 187"
 Cohesion: 0.16
 Nodes (14): evaluate_readiness(), _fetch_web_topics(), parse_web_topics(), Bound the entire GET, including a peer trickling bytes between timeouts.      ur, Only this entry point imports ROS; pure tests need no DDS participant., Read the robot-local namespace; YAML constructors are never executed., The deployed robot_webrtc /topics contract is a flat array of strings., Publisher endpoint types, not advertised names/subscriptions, are evidence. (+6 more)
 
-### Community 185 - "Community 185"
-Cohesion: 0.22
-Nodes (12): apply(), isolated(), Offline transaction and desktop dependency tests; never call real systemd., test_atomic_replace_failure_cleans_temporary_and_keeps_original(), test_changed_listener_identity_fails_repair(), test_partial_write_intent_recovers_original(), test_recovery_rejects_applied_path_outside_allowlist(), test_recovery_rejects_state_with_arbitrary_root_target() (+4 more)
-
-### Community 186 - "Community 186"
-Cohesion: 0.21
-Nodes (12): aborts(), check_gate(), cov(), is_rtf0(), load_runs(), main(), Return a list of (name, passed | None, detail). None = undecidable., Load every *_summary.json under a dir (or matching a glob), tagged by name. (+4 more)
-
-### Community 187 - "Community 187"
+### Community 188 - "Community 188"
 Cohesion: 0.18
 Nodes (15): build_grid(), check_waypoints(), flood_free(), _footprint_at_plane(), _geom_world_pose(), main(), Verify every point along the waypoint polyline keeps `clearance`     metres from, Free = flood-fill of non-occupied cells reachable from seed; the rest is     unk (+7 more)
 
-### Community 188 - "Community 188"
+### Community 189 - "Community 189"
+Cohesion: 0.18
+Nodes (8): CrowdScenario, PersonPath, Deterministic F1 motion fixtures; metres, seconds, world frame, floor at z=0., Clamped linear position and travel heading; retain heading at a stop., Travelled arc length drives gait and freezes it while standing., load_recognition_scenario(), Supplementary F3 recognition tests; the six F1 scenario families stay fixed., test_supplementary_camera_exit_keeps_original_f1_matrix_unchanged()
+
+### Community 190 - "Community 190"
 Cohesion: 0.14
 Nodes (4): load_tool(), Exercise the D455 boot-service installer against an isolated host tree., test_every_image_transport_variant_follows_the_contract_name(), test_unit_publishes_the_simulator_names_on_the_robot_tree()
 
-### Community 189 - "Community 189"
-Cohesion: 0.21
-Nodes (15): box_triangles(), cylinder_triangles(), _geometry_triangles(), load_sdf_model(), load_world_models(), _model_parts(), Triangles ``(N, 3, 3)`` of a binary or ASCII STL file., 12 triangles of an axis-aligned box centred on the origin. (+7 more)
+### Community 191 - "Community 191"
+Cohesion: 0.15
+Nodes (13): create_scene_control_client(), is_benchmark_entity(), _quaternion_from_yaw(), Simulator-neutral benchmark scene control over ROS ``simulation_interfaces``.  T, Absolute standard service names under one provider namespace., Build a client for the provider serving ``service_namespace``.      The namespac, scene_control_service_names(), Path (+5 more)
 
-### Community 190 - "Community 190"
+### Community 192 - "Community 192"
 Cohesion: 0.40
 Nodes (14): boot_time(), dur(), hints(), last_with(), list_recordings(), live(), load(), main() (+6 more)
 
-### Community 191 - "Community 191"
+### Community 193 - "Community 193"
 Cohesion: 0.20
 Nodes (13): decode_depth_to_meters(), encode_depth_message(), Aligned depth frame sources (docs/target_localization/aligned_depth.md).  Produc, Decode a depth Image message into float32 meters, invalid pixels kept     as 0/N, Image, Image, make_image(), test_decode_depth_16uc1_honours_row_padding() (+5 more)
 
-### Community 192 - "Community 192"
-Cohesion: 0.30
-Nodes (14): localize_projective_ranging(), Localize one full-grid mask against one aligned depth frame.      The standalone, build_depth(), object_mask_data(), test_all_invalid_depth_blames_the_selection_not_the_recipe(), test_rect_accepts_explicit_isolation_recipe(), test_rect_branch_respects_custom_depth_max(), test_rect_mask_recovers_object_coordinate() (+6 more)
-
-### Community 193 - "Community 193"
+### Community 194 - "Community 194"
 Cohesion: 0.20
 Nodes (5): clamp_command(), Gate, main(), Return planar components or None for malformed/unsupported input., Only callbacks forward nonzero commands; timer never replays them.
 
-### Community 194 - "Community 194"
+### Community 195 - "Community 195"
 Cohesion: 0.22
 Nodes (6): main(), recent_journal(), recovery_due(), scans_restored(), stationary_ok(), RecoveryDecisionTests
 
-### Community 195 - "Community 195"
+### Community 196 - "Community 196"
+Cohesion: 0.30
+Nodes (10): Future, health(), make_ready(), test_cancellation_never_unlocks_before_terminal_result(), test_fake_nav2_server_receives_cancel_and_terminal_result(), test_frontier_owner_blocks_goals_until_resume_and_keeps_unknown_result_paused(), test_health_loss_during_pending_goal_cancels_on_late_acceptance(), test_late_cancel_reply_cannot_modify_a_new_goal() (+2 more)
+
+### Community 197 - "Community 197"
 Cohesion: 0.22
 Nodes (13): evaluate(), main(), micros(), Rows of (criterion, passed, detail); all inputs already read from the host., show(), active(), decide(), external_source() (+5 more)
 
-### Community 196 - "Community 196"
-Cohesion: 0.22
-Nodes (10): LaunchContext, Path, _context(), gazebo_launch(), _load(), Gazebo bringup: the scene-control server, the optional GUI, and world lookup., test_generated_gui_config_is_registered_for_shutdown_removal(), test_headless_rendering_starts_only_the_server_without_a_display() (+2 more)
-
-### Community 197 - "Community 197"
-Cohesion: 0.25
-Nodes (10): LeaderState, People, Planar, apply_planar(), LeaderIdentityNode, main(), person_tracks(), planar_transform() (+2 more)
-
 ### Community 198 - "Community 198"
-Cohesion: 0.20
-Nodes (5): TargetPointcloudMeasurementNode, Image, ndarray, PointCloud2, TargetDetections
+Cohesion: 0.16
+Nodes (8): A bounded hand-off from service callbacks to the simulation main loop.      :met, Requests waiting for the main loop., Refuse new requests and cancel every queued one., SceneCommandQueue, SceneControlService, MainLoop, provider(), Drains the scene queue once per simulated update, like the runner.
 
 ### Community 199 - "Community 199"
 Cohesion: 0.22
-Nodes (11): Buffered stamps as nanoseconds, oldest first. Diagnostics only., Stamp-keyed rolling buffer of recent messages, matched by header stamp.      Use, StampedMessageBuffer, color_image(), stamp(), test_scan_history_retains_a_match_through_silhouette_latency(), test_stamped_buffer_evicts_oldest_beyond_depth(), test_stamped_buffer_exact_stamp_hit() (+3 more)
+Nodes (10): LaunchContext, Path, _context(), gazebo_launch(), _load(), Gazebo bringup: the scene-control server, the optional GUI, and world lookup., test_generated_gui_config_is_registered_for_shutdown_removal(), test_headless_rendering_starts_only_the_server_without_a_display() (+2 more)
 
 ### Community 200 - "Community 200"
+Cohesion: 0.25
+Nodes (10): LeaderState, People, Planar, apply_planar(), LeaderIdentityNode, main(), person_tracks(), planar_transform() (+2 more)
+
+### Community 201 - "Community 201"
 Cohesion: 0.23
 Nodes (11): project(), Camera-LiDAR overlay check, on a synthetic scene with known geometry., Optical-frame Z of a zig-zag back wall, so lateral shifts change depth., Aligned depth of the wall: solve Z = wall(X) along each pixel ray., A LaserScan whose beams hit the wall, measured with a yaw-rotated mount., scan_of_wall(), scene_depth(), test_aligned_scan_lands_on_the_depth_surface() (+3 more)
 
-### Community 201 - "Community 201"
+### Community 202 - "Community 202"
 Cohesion: 0.39
 Nodes (13): lock_on(), person(), propose(), test_appearance_change_drops_the_lock(), test_continuous_lidar_track_holds_verified_identity_without_gallery_update(), test_feature_dimension_change_fails_closed(), test_gallery_is_bounded(), test_leader_under_a_new_track_id_is_recovered_after_confirmation() (+5 more)
-
-### Community 202 - "Community 202"
-Cohesion: 0.26
-Nodes (12): configure_silhouette_node(), fill_detections_message(), Color-input source seam that records the shared prepared array., Use the box-gate test fixture without loading a real SlimSAM model., rgb_image(), _RgbDepthSource, test_box_monocular_keeps_depth_side_conversion_only(), test_enabled_diagnostics_record_silhouette_and_monocular_stages() (+4 more)
 
 ### Community 203 - "Community 203"
 Cohesion: 0.13
@@ -1409,12 +1405,12 @@ Cohesion: 0.15
 Nodes (5): Child, Regression gates for readiness and bounded, child-only shutdown decisions., test_already_exited_child_receives_no_signal(), test_missing_config_records_blocked_run_without_spawning(), test_shutdown_sends_one_graceful_signal_and_only_escalates_after_timeout()
 
 ### Community 205 - "Community 205"
-Cohesion: 0.14
-Nodes (13): blender, dimensions_m, floor_center_translation, max_export_pose_deviation_m, sha256, materials.json, mesh.npz, model.dae (+5 more)
+Cohesion: 0.13
+Nodes (14): blender, dimensions_m, floor_center_translation, max_export_pose_deviation_m, removed_loose_edges, sha256, materials.json, mesh.npz (+6 more)
 
 ### Community 206 - "Community 206"
-Cohesion: 0.23
-Nodes (11): AppearanceMatch, match_gallery(), normalize_embedding(), Model-independent F3 appearance matching; no simulator identity inputs., Match a fixed leader gallery, rejecting ties and incompatible features.      Thr, Return a finite unit embedding, or None for unavailable/invalid features., match(), test_identical_lookalikes_are_ambiguous_regardless_of_insertion_order() (+3 more)
+Cohesion: 0.14
+Nodes (13): blender, dimensions_m, floor_center_translation, max_export_pose_deviation_m, sha256, materials.json, mesh.npz, model.dae (+5 more)
 
 ### Community 207 - "Community 207"
 Cohesion: 0.29
@@ -1429,32 +1425,28 @@ Cohesion: 0.14
 Nodes (13): blender, dimensions_m, floor_center_translation, max_export_pose_deviation_m, sha256, materials.json, mesh.npz, model.dae (+5 more)
 
 ### Community 210 - "Community 210"
+Cohesion: 0.26
+Nodes (13): pgm_to_grid(), Load a PGM + companion YAML and return a normalised int8 grid + meta dict., Path, ndarray, Path, 205 is the conventional unknown grey, and it must not land in FREE.      The cla, Counts read back must equal the counts written, per class., A map declaring different thresholds is classified by those, not by     hardcode (+5 more)
+
+### Community 212 - "Community 212"
 Cohesion: 0.14
 Nodes (13): blender, dimensions_m, floor_center_translation, max_export_pose_deviation_m, sha256, materials.json, mesh.npz, model.dae (+5 more)
 
-### Community 211 - "Community 211"
+### Community 213 - "Community 213"
 Cohesion: 0.32
 Nodes (13): apply(), check_caps(), deployed_driver(), file_manifest(), main(), owned_files(), The service install must not follow a robot-owned workspace parent., read_record() (+5 more)
 
-### Community 212 - "Community 212"
+### Community 214 - "Community 214"
+Cohesion: 0.35
+Nodes (12): validate_spawn_request(), code_of(), Isaac scene-control request validation, entity registry, and poses., spawn_request(), test_empty_name_needs_renaming(), test_file_uri_and_empty_frame_are_accepted(), test_invalid_poses_are_refused(), test_names_must_be_usd_identifiers() (+4 more)
+
+### Community 215 - "Community 215"
 Cohesion: 0.23
 Nodes (7): lidar_offset(), main(), point_in_poly(), poly_extent(), Static front/rear lidar pose in base_link, per docs/isaac/robot-model.md     (co, Standard ray-crossing test; polygon is a list of geometry_msgs Point32., StallProbe
 
-### Community 213 - "Community 213"
-Cohesion: 0.19
-Nodes (11): build_gated_target_localization(), _camera_inputs(), generate_launch_description(), Start the localization stack once the camera contract has publishers.      Exter, generate_launch_description(), generate_launch_description(), cyclonedds_actions(), Launch-layer constants and node specs shared by the public entrypoints.  Both `r (+3 more)
-
-### Community 214 - "Community 214"
-Cohesion: 0.14
-Nodes (13): blender, dimensions_m, floor_center_translation, max_export_pose_deviation_m, sha256, materials.json, mesh.npz, model.dae (+5 more)
-
-### Community 215 - "Community 215"
-Cohesion: 0.14
-Nodes (13): blender, dimensions_m, floor_center_translation, max_export_pose_deviation_m, sha256, materials.json, mesh.npz, model.dae (+5 more)
-
 ### Community 216 - "Community 216"
-Cohesion: 0.14
-Nodes (13): blender, dimensions_m, floor_center_translation, max_export_pose_deviation_m, sha256, materials.json, mesh.npz, model.dae (+5 more)
+Cohesion: 0.20
+Nodes (12): cylinder_local_points(), _points_for_prim(), Return a dense support polygon for a USD cylinder.      At the Ridgeback wheel r, aggregate(), figure(), cases(), evaluate(), main() (+4 more)
 
 ### Community 217 - "Community 217"
 Cohesion: 0.14
@@ -1473,12 +1465,12 @@ Cohesion: 0.14
 Nodes (13): blender, dimensions_m, floor_center_translation, max_export_pose_deviation_m, sha256, materials.json, mesh.npz, model.dae (+5 more)
 
 ### Community 221 - "Community 221"
-Cohesion: 0.18
-Nodes (9): Locate checkout resources without assuming a colcon install directory depth., workspace_root(), compute_environment(), model_cache_environment(), Apply optional inference Python environment only to compute processes.  Compute, _venv_environment(), Path, Dependency closure and import guards for independent deployment. (+1 more)
+Cohesion: 0.14
+Nodes (13): blender, dimensions_m, floor_center_translation, max_export_pose_deviation_m, sha256, materials.json, mesh.npz, model.dae (+5 more)
 
 ### Community 222 - "Community 222"
-Cohesion: 0.18
-Nodes (12): append_delete_markers(), append_estimator_markers(), color_message(), Construct target-localization RViz markers without owning ROS or TF state., Place a base-frame ``(forward, lateral)`` measurement in the world., Remove an estimator's ring and dot without waiting for their lifetime., Append one estimator's ring and dot; return whether it placed anything., ring_points() (+4 more)
+Cohesion: 0.14
+Nodes (13): blender, dimensions_m, floor_center_translation, max_export_pose_deviation_m, sha256, materials.json, mesh.npz, model.dae (+5 more)
 
 ### Community 223 - "Community 223"
 Cohesion: 0.14
@@ -1489,24 +1481,24 @@ Cohesion: 0.14
 Nodes (13): blender, dimensions_m, floor_center_translation, max_export_pose_deviation_m, sha256, materials.json, mesh.npz, model.dae (+5 more)
 
 ### Community 225 - "Community 225"
+Cohesion: 0.14
+Nodes (13): blender, dimensions_m, floor_center_translation, max_export_pose_deviation_m, sha256, materials.json, mesh.npz, model.dae (+5 more)
+
+### Community 226 - "Community 226"
 Cohesion: 0.40
 Nodes (8): Path, Child, Owned signal handling keeps the ROS context usable after a real signal.  Every c, test_a_signal_during_shielded_cleanup_is_recorded_not_raised(), test_a_signal_interrupts_spinning_and_leaves_the_context_usable(), test_default_rclpy_handlers_invalidate_the_context_before_cleanup(), test_repeated_signals_inside_executor_internals_leave_ros_working(), test_shielding_under_default_handlers_leaves_rclpy_in_charge()
 
-### Community 226 - "Community 226"
+### Community 227 - "Community 227"
 Cohesion: 0.29
 Nodes (11): Path, Popen, _finish(), Exercise shutdown ordering with real, harmless child sessions., _start(), test_configuration_cleanup_keeps_environment_responsive(), test_nonzero_configuration_exit_fails_and_stops_environment(), test_public_ros2_launch_propagates_supervisor_status() (+3 more)
 
-### Community 227 - "Community 227"
+### Community 228 - "Community 228"
 Cohesion: 0.14
 Nodes (13): blender, dimensions_m, floor_center_translation, max_export_pose_deviation_m, sha256, materials.json, mesh.npz, model.dae (+5 more)
-
-### Community 228 - "Community 228"
-Cohesion: 0.40
-Nodes (8): _assert_clean_interrupt(), Process, A real Ctrl-C during a benchmark scene still removes what the scene spawned.  A, _remaining(), test_a_second_interrupt_does_not_abandon_the_rollback(), test_an_interrupt_in_the_scene_body_removes_every_entity(), test_an_interrupt_while_awaiting_a_spawn_response_removes_that_entity_too(), test_an_interrupt_with_the_provider_gone_gives_up_after_one_call()
 
 ### Community 229 - "Community 229"
-Cohesion: 0.14
-Nodes (13): blender, dimensions_m, floor_center_translation, max_export_pose_deviation_m, sha256, materials.json, mesh.npz, model.dae (+5 more)
+Cohesion: 0.40
+Nodes (8): _assert_clean_interrupt(), Process, A real Ctrl-C during a benchmark scene still removes what the scene spawned.  A, _remaining(), test_a_second_interrupt_does_not_abandon_the_rollback(), test_an_interrupt_in_the_scene_body_removes_every_entity(), test_an_interrupt_while_awaiting_a_spawn_response_removes_that_entity_too(), test_an_interrupt_with_the_provider_gone_gives_up_after_one_call()
 
 ### Community 230 - "Community 230"
 Cohesion: 0.14
@@ -1517,8 +1509,8 @@ Cohesion: 0.15
 Nodes (12): clip-reid, repository, revision, osnet, repository, revision, solider, repository (+4 more)
 
 ### Community 232 - "Community 232"
-Cohesion: 0.19
-Nodes (10): mad_outlier_removal(), point_ranges(), Statistical cleanup for the ``tight`` branch: median +/- k sigma on range., Euclidean camera-frame range of each point, ``(N,)`` meters., Accel-limit toward the commanded body twist, write joint targets., ndarray, test_mad_outlier_removal_drops_injected_outlier(), test_mad_outlier_removal_zero_spread_keeps_all() (+2 more)
+Cohesion: 0.21
+Nodes (11): apply_vehicle_front_offset(), planar_measurement_from_vehicle_front(), Planar frame math shared by every path that reports against the robot.  No estim, Inverse of ``apply_vehicle_front_offset``: front-referenced -> base origin., World-frame offset -> ``(forward_m, lateral_m, distance_m)`` off the robot front, remove_vehicle_front_offset(), world_to_vehicle_planar(), Forward, lateral, and distance must agree; each is measured off the front. (+3 more)
 
 ### Community 233 - "Community 233"
 Cohesion: 0.24
@@ -1565,1031 +1557,1011 @@ Cohesion: 0.15
 Nodes (12): alpha_masked, animation_frames, blender, cycle_seconds, fps, height_m, joined_skin_max_deviation_m, max_deviation_from_isaac_cache_m (+4 more)
 
 ### Community 246 - "Community 246"
-Cohesion: 0.15
-Nodes (12): alpha_masked, animation_frames, blender, cycle_seconds, fps, height_m, joined_skin_max_deviation_m, max_deviation_from_isaac_cache_m (+4 more)
+Cohesion: 0.19
+Nodes (7): Joy, Node, DepthToMono, main(), clamp(), JoyXCombiner, main()
 
 ### Community 247 - "Community 247"
 Cohesion: 0.15
-Nodes (13): files, props/book_encyclopedia_set_01/textures/book_encyclopedia_set_01_cover_diff_1k.jpg, props/metal_trash_can/textures/metal_trash_can_arm_1k.jpg, props/metal_trash_can/textures/metal_trash_can_nor_gl_1k.jpg, bytes, sha256, url, bytes (+5 more)
+Nodes (12): alpha_masked, animation_frames, blender, cycle_seconds, fps, height_m, joined_skin_max_deviation_m, max_deviation_from_isaac_cache_m (+4 more)
 
 ### Community 248 - "Community 248"
-Cohesion: 0.21
-Nodes (13): One trial's ground truth as the display surfaces consume it.      ``trial_id`` n, Unpack a truth message, or ``None`` once it is too old to display.      Age is m, truth_reading(), TruthReading, hud_truth_header(), PointStamped, test_hud_truth_header_drops_the_truth_entirely_when_it_has_expired(), test_hud_truth_header_names_the_trial_the_number_belongs_to() (+5 more)
+Cohesion: 0.15
+Nodes (13): files, props/book_encyclopedia_set_01/textures/book_encyclopedia_set_01_cover_diff_1k.jpg, props/metal_trash_can/textures/metal_trash_can_arm_1k.jpg, props/metal_trash_can/textures/metal_trash_can_nor_gl_1k.jpg, bytes, sha256, url, bytes (+5 more)
 
 ### Community 249 - "Community 249"
+Cohesion: 0.17
+Nodes (5): write_sample(), Cross-backend fixture geometry and deterministic trajectory checks., test_qualification_rejects_incomplete_or_incorrect_evidence(), test_sensor_readiness_requires_complete_extrinsics(), test_truth_preserves_observed_pose_separately_from_command()
+
+### Community 250 - "Community 250"
 Cohesion: 0.15
 Nodes (12): alpha_masked, animation_frames, blender, cycle_seconds, fps, height_m, joined_skin_max_deviation_m, max_deviation_from_isaac_cache_m (+4 more)
 
-### Community 250 - "Community 250"
+### Community 251 - "Community 251"
 Cohesion: 0.18
 Nodes (11): bin_degrees(), Contract tests for the Isaac RTX-lidar scan assembler (no rclpy needed).  Pins t, No edge/seam mask. The phantom band §1 chased was a detached-sensor     transfor, Every bin in the contract window must be reachable — the arc is the     robot's, CycloneDDS rejects two message types on one topic in one participant.      The o, test_assembler_declares_no_bin_mask(), test_colliding_raw_returns_keep_the_nearest_valid_ray(), test_contract_scan_geometry_is_the_ust_10lx_window() (+3 more)
 
-### Community 251 - "Community 251"
+### Community 252 - "Community 252"
 Cohesion: 0.32
 Nodes (7): _assert_clean_exit(), Child, _env(), The detector and measurement nodes stop their workers before ROS goes away.  Eac, test_detector_interrupted_during_inference_exits_cleanly(), test_measurement_node_interrupted_while_spinning_exits_cleanly(), test_pointcloud_teardown_waits_for_a_frame_and_publishes_nothing_after_stop()
 
-### Community 253 - "Community 253"
-Cohesion: 0.23
-Nodes (13): hud_wide_text_from(), The wide renderer, same discipline. No truth argument: it has no truth row., Each line's cells with their padding intact, markup stripped.      One ``<span>`, test_a_column_nothing_reported_prints_a_dash_over_a_blank_age(), test_a_fresh_column_carries_an_age_too(), test_a_missing_column_keeps_its_fresh_colour_not_the_aged_one(), test_an_aged_column_prints_its_own_age_and_dims_whole(), test_the_wide_layout_is_names_then_distances_then_ages() (+5 more)
-
 ### Community 254 - "Community 254"
+Cohesion: 0.24
+Nodes (11): ObjectSpec, _parse_object(), _parse_robot(), parse_scene(), Declarative benchmark scenario spec: robots + object occluders per scene.  The r, One static object occluder resolved through the selected asset catalog., Validate one scene mapping into a :class:`Scene` (raises ``ValueError`` on bad i, _require_number() (+3 more)
+
+### Community 255 - "Community 255"
 Cohesion: 0.17
 Nodes (11): blender, cycle_seconds, fps, frames, height_m, sha256, CesiumMan.glb, texture.png (+3 more)
 
-### Community 255 - "Community 255"
+### Community 256 - "Community 256"
+Cohesion: 0.18
+Nodes (5): Get robot position in map frame., Main exploration loop., Select a new frontier goal., Publish frontier cluster centroids as spheres for RViz., Convert grid coordinates to world coordinates.
+
+### Community 257 - "Community 257"
 Cohesion: 0.52
 Nodes (11): apply(), command(), desired_files(), load(), main(), restart_previous(), restore(), restore_files() (+3 more)
 
-### Community 258 - "Community 258"
+### Community 260 - "Community 260"
 Cohesion: 0.29
 Nodes (10): D3 silent-loss verdict on synthetic event timelines., test_a_command_lingering_after_the_input_fails(), test_drop_before_held_input_fails(), test_held_input_surviving_the_link_drop_fails(), test_missing_fresh_zero_or_neutral_evidence_fails(), test_missing_source_or_nonzero_mux_fails_under_pressed_stop(), test_no_link_drop_or_a_released_stop_fails(), test_stale_stop_or_missing_settled_tail_fails() (+2 more)
 
-### Community 259 - "Community 259"
+### Community 261 - "Community 261"
 Cohesion: 0.24
 Nodes (10): _dominant_bounds(), generate(), main(), parse_args(), _rasterize(), Bounds (xmin,ymin,xmax,ymax) of the spatially largest connected cluster     of s, Segments -> (occupied bool grid [iy,ix], origin (xmin,ymin)). Segments     outsi, World-space plane-crossing segments [(x0,y0,x1,y1), ...] from every     visible (+2 more)
 
-### Community 260 - "Community 260"
+### Community 262 - "Community 262"
 Cohesion: 0.32
 Nodes (7): build(), Description, Scoped URDF collision importer for the physical-drive experiment.  Fixed links a, roller_geometry(), transform(), load_rows(), render()
 
-### Community 261 - "Community 261"
+### Community 263 - "Community 263"
 Cohesion: 0.17
 Nodes (11): bundle_self_contained, external_prerequisites, fingerprint_scope, handover_bundle_head, handover_bundle_required_base, local_handover_artifacts, observed_date, packages (+3 more)
 
-### Community 262 - "Community 262"
+### Community 264 - "Community 264"
+Cohesion: 0.21
+Nodes (10): append_estimator_markers(), color_message(), Construct target-localization RViz markers without owning ROS or TF state., Place a base-frame ``(forward, lateral)`` measurement in the world., Append one estimator's ring and dot; return whether it placed anything., ring_points(), world_marker_point(), Shared visual tokens for target-localization HUD and marker renderers. (+2 more)
+
+### Community 265 - "Community 265"
 Cohesion: 0.29
 Nodes (12): batch_messages(), partition_measurements(), Drop ages from ``(message, age_seconds)`` entries., Split cached messages into ``(same_batch, aged)`` and discard stale data.      L, cached(), test_a_lone_lagging_producer_is_its_own_current_batch(), test_a_message_older_than_the_lifetime_but_received_now_still_renders(), test_a_message_past_the_observation_age_is_dropped_however_recent_its_receipt() (+4 more)
 
-### Community 263 - "Community 263"
-Cohesion: 0.21
-Nodes (7): Path, _load_module(), _passing_samples(), _repo_root(), test_aggregate_requires_repeatability_and_aabb_control(), test_case_gate_accepts_stable_contact_and_recovery(), test_case_gate_rejects_missing_contact_and_excess_penetration()
-
-### Community 264 - "Community 264"
+### Community 266 - "Community 266"
 Cohesion: 0.21
 Nodes (5): PTP installer transactions without package installation or real services., test_a_clock_more_than_a_millisecond_off_is_stepped_not_slewed(), test_intel_serves_its_wall_clock_and_keeps_chrony(), test_thor_hands_the_wall_clock_from_chrony_and_back(), text()
 
-### Community 265 - "Community 265"
+### Community 267 - "Community 267"
 Cohesion: 0.27
 Nodes (10): _camera_source(), _parsed_camera(), The camera as the checked-out Clearpath parser actually builds it., test_camera_mount_pose_matches_the_measured_robot(), test_clearpath_parser_resolves_the_configured_device_type(), test_clearpath_parser_retains_alignment_and_sync_parameters(), test_description_generator_selects_the_configured_model(), test_parsed_camera_preserves_streams_mount_and_clearpath_profiles() (+2 more)
 
-### Community 266 - "Community 266"
-Cohesion: 0.24
-Nodes (8): contract_laser_spec(), LaserSpec, legacy_sensor_geometry(), level_optical_frame(), Geometric audit of benchmark scenes against the robot's camera and LiDAR.  Every, Planar scan geometry in the laser frame., The shared UST-10LX raw-scan contract (``ridgeback_common.lidar_contract``)., Optical frame at ``(x, y, z)`` in base_link looking along +x, image-right = -y.
+### Community 268 - "Community 268"
+Cohesion: 0.22
+Nodes (10): benchmark_display_name(), benchmark_run_folder_name(), Benchmark-only output, run-folder, and display naming., Short filesystem-safe name for a scenario file, for the run folder.      ``bench, Run folder name: timestamp first, then the axes that change the results.      Th, Human-readable prose name for logs and the summary ``estimator`` column.      Th, scenario_slug(), test_benchmark_display_name_is_spaced_prose_without_isolation() (+2 more)
 
-### Community 267 - "Community 267"
+### Community 269 - "Community 269"
 Cohesion: 0.36
 Nodes (10): FeedbackWheelSample, complete_batch(), expect(), main(), published(), ready(), receive(), int64_t (+2 more)
 
-### Community 269 - "Community 269"
-Cohesion: 0.24
-Nodes (3): CandidateTests, DropinTests, RunDirectoryTests
-
 ### Community 270 - "Community 270"
-Cohesion: 0.33
-Nodes (8): CpuMeter, main(), make_image(), own_udp_drops(), publish(), Kernel receive-buffer drops summed over this process's UDP sockets., Process CPU time as a percentage of one core since construction., subscribe()
-
-### Community 271 - "Community 271"
-Cohesion: 0.24
-Nodes (5): hull(), origin(), outlines(), pose(), transform()
+Cohesion: 0.25
+Nodes (5): isolated_policy(), main(), Keep deployed policy values and connect only its e-stop to the fake guard., HandoverIsolationTests, The D4 integration harness must never retain deployed ROS endpoints.
 
 ### Community 272 - "Community 272"
 Cohesion: 0.24
-Nodes (9): _gui_config(), _launch_gazebo(), Gazebo server, optional GUI client, clock bridge, and the Clearpath robot.  The, Absolute path of ``<world>.sdf`` in the first directory that has it., Clearpath's GUI layout with the Teleop plugin aimed at the robot namespace., Remove the generated GUI layout after the owning launch shuts down., _remove_gui_config(), resolve_world_sdf() (+1 more)
+Nodes (3): CandidateTests, DropinTests, RunDirectoryTests
 
 ### Community 273 - "Community 273"
-Cohesion: 0.27
-Nodes (9): aggregate(), figure(), cases(), evaluate(), main(), Numerical gates operate only on recorded observations, never command pose., run(), test_aggregate_rejects_missing_boots() (+1 more)
+Cohesion: 0.33
+Nodes (8): CpuMeter, main(), make_image(), own_udp_drops(), publish(), Kernel receive-buffer drops summed over this process's UDP sockets., Process CPU time as a percentage of one core since construction., subscribe()
 
 ### Community 274 - "Community 274"
-Cohesion: 0.29
-Nodes (8): dry_run_targets(), cleanup.sh ownership, on harmless sentinel processes and a dry run.  Each sentin, A configurator-started sweep must not kill the configurator above it., PIDs a dry run would kill, optionally run two levels below a renamed shell., sentinels(), test_other_checkouts_configurators_and_the_gui_are_preserved(), test_stale_nodes_of_this_checkout_are_targeted(), test_the_calling_chain_is_never_targeted()
+Cohesion: 0.24
+Nodes (9): _gui_config(), _launch_gazebo(), Gazebo server, optional GUI client, clock bridge, and the Clearpath robot.  The, Absolute path of ``<world>.sdf`` in the first directory that has it., Clearpath's GUI layout with the Teleop plugin aimed at the robot namespace., Remove the generated GUI layout after the owning launch shuts down., _remove_gui_config(), resolve_world_sdf() (+1 more)
 
 ### Community 275 - "Community 275"
 Cohesion: 0.22
-Nodes (7): array, Event, field, ns, valid, wheel, int64_t
+Nodes (8): Fixture, layout(), Prop, Shared metre-scale layouts for the realistic visual scenario profile.  Keep stat, The richer world must retain usable scenario lanes and deliberate look-alikes., Gazebo renders Collada <lines> as unlit white strokes (seen as white tree foliag, test_all_scenario_paths_clear_of_static_furniture(), test_static_props_have_no_wire_edges_and_textures_resolve()
 
 ### Community 276 - "Community 276"
+Cohesion: 0.25
+Nodes (11): Unpack a truth message, or ``None`` once it is too old to display.      Age is m, truth_reading(), hud_truth_header(), PointStamped, test_hud_truth_header_drops_the_truth_entirely_when_it_has_expired(), test_hud_truth_header_names_the_trial_the_number_belongs_to(), test_hud_truth_header_omits_empty_brackets_for_an_unnamed_trial(), test_truth_reading_expires_on_stamp_age_not_on_arrival() (+3 more)
+
+### Community 277 - "Community 277"
+Cohesion: 0.29
+Nodes (8): dry_run_targets(), cleanup.sh ownership, on harmless sentinel processes and a dry run.  Each sentin, A configurator-started sweep must not kill the configurator above it., PIDs a dry run would kill, optionally run two levels below a renamed shell., sentinels(), test_other_checkouts_configurators_and_the_gui_are_preserved(), test_stale_nodes_of_this_checkout_are_targeted(), test_the_calling_chain_is_never_targeted()
+
+### Community 278 - "Community 278"
+Cohesion: 0.22
+Nodes (7): array, Event, field, ns, valid, wheel, int64_t
+
+### Community 279 - "Community 279"
 Cohesion: 0.27
 Nodes (8): AST, Path, interrupted_entry_points(), _is_rclpy_call(), Node entry points must survive the shutdown rclpy's own SIGINT handler performs., Start every entry point together, SIGINT each once, collect exit and output., test_every_rclpy_shutdown_tolerates_an_already_shut_context(), _unguarded_shutdowns()
 
-### Community 277 - "Community 277"
+### Community 280 - "Community 280"
+Cohesion: 0.24
+Nodes (9): compute_ground_truth_instances(), normalize_pose(), Simulator-neutral pose normalization and benchmark ground-truth helpers., Normalize optional pose components to concrete floats., Compute front-referenced planar truth from one simulator pose snapshot., yaw_from_quaternion(), Any, test_simulation_truth_uses_one_normalized_pose_snapshot() (+1 more)
+
+### Community 281 - "Community 281"
 Cohesion: 0.40
 Nodes (9): is_gazebo_gui(), is_offline_tool(), kill_matches(), leftovers(), may_kill(), owned_elsewhere(), pause(), terminate() (+1 more)
 
-### Community 278 - "Community 278"
+### Community 282 - "Community 282"
 Cohesion: 0.29
 Nodes (5): main(), Preserve policy values while replacing every configured ROS endpoint., sandbox_policy(), Deployed mux values may be tested only after every endpoint is isolated., SandboxPolicyTests
 
-### Community 279 - "Community 279"
+### Community 283 - "Community 283"
 Cohesion: 0.24
 Nodes (6): check(), verify(), verify(), function(), harness(), verify()
 
-### Community 280 - "Community 280"
-Cohesion: 0.27
-Nodes (7): main(), query(), Find L1 release while the same forward stick remains displaced., read(), separate_release_evidence(), The stationary button check must distinguish L1 release from centring., SeparateReleaseTests
+### Community 284 - "Community 284"
+Cohesion: 0.22
+Nodes (5): directional_trial_command_safe(), forward_trial_command_safe(), permit_odometry_safe(), DeadmanYawToleranceTests, A physical test must remain unarmed on released/stale stops or held controls.
 
-### Community 281 - "Community 281"
+### Community 285 - "Community 285"
 Cohesion: 0.29
 Nodes (6): Measured-outline comparison against the configured Nav2 footprint., rows(), test_a_protrusion_past_the_side_fails(), test_a_square_corner_is_outside_the_chamfered_footprint(), test_converts_tape_distances_to_base_link(), test_uncertainty_can_turn_a_marginal_point_into_a_fail()
 
-### Community 283 - "Community 283"
+### Community 287 - "Community 287"
 Cohesion: 0.20
 Nodes (10): source_sha256, image_0.png, image_1.png, image_3.png, image_4.png, image_5.png, image_6.png, image_7.png (+2 more)
 
-### Community 284 - "Community 284"
+### Community 288 - "Community 288"
 Cohesion: 0.29
 Nodes (9): Offline regression checks for geometric assumptions and qualification gates., samples(), test_declared_mass_is_merged_with_parallel_axis_shift(), test_linear_gate_rejects_wrong_direction_and_cross_drift(), test_nonwheel_movable_joint_is_rejected(), test_rollers_fit_declared_wheel_envelope(), test_sensor_detachment_cannot_pass_motion_gate(), test_timeout_does_not_pass_a_robot_still_moving() (+1 more)
 
-### Community 285 - "Community 285"
+### Community 289 - "Community 289"
 Cohesion: 0.27
 Nodes (10): display_distance(), nearest_instance_index(), Index of the closest detection, or ``None`` when nothing is rankable.      The s, The one distance that speaks for a detection, in canonical order.      ``read_di, ``(estimator, index) -> distance`` from a ``{index: {estimator: value}}``., reader_from(), test_a_frame_no_estimator_placed_ranks_to_nothing(), test_canonical_order_decides_which_estimator_speaks_for_a_detection() (+2 more)
 
-### Community 287 - "Community 287"
-Cohesion: 0.33
-Nodes (6): Truth-free F2 adapter boundary and the planned scan-clustering baseline., ScanDetector, ScanInput, main(), Replay cached embeddings through actual fusion and leader-lock cores., replay()
-
-### Community 288 - "Community 288"
-Cohesion: 0.22
-Nodes (9): camera_floor_geometry(), Camera height above the floor and gravity-down, from the optical->base transform, _pitched_optical_to_base(), A level optical->base rotation tilted about the optical X axis., A level optical->base rotation rolled about the optical Z (viewing) axis.      A, _rolled_optical_to_base(), test_camera_floor_geometry_level_mount(), test_camera_floor_geometry_recovers_the_down_vector() (+1 more)
-
-### Community 289 - "Community 289"
-Cohesion: 0.22
-Nodes (8): dds_profile, fps, installed, max_message_size, namespace, profile, revision, serial
-
-### Community 290 - "Community 290"
-Cohesion: 0.36
-Nodes (8): evaluate(), footprint(), main(), plot(), Local costmap footprint polygon and padding from nav2_params.yaml text., Distance to the polygon boundary: positive inside, negative outside., signed_margin(), to_base_link()
-
 ### Community 291 - "Community 291"
 Cohesion: 0.28
-Nodes (5): await_pressed_stop(), Keep a physical test unarmed until two recent stop reports assert it., DeadmanYawToleranceTests, A physical test must remain unarmed on released/stale stops or held controls., stop()
+Nodes (4): BaseHTTPRequestHandler, CameraMjpegNode, Handler, main()
 
 ### Community 292 - "Community 292"
-Cohesion: 0.31
-Nodes (7): Classify a stop only if it precedes the independent one-second budget.      Host, stop_action_evidence(), Outage and rate summary of observe_thor_failure, on synthetic per-second rows., row(), test_an_unrecovered_outage_is_open_ended(), test_finds_an_outage_and_its_recovery(), test_reports_a_local_sensor_dip()
+Cohesion: 0.22
+Nodes (7): contract_laser_spec(), LaserSpec, legacy_sensor_geometry(), level_optical_frame(), Planar scan geometry in the laser frame., The shared UST-10LX raw-scan contract (``ridgeback_common.lidar_contract``)., Optical frame at ``(x, y, z)`` in base_link looking along +x, image-right = -y.
+
+### Community 293 - "Community 293"
+Cohesion: 0.28
+Nodes (7): main(), Own a single benchmark's configuration and persistent environment sessions.  The, Run both layers; stop the complete configuration group before the environment., run_commands(), Record SIGINT and SIGTERM instead of raising them until the block exits.      Yi, shielded(), Path
 
 ### Community 294 - "Community 294"
 Cohesion: 0.22
-Nodes (7): frame_camera(), place(), Point the viewport at the robot from a three-quarter view.      The camera-to-wo, Reference an asset under a plain offset parent.      The referenced layers autho, set_approximation(), Prim, Path
+Nodes (8): dds_profile, fps, installed, max_message_size, namespace, profile, revision, serial
 
 ### Community 295 - "Community 295"
+Cohesion: 0.28
+Nodes (4): main(), await_pressed_stop(), Keep a physical test unarmed until two recent stop reports assert it., stop()
+
+### Community 296 - "Community 296"
+Cohesion: 0.36
+Nodes (8): evaluate(), footprint(), main(), plot(), Local costmap footprint polygon and padding from nav2_params.yaml text., Distance to the polygon boundary: positive inside, negative outside., signed_margin(), to_base_link()
+
+### Community 298 - "Community 298"
+Cohesion: 0.22
+Nodes (7): frame_camera(), place(), Point the viewport at the robot from a three-quarter view.      The camera-to-wo, Reference an asset under a plain offset parent.      The referenced layers autho, set_approximation(), Prim, Path
+
+### Community 299 - "Community 299"
 Cohesion: 0.22
 Nodes (9): outfits, red_navy, white_black, hair, top, trousers, hair, top (+1 more)
 
-### Community 296 - "Community 296"
+### Community 300 - "Community 300"
 Cohesion: 0.28
 Nodes (5): performance(), Performance-policy installer on a fake sysfs, without real services or nvpmodel., Stand in for the boot unit's script, which systemctl would run., test_intel_reports_each_difference_then_passes_after_apply(), test_thor_leaves_maxn_for_120w_and_rollback_restores_mode_and_governors()
 
-### Community 297 - "Community 297"
+### Community 301 - "Community 301"
 Cohesion: 0.22
 Nodes (3): host(), Exercise deployment scripts with isolated files and fake host commands., Redirect every privileged path; fake commands never touch host services.
 
-### Community 299 - "Community 299"
-Cohesion: 0.25
-Nodes (7): box_within_frame_fraction(), Pure detector-box acceptance policy shared by live and replay paths., True if the detector box covers at most ``max_fraction`` of the frame., test_box_within_frame_fraction_accepts_normal_box(), test_box_within_frame_fraction_boundary_at_max_fraction(), test_box_within_frame_fraction_degenerate_frame_is_rejected(), test_box_within_frame_fraction_rejects_near_full_frame_box()
-
-### Community 301 - "Community 301"
+### Community 303 - "Community 303"
 Cohesion: 0.25
 Nodes (4): Check if a goal position has enough clearance from obstacles.                  C, Return True if pos is too close to a recently-visited goal., Return the goal position for a cluster.          Advances PAST the frontier boun, Find the best safe, non-blacklisted frontier.          Selection strategy (tier-
 
-### Community 302 - "Community 302"
-Cohesion: 0.29
-Nodes (3): Select a new frontier goal., Publish frontier cluster centroids as spheres for RViz., Convert grid coordinates to world coordinates.
-
-### Community 303 - "Community 303"
+### Community 304 - "Community 304"
 Cohesion: 0.36
 Nodes (6): probe_auxiliary_data(), command(), verify(), listener_identity(), main(), wait_ready()
 
-### Community 304 - "Community 304"
+### Community 305 - "Community 305"
+Cohesion: 0.32
+Nodes (6): evaluate(), main(), nonzero(), parse_connected(), Return True/False only for a successful, explicit bluetoothctl report., Summary and pass/fail from (t, stage, active) events; t is seconds since start.
+
+### Community 306 - "Community 306"
 Cohesion: 0.46
 Nodes (7): desktop_candidates(), git(), main(), prepare(), Extract only regular files/directories with canonical relative names., unpack_public_source(), Path
 
-### Community 305 - "Community 305"
+### Community 307 - "Community 307"
 Cohesion: 0.25
 Nodes (8): FeedbackWheelSample, current, device, duty_cycle, name, setpoint, speed, travel
 
-### Community 306 - "Community 306"
+### Community 308 - "Community 308"
 Cohesion: 0.57
 Nodes (7): camera_trial(), captures(), counters(), excess_wired_tx(), main(), rates(), stop_captures()
 
-### Community 308 - "Community 308"
-Cohesion: 0.29
-Nodes (5): launch_setup(), Shared Ridgeback 2D LiDAR and merged-scan geometry.  The raw values are the UST-, Return slam_toolbox's range threshold for the selected scan frame., slam_max_laser_range(), test_slam_range_threshold_follows_the_scan_frame()
-
-### Community 309 - "Community 309"
+### Community 310 - "Community 310"
 Cohesion: 0.43
 Nodes (7): isolated(), Offline desktop-lifecycle checks; no real services are touched., test_changed_desktop_identity_fails_verification(), test_install_verifies_listener_identity_across_webserver_restart(), test_listener_must_belong_to_independent_service(), test_rollback_refuses_external_edits_before_stopping_anything(), test_rollback_removes_only_owned_files_and_restores_vendor()
 
-### Community 310 - "Community 310"
+### Community 311 - "Community 311"
 Cohesion: 0.36
 Nodes (7): cast(), main(), Nearest segment hit per bearing. segs: (n,4) array., Render-purpose, visible Mesh prims — what the RTX lidar can hit.      Excludes c, Plane-crossing segments [(x0,y0,x1,y1)] for one mesh, in base_link., slice_prim(), visible_render_meshes()
-
-### Community 311 - "Community 311"
-Cohesion: 0.32
-Nodes (7): build_readiness_gate(), Per-configuration measurement, visualization, and runner benchmark layer., Start the config stack only after the persistent layer is genuinely ready., The persistent environment this layer measures in, resolved once.      Read when, resolve_environment(), _resolved_topic(), BenchmarkEnvironment
 
 ### Community 312 - "Community 312"
 Cohesion: 0.29
 Nodes (7): build_supervisor(), generate_launch_description(), layer_arguments(), Public single-run entrypoint with ordered configuration/environment shutdown., Read declarations without evaluating their substitution-backed defaults., Propagate lifecycle failures through the public ros2 launch caller., supervisor_exited()
 
 ### Community 313 - "Community 313"
-Cohesion: 0.25
-Nodes (3): CameraProfile, One centred, square-pixel colour/aligned-depth render profile., Nominal D455 stereo-imager focal length at this resolution.
-
-### Community 314 - "Community 314"
 Cohesion: 0.43
 Nodes (7): Path, _paths(), Generated Isaac clutter assets remain reproducible and SDF-equivalent., test_generated_usd_bounds_match_sdf_within_one_millimetre(), test_iv_pole_uses_usd_cylinders(), test_regeneration_is_byte_stable(), test_visuals_have_materials_and_collisions_are_invisible()
 
-### Community 315 - "Community 315"
+### Community 314 - "Community 314"
 Cohesion: 0.32
 Nodes (4): Path, _load_worlds_module(), _repo_root(), test_runtime_and_map_tools_do_not_pin_old_geometry_defaults()
 
 ### Community 318 - "Community 318"
-Cohesion: 0.68
-Nodes (7): _estimator(), _manifest(), test_render_sweep_report_marks_skipped_completed_config(), test_shutdown_failure_is_visible_beside_saved_comparison_rows(), test_sweep_report_is_regenerable_from_manifest_and_runs(), test_sweep_rollup_handles_multi_estimator_and_missing_run(), _write_run()
+Cohesion: 0.57
+Nodes (6): addresses(), candidate(), command(), main(), save(), write_profile()
 
 ### Community 319 - "Community 319"
 Cohesion: 0.38
-Nodes (6): projection_meshes(), Per-person recorded rendering geometry; evaluation only, never inference., Scoring must use the recorded humans/routes rather than a baseline mannequin., test_annotation_uses_each_recorded_model_and_scale_and_checks_hash(), test_realistic_geometry_requires_the_recorded_snapshot(), test_unknown_profiles_cannot_silently_use_baseline_geometry()
-
-### Community 320 - "Community 320"
-Cohesion: 0.38
-Nodes (5): Gate parameter as written by an operator -> the ceiling to clean against.      N, resolve_depth_gate(), test_non_positive_gate_means_unbounded(), test_positive_gate_passes_through(), test_unbounded_gate_still_rejects_the_invalid_pixel_encodings()
-
-### Community 322 - "Community 322"
-Cohesion: 0.33
-Nodes (3): directional_trial_command_safe(), forward_trial_command_safe(), permit_odometry_safe()
-
-### Community 323 - "Community 323"
-Cohesion: 0.38
 Nodes (3): Fixture, main(), PumaHardware
 
-### Community 325 - "Community 325"
+### Community 321 - "Community 321"
 Cohesion: 0.48
 Nodes (6): names(), Boot clock verification criteria on synthetic systemd/chrony readings., test_a_clean_stepped_boot_passes(), test_a_consumer_started_before_the_step_fails(), test_local_reference_or_large_offset_fails(), test_same_boot_fails()
 
-### Community 326 - "Community 326"
+### Community 322 - "Community 322"
 Cohesion: 0.29
 Nodes (6): mbs_webserver_start.sh script, HOME, MMP_NS, PATH, ROBOT_NS, ROS_DOMAIN_ID
 
-### Community 327 - "Community 327"
+### Community 323 - "Community 323"
 Cohesion: 0.43
 Nodes (6): capture(), centre(), main(), Return the first full positive depth frame after renderer warmup., Return the central 20% where range and image-plane depth agree <1%., ndarray
 
-### Community 328 - "Community 328"
+### Community 324 - "Community 324"
 Cohesion: 0.48
 Nodes (6): cast(), main(), parse_args(), {prim_path: [(x0,y0,x1,y1)]} for segments within radius of (cx,cy).      Mirrors, run(), slice_near()
 
-### Community 329 - "Community 329"
-Cohesion: 0.38
-Nodes (4): Joy, clamp(), JoyXCombiner, main()
-
-### Community 330 - "Community 330"
+### Community 325 - "Community 325"
 Cohesion: 0.33
 Nodes (5): build_topic_whitelist(), _pattern(), Anchored regex for one viewer topic, matching how it appears on the graph., Return topic_whitelist regexes for the viewer topics: joint_states     (always),, generate_launch_description()
 
-### Community 331 - "Community 331"
+### Community 326 - "Community 326"
 Cohesion: 0.29
 Nodes (6): hair_albedo, black, blonde, brown, method, tool
 
-### Community 332 - "Community 332"
+### Community 327 - "Community 327"
 Cohesion: 0.29
 Nodes (6): dds_profile, fps, profile, scope, serial, source_revision
 
-### Community 333 - "Community 333"
+### Community 328 - "Community 328"
 Cohesion: 0.29
 Nodes (6): nearest_in_front(), Who the robot locks onto: the nearest person standing in front of it., Nearest in the front sector; optional F3 uncertainty ties use geometry.      Wit, Track, test_f3_acquisition_tie_is_deterministic_and_prefers_centre_before_side(), test_nearest_in_front_ignores_people_behind_and_to_the_side()
 
-### Community 334 - "Community 334"
+### Community 329 - "Community 329"
 Cohesion: 0.43
 Nodes (6): evaluated_points(), main(), Blender 4.2.9: blender -b --python prepare_f3_gazebo_human.py -- <maya-dir> <may, Parent extra root bones (the IK feet) under their calves, keeping the walk., single_root(), skinned_meshes()
 
-### Community 335 - "Community 335"
+### Community 330 - "Community 330"
+Cohesion: 0.38
+Nodes (6): export_opacity(), main(), Blender 4.2.9 asset conversion: -- <asset-directory> [human]., Drop wire-only edges: Gazebo draws Collada <lines> as unlit white strokes., Keep the publisher's separate grayscale mask in Collada without repacking pixels, remove_loose_edges()
+
+### Community 331 - "Community 331"
 Cohesion: 0.67
 Nodes (6): CompletedProcess, Path, _git(), _make_repo(), test_pre_commit_propagates_graph_rebuild_failure(), test_pre_commit_rebuilds_and_stages_graph_for_staged_code()
 
-### Community 336 - "Community 336"
+### Community 332 - "Community 332"
 Cohesion: 0.29
 Nodes (7): euclidean_float64, foreground_count, foreground_first, foreground_last, foreground_sum, reason, xyz_optical
 
-### Community 337 - "Community 337"
+### Community 333 - "Community 333"
 Cohesion: 0.29
 Nodes (7): euclidean_rect_default, foreground_count, foreground_first, foreground_last, foreground_sum, reason, xyz_optical
 
-### Community 338 - "Community 338"
+### Community 334 - "Community 334"
 Cohesion: 0.29
 Nodes (7): euclidean_rect_height_crop, foreground_count, foreground_first, foreground_last, foreground_sum, reason, xyz_optical
 
-### Community 339 - "Community 339"
+### Community 335 - "Community 335"
 Cohesion: 0.29
 Nodes (7): euclidean_rect_height_crop_nearest_mode_band, foreground_count, foreground_first, foreground_last, foreground_sum, reason, xyz_optical
 
-### Community 340 - "Community 340"
+### Community 336 - "Community 336"
 Cohesion: 0.29
 Nodes (7): euclidean_rect_height_crop_range_band, foreground_count, foreground_first, foreground_last, foreground_sum, reason, xyz_optical
 
-### Community 341 - "Community 341"
+### Community 337 - "Community 337"
 Cohesion: 0.29
 Nodes (7): euclidean_rect_nearest_mode_band, foreground_count, foreground_first, foreground_last, foreground_sum, reason, xyz_optical
 
-### Community 342 - "Community 342"
+### Community 338 - "Community 338"
 Cohesion: 0.29
 Nodes (7): euclidean_rect_range_band, foreground_count, foreground_first, foreground_last, foreground_sum, reason, xyz_optical
 
-### Community 343 - "Community 343"
+### Community 339 - "Community 339"
 Cohesion: 0.29
 Nodes (7): euclidean_tight, foreground_count, foreground_first, foreground_last, foreground_sum, reason, xyz_optical
 
-### Community 344 - "Community 344"
+### Community 340 - "Community 340"
 Cohesion: 0.29
 Nodes (7): euclidean_tight_gated, foreground_count, foreground_first, foreground_last, foreground_sum, reason, xyz_optical
 
-### Community 345 - "Community 345"
+### Community 341 - "Community 341"
 Cohesion: 0.48
 Nodes (5): probe(), test_a_step_outside_read_uncertainty_aborts_the_probe(), test_clock_read_scheduling_delay_does_not_imply_a_wall_clock_step(), test_retry_selection_depends_only_on_clock_uncertainty(), test_steps_between_exchanges_abort_even_with_short_round_trip()
 
-### Community 346 - "Community 346"
+### Community 342 - "Community 342"
 Cohesion: 0.38
 Nodes (5): _inside_margin(), Signed distance to the polygon boundary, positive inside., Plan-view vertices of a binary STL., _stl_xy(), test_outline_encloses_the_clearpath_meshes_in_both_simulators()
 
-### Community 347 - "Community 347"
+### Community 343 - "Community 343"
 Cohesion: 0.67
 Nodes (6): corpus(), git(), main(), Path, removed_lines(), tokens()
 
-### Community 348 - "Community 348"
+### Community 345 - "Community 345"
 Cohesion: 0.67
 Nodes (4): Driver, field(), fill(), main()
 
-### Community 349 - "Community 349"
+### Community 346 - "Community 346"
 Cohesion: 0.67
 Nodes (5): candidate(), main(), run(), sources(), write_profile()
 
-### Community 351 - "Community 351"
+### Community 348 - "Community 348"
 Cohesion: 0.53
 Nodes (5): expanded(), Regression gates for the shared support and planar-drive import boundary., test_planar_import_removes_only_support_bodies(), test_support_fits_retained_deck_and_housing(), test_unsupported_geometry_fails_before_mutating_urdf()
 
-### Community 352 - "Community 352"
+### Community 349 - "Community 349"
 Cohesion: 0.33
 Nodes (5): captured_utc, files, host, repo_head, working_tree
 
-### Community 353 - "Community 353"
+### Community 350 - "Community 350"
 Cohesion: 0.33
 Nodes (5): files, observed_date, relationship, repository, revision
 
-### Community 354 - "Community 354"
-Cohesion: 0.47
-Nodes (6): nearest_beam_record(), The nearest ranked detection's ray record, or the first useful miss.      Match, beam_record(), test_a_batch_with_no_estimates_still_draws_its_beams(), test_records_are_matched_by_detection_index_not_position(), test_the_drawn_record_is_the_nearest_detections()
-
-### Community 355 - "Community 355"
+### Community 351 - "Community 351"
 Cohesion: 0.53
 Nodes (5): Path, _repo_root(), test_installer_exposes_side_by_side_candidate_path(), test_isaac_requirement_is_pinned_to_6_1_ga(), test_smoke_gate_requires_exact_6_1_version_and_clock_delivery()
 
-### Community 356 - "Community 356"
+### Community 352 - "Community 352"
 Cohesion: 0.33
 Nodes (6): polar_rect, merged_beams, ray_count, reason, selected_beams, xz_optical
 
-### Community 357 - "Community 357"
+### Community 353 - "Community 353"
 Cohesion: 0.33
 Nodes (6): polar_tight, merged_beams, ray_count, reason, selected_beams, xz_optical
 
-### Community 358 - "Community 358"
+### Community 354 - "Community 354"
 Cohesion: 0.33
 Nodes (6): projective_float64, depth_m, foreground_pixel_count, reason, representative_uv, xyz_optical
 
-### Community 359 - "Community 359"
+### Community 355 - "Community 355"
 Cohesion: 0.33
 Nodes (6): projective_rect_default, depth_m, foreground_pixel_count, reason, representative_uv, xyz_optical
 
-### Community 360 - "Community 360"
+### Community 356 - "Community 356"
 Cohesion: 0.33
 Nodes (6): projective_rect_nearest_mode_histogram, depth_m, foreground_pixel_count, reason, representative_uv, xyz_optical
 
-### Community 361 - "Community 361"
+### Community 357 - "Community 357"
 Cohesion: 0.33
 Nodes (6): projective_rect_otsu, depth_m, foreground_pixel_count, reason, representative_uv, xyz_optical
 
-### Community 362 - "Community 362"
+### Community 358 - "Community 358"
 Cohesion: 0.33
 Nodes (6): projective_rect_unlimited, depth_m, foreground_pixel_count, reason, representative_uv, xyz_optical
 
-### Community 363 - "Community 363"
+### Community 359 - "Community 359"
 Cohesion: 0.33
 Nodes (6): projective_tight, depth_m, foreground_pixel_count, reason, representative_uv, xyz_optical
 
-### Community 364 - "Community 364"
+### Community 360 - "Community 360"
 Cohesion: 0.33
 Nodes (6): projective_tight_gated, depth_m, foreground_pixel_count, reason, representative_uv, xyz_optical
 
-### Community 365 - "Community 365"
+### Community 361 - "Community 361"
 Cohesion: 0.47
 Nodes (3): panel_height(), test_rich_panel_is_tighter_than_the_plain_one(), test_rich_panel_still_covers_its_text()
 
-### Community 366 - "Community 366"
-Cohesion: 0.60
-Nodes (5): record(), test_camera_exit_and_recovery_are_scored_separately_from_missing_features(), test_equidistant_selected_target_is_not_declared_correct(), test_unobserved_camera_exit_coverage_is_unknown_and_wrong_lock_is_counted(), test_unselected_duplicate_cannot_steal_selected_leaders_truth_label()
+### Community 362 - "Community 362"
+Cohesion: 0.33
+Nodes (3): _downgrade_to_payload_v1(), _FakeSegmenter, Rewrite a capture as the scan-less evidence written before payload v2.      The
 
-### Community 370 - "Community 370"
+### Community 366 - "Community 366"
 Cohesion: 0.47
 Nodes (5): explainer_sources(), main(), Map each explainer page to the repository files it draws on., Pages with a changed source that were not changed themselves., stale_pages()
 
-### Community 371 - "Community 371"
-Cohesion: 0.40
-Nodes (5): optical_to_base_planar(), Camera-optical point -> planar position and distance in the base frame., ndarray, test_base_adapter_applies_camera_mounting_translation(), test_base_adapter_level_camera_forward_is_z_minus_offset()
-
-### Community 372 - "Community 372"
+### Community 368 - "Community 368"
 Cohesion: 0.60
 Nodes (3): controllers(), main(), poll()
 
-### Community 373 - "Community 373"
+### Community 369 - "Community 369"
 Cohesion: 0.50
 Nodes (3): Receive and process occupancy grid (costmap)., Convert occupancy grid to robot awareness map (vectorized).          Nav2 publis, OccupancyGrid
 
-### Community 374 - "Community 374"
+### Community 370 - "Community 370"
 Cohesion: 0.40
 Nodes (4): Send goal to Nav2 NavigateToPose action. Returns True if sent., facing_quaternion(), Yaw-only quaternion (z, w) that points from start towards target., test_goal_faces_from_the_robot_towards_the_goal()
 
-### Community 376 - "Community 376"
+### Community 372 - "Community 372"
+Cohesion: 0.60
+Nodes (4): evaluate(), main(), Summary and pass/fail. ages: [(name, motion_ms, auxiliary_ms)], queue: [(frames,, running_driver()
+
+### Community 373 - "Community 373"
 Cohesion: 0.60
 Nodes (3): controllers(), main(), poll()
 
-### Community 379 - "Community 379"
+### Community 376 - "Community 376"
 Cohesion: 0.50
 Nodes (4): start_exploration.sh script, is_passthrough(), RMW_IMPLEMENTATION, ROS_LOG_DIR
 
-### Community 380 - "Community 380"
+### Community 377 - "Community 377"
 Cohesion: 0.50
 Nodes (4): main(), observable_fraction(), load_grid(), Path
 
-### Community 381 - "Community 381"
+### Community 378 - "Community 378"
+Cohesion: 0.50
+Nodes (5): main(), parse_args(), parse_speed_list(), run_child(), Namespace
+
+### Community 379 - "Community 379"
 Cohesion: 0.40
 Nodes (5): humans/harper/source.glb, bytes, sha256, source_page, url
 
-### Community 382 - "Community 382"
+### Community 380 - "Community 380"
 Cohesion: 0.40
 Nodes (5): humans/jordan/source.glb, bytes, sha256, source_page, url
 
-### Community 383 - "Community 383"
+### Community 381 - "Community 381"
 Cohesion: 0.40
 Nodes (5): humans/sam/source.glb, bytes, sha256, source_page, url
 
-### Community 384 - "Community 384"
-Cohesion: 0.40
-Nodes (5): The ``enabled_estimators`` parameter as this node's mask-row subset.      A sele, resolve_enabled_estimators(), test_resolve_enabled_estimators_keeps_only_the_mask_rows(), test_resolve_enabled_estimators_rejects_a_selection_with_no_mask_row(), test_resolve_enabled_estimators_rejects_an_unknown_key()
-
-### Community 385 - "Community 385"
+### Community 383 - "Community 383"
 Cohesion: 0.40
 Nodes (5): ScopedPixelBuffer, getPixelBuffer, getQImage, pixel_buffer_, HardwarePixelBufferSharedPtr
 
-### Community 386 - "Community 386"
-Cohesion: 0.50
-Nodes (4): export_opacity(), main(), Blender 4.2.9 asset conversion: -- <asset-directory> [human]., Keep the publisher's separate grayscale mask in Collada without repacking pixels
-
-### Community 387 - "Community 387"
+### Community 384 - "Community 384"
 Cohesion: 0.40
 Nodes (4): euclidean_rect_starved, reason, projective_tight_starved, reason
 
-### Community 388 - "Community 388"
-Cohesion: 0.50
-Nodes (4): _evidence_issues(), Estimators this job selects that the loaded evidence cannot feed.      The profi, The page refuses before the run, naming the estimator and the reason.      The e, test_a_capture_without_a_scan_refuses_polar_instead_of_dropping_it()
-
-### Community 389 - "Community 389"
+### Community 385 - "Community 385"
 Cohesion: 0.67
 Nodes (3): main(), prepare(), Fetch pinned official F3 sources/checkpoints; refuse dirty source overwrites.
 
-### Community 393 - "Community 393"
+### Community 386 - "Community 386"
+Cohesion: 0.67
+Nodes (3): main(), _parser(), ArgumentParser
+
+### Community 390 - "Community 390"
 Cohesion: 0.83
 Nodes (3): block(), harness(), verify()
 
-### Community 394 - "Community 394"
+### Community 391 - "Community 391"
 Cohesion: 0.83
 Nodes (3): mcp_query.sh script, _data(), _post()
 
-### Community 395 - "Community 395"
+### Community 392 - "Community 392"
+Cohesion: 0.67
+Nodes (3): main(), Outage windows of Thor results and worst per-second local rates., summarize()
+
+### Community 393 - "Community 393"
 Cohesion: 0.50
 Nodes (4): hair, top, trousers, black_tan
 
-### Community 396 - "Community 396"
+### Community 394 - "Community 394"
 Cohesion: 0.50
 Nodes (4): hair, top, trousers, cobalt_khaki
 
-### Community 397 - "Community 397"
+### Community 395 - "Community 395"
 Cohesion: 0.50
 Nodes (4): hair, top, trousers, green_grey
 
-### Community 398 - "Community 398"
+### Community 396 - "Community 396"
 Cohesion: 0.50
 Nodes (4): hair, top, trousers, mustard_navy
 
-### Community 399 - "Community 399"
+### Community 397 - "Community 397"
 Cohesion: 0.50
 Nodes (4): hair, top, trousers, orange_olive
 
-### Community 400 - "Community 400"
+### Community 398 - "Community 398"
 Cohesion: 0.50
 Nodes (4): pink_white, hair, top, trousers
 
-### Community 401 - "Community 401"
+### Community 399 - "Community 399"
 Cohesion: 0.50
 Nodes (4): plum_charcoal, hair, top, trousers
 
-### Community 402 - "Community 402"
+### Community 400 - "Community 400"
 Cohesion: 0.50
 Nodes (4): teal_denim, hair, top, trousers
 
-### Community 403 - "Community 403"
+### Community 401 - "Community 401"
 Cohesion: 0.50
 Nodes (3): credit, license, publishers
 
-### Community 404 - "Community 404"
+### Community 402 - "Community 402"
 Cohesion: 0.50
 Nodes (4): bytes, sha256, url, daylight.hdr
 
-### Community 405 - "Community 405"
+### Community 403 - "Community 403"
 Cohesion: 0.50
 Nodes (4): props/barrel_03/barrel_03.bin, bytes, sha256, url
 
-### Community 406 - "Community 406"
+### Community 404 - "Community 404"
 Cohesion: 0.50
 Nodes (4): props/barrel_03/barrel_03.gltf, bytes, sha256, url
 
-### Community 407 - "Community 407"
+### Community 405 - "Community 405"
 Cohesion: 0.50
 Nodes (4): props/barrel_03/textures/barrel_03_arm_1k.jpg, bytes, sha256, url
 
-### Community 408 - "Community 408"
+### Community 406 - "Community 406"
 Cohesion: 0.50
 Nodes (4): props/barrel_03/textures/barrel_03_diff_1k.jpg, bytes, sha256, url
 
-### Community 409 - "Community 409"
+### Community 407 - "Community 407"
 Cohesion: 0.50
 Nodes (4): props/barrel_03/textures/barrel_03_nor_gl_1k.jpg, bytes, sha256, url
 
-### Community 410 - "Community 410"
+### Community 408 - "Community 408"
 Cohesion: 0.50
 Nodes (4): props/binder_notebook/binder_notebook.bin, bytes, sha256, url
 
-### Community 411 - "Community 411"
+### Community 409 - "Community 409"
 Cohesion: 0.50
 Nodes (4): props/binder_notebook/binder_notebook.gltf, bytes, sha256, url
 
-### Community 412 - "Community 412"
+### Community 410 - "Community 410"
 Cohesion: 0.50
 Nodes (4): props/binder_notebook/textures/binder_notebook_arm_1k.jpg, bytes, sha256, url
 
-### Community 413 - "Community 413"
+### Community 411 - "Community 411"
 Cohesion: 0.50
 Nodes (4): props/binder_notebook/textures/binder_notebook_diff_1k.jpg, bytes, sha256, url
 
-### Community 414 - "Community 414"
+### Community 412 - "Community 412"
 Cohesion: 0.50
 Nodes (4): props/binder_notebook/textures/binder_notebook_nor_gl_1k.jpg, bytes, sha256, url
 
-### Community 415 - "Community 415"
+### Community 413 - "Community 413"
 Cohesion: 0.50
 Nodes (4): props/book_encyclopedia_set_01/book_encyclopedia_set_01.bin, bytes, sha256, url
 
-### Community 416 - "Community 416"
+### Community 414 - "Community 414"
 Cohesion: 0.50
 Nodes (4): props/book_encyclopedia_set_01/book_encyclopedia_set_01.gltf, bytes, sha256, url
 
-### Community 417 - "Community 417"
+### Community 415 - "Community 415"
 Cohesion: 0.50
 Nodes (4): props/book_encyclopedia_set_01/textures/book_encyclopedia_set_01_cover_arm_1k.jpg, bytes, sha256, url
 
-### Community 418 - "Community 418"
+### Community 416 - "Community 416"
 Cohesion: 0.50
 Nodes (4): props/book_encyclopedia_set_01/textures/book_encyclopedia_set_01_cover_nor_gl_1k.jpg, bytes, sha256, url
 
-### Community 419 - "Community 419"
+### Community 417 - "Community 417"
 Cohesion: 0.50
 Nodes (4): props/book_encyclopedia_set_01/textures/book_encyclopedia_set_01_paper_diff_1k.jpg, bytes, sha256, url
 
-### Community 420 - "Community 420"
+### Community 418 - "Community 418"
 Cohesion: 0.50
 Nodes (4): props/book_encyclopedia_set_01/textures/book_encyclopedia_set_01_paper_nor_gl_1k.jpg, bytes, sha256, url
 
-### Community 421 - "Community 421"
+### Community 419 - "Community 419"
 Cohesion: 0.50
 Nodes (4): props/book_encyclopedia_set_01/textures/book_encyclopedia_set_01_paper_roughness_1k.jpg, bytes, sha256, url
 
-### Community 422 - "Community 422"
+### Community 420 - "Community 420"
 Cohesion: 0.50
 Nodes (4): props/grass_medium_01/grass_medium_01.bin, bytes, sha256, url
 
-### Community 423 - "Community 423"
+### Community 421 - "Community 421"
 Cohesion: 0.50
 Nodes (4): props/grass_medium_01/grass_medium_01.gltf, bytes, sha256, url
 
-### Community 424 - "Community 424"
+### Community 422 - "Community 422"
 Cohesion: 0.50
 Nodes (4): props/grass_medium_01/textures/grass_medium_01_arm_1k.jpg, bytes, sha256, url
 
-### Community 425 - "Community 425"
+### Community 423 - "Community 423"
 Cohesion: 0.50
 Nodes (4): props/grass_medium_01/textures/grass_medium_01_diff_1k.jpg, bytes, sha256, url
 
-### Community 426 - "Community 426"
+### Community 424 - "Community 424"
 Cohesion: 0.50
 Nodes (4): props/grass_medium_01/textures/grass_medium_01_nor_gl_1k.jpg, bytes, sha256, url
 
-### Community 427 - "Community 427"
+### Community 425 - "Community 425"
 Cohesion: 0.50
 Nodes (4): props/grass_medium_01/textures/opacity.png, bytes, sha256, url
 
-### Community 428 - "Community 428"
+### Community 426 - "Community 426"
 Cohesion: 0.50
 Nodes (4): props/metal_office_desk/metal_office_desk.bin, bytes, sha256, url
 
-### Community 429 - "Community 429"
+### Community 427 - "Community 427"
 Cohesion: 0.50
 Nodes (4): props/metal_office_desk/metal_office_desk.gltf, bytes, sha256, url
 
-### Community 430 - "Community 430"
+### Community 428 - "Community 428"
 Cohesion: 0.50
 Nodes (4): props/metal_office_desk/textures/metal_office_desk_arm_1k.jpg, bytes, sha256, url
 
-### Community 431 - "Community 431"
+### Community 429 - "Community 429"
 Cohesion: 0.50
 Nodes (4): props/metal_office_desk/textures/metal_office_desk_diff_1k.jpg, bytes, sha256, url
 
-### Community 432 - "Community 432"
+### Community 430 - "Community 430"
 Cohesion: 0.50
 Nodes (4): props/metal_office_desk/textures/metal_office_desk_nor_gl_1k.jpg, bytes, sha256, url
 
-### Community 433 - "Community 433"
+### Community 431 - "Community 431"
 Cohesion: 0.50
 Nodes (4): props/metal_trash_can/metal_trash_can.bin, bytes, sha256, url
 
-### Community 434 - "Community 434"
+### Community 432 - "Community 432"
 Cohesion: 0.50
 Nodes (4): props/metal_trash_can/metal_trash_can.gltf, bytes, sha256, url
 
-### Community 435 - "Community 435"
+### Community 433 - "Community 433"
 Cohesion: 0.50
 Nodes (4): props/metal_trash_can/textures/metal_trash_can_diff_1k.jpg, bytes, sha256, url
 
-### Community 436 - "Community 436"
+### Community 434 - "Community 434"
 Cohesion: 0.50
 Nodes (4): props/metal_trash_can/textures/metal_trash_can_rust_arm_1k.jpg, bytes, sha256, url
 
-### Community 437 - "Community 437"
+### Community 435 - "Community 435"
 Cohesion: 0.50
 Nodes (4): props/metal_trash_can/textures/metal_trash_can_rust_diff_1k.jpg, bytes, sha256, url
 
-### Community 438 - "Community 438"
+### Community 436 - "Community 436"
 Cohesion: 0.50
 Nodes (4): props/metal_trash_can/textures/metal_trash_can_rust_nor_gl_1k.jpg, bytes, sha256, url
 
-### Community 439 - "Community 439"
+### Community 437 - "Community 437"
 Cohesion: 0.50
 Nodes (4): props/modern_arm_chair_01/modern_arm_chair_01.bin, bytes, sha256, url
 
-### Community 440 - "Community 440"
+### Community 438 - "Community 438"
 Cohesion: 0.50
 Nodes (4): props/modern_arm_chair_01/modern_arm_chair_01.gltf, bytes, sha256, url
 
-### Community 441 - "Community 441"
+### Community 439 - "Community 439"
 Cohesion: 0.50
 Nodes (4): props/modern_arm_chair_01/textures/modern_arm_chair_01_legs_arm_1k.jpg, bytes, sha256, url
 
-### Community 442 - "Community 442"
+### Community 440 - "Community 440"
 Cohesion: 0.50
 Nodes (4): props/modern_arm_chair_01/textures/modern_arm_chair_01_legs_diff_1k.jpg, bytes, sha256, url
 
-### Community 443 - "Community 443"
+### Community 441 - "Community 441"
 Cohesion: 0.50
 Nodes (4): props/modern_arm_chair_01/textures/modern_arm_chair_01_legs_nor_gl_1k.jpg, bytes, sha256, url
 
-### Community 444 - "Community 444"
+### Community 442 - "Community 442"
 Cohesion: 0.50
 Nodes (4): props/modern_arm_chair_01/textures/modern_arm_chair_01_pillow_arm_1k.jpg, bytes, sha256, url
 
-### Community 445 - "Community 445"
+### Community 443 - "Community 443"
 Cohesion: 0.50
 Nodes (4): props/modern_arm_chair_01/textures/modern_arm_chair_01_pillow_diff_1k.jpg, bytes, sha256, url
 
-### Community 446 - "Community 446"
+### Community 444 - "Community 444"
 Cohesion: 0.50
 Nodes (4): props/modern_arm_chair_01/textures/modern_arm_chair_01_pillow_nor_gl_1k.jpg, bytes, sha256, url
 
-### Community 447 - "Community 447"
+### Community 445 - "Community 445"
 Cohesion: 0.50
 Nodes (4): props/modern_coffee_table_01/modern_coffee_table_01.bin, bytes, sha256, url
 
-### Community 448 - "Community 448"
+### Community 446 - "Community 446"
 Cohesion: 0.50
 Nodes (4): props/modern_coffee_table_01/modern_coffee_table_01.gltf, bytes, sha256, url
 
-### Community 449 - "Community 449"
+### Community 447 - "Community 447"
 Cohesion: 0.50
 Nodes (4): props/modern_coffee_table_01/textures/modern_coffee_table_01_diff_1k.jpg, bytes, sha256, url
 
-### Community 450 - "Community 450"
+### Community 448 - "Community 448"
 Cohesion: 0.50
 Nodes (4): props/modern_coffee_table_01/textures/modern_coffee_table_01_nor_gl_1k.jpg, bytes, sha256, url
 
-### Community 451 - "Community 451"
+### Community 449 - "Community 449"
 Cohesion: 0.50
 Nodes (4): props/modern_coffee_table_01/textures/modern_coffee_table_01_rough_1k.jpg, bytes, sha256, url
 
-### Community 452 - "Community 452"
+### Community 450 - "Community 450"
 Cohesion: 0.50
 Nodes (4): props/painted_wooden_bench/painted_wooden_bench.bin, bytes, sha256, url
 
-### Community 453 - "Community 453"
+### Community 451 - "Community 451"
 Cohesion: 0.50
 Nodes (4): props/painted_wooden_bench/painted_wooden_bench.gltf, bytes, sha256, url
 
-### Community 454 - "Community 454"
+### Community 452 - "Community 452"
 Cohesion: 0.50
 Nodes (4): props/painted_wooden_bench/textures/painted_wooden_bench_arm_1k.jpg, bytes, sha256, url
 
-### Community 455 - "Community 455"
+### Community 453 - "Community 453"
 Cohesion: 0.50
 Nodes (4): props/painted_wooden_bench/textures/painted_wooden_bench_diff_1k.jpg, bytes, sha256, url
 
-### Community 456 - "Community 456"
+### Community 454 - "Community 454"
 Cohesion: 0.50
 Nodes (4): props/painted_wooden_bench/textures/painted_wooden_bench_nor_gl_1k.jpg, bytes, sha256, url
 
-### Community 457 - "Community 457"
+### Community 455 - "Community 455"
 Cohesion: 0.50
 Nodes (4): props/plastic_crate_01/plastic_crate_01.bin, bytes, sha256, url
 
-### Community 458 - "Community 458"
+### Community 456 - "Community 456"
 Cohesion: 0.50
 Nodes (4): props/plastic_crate_01/plastic_crate_01.gltf, bytes, sha256, url
 
-### Community 459 - "Community 459"
+### Community 457 - "Community 457"
 Cohesion: 0.50
 Nodes (4): props/plastic_crate_01/textures/plastic_crate_01_arm_1k.jpg, bytes, sha256, url
 
-### Community 460 - "Community 460"
+### Community 458 - "Community 458"
 Cohesion: 0.50
 Nodes (4): props/plastic_crate_01/textures/plastic_crate_01_diff_1k.jpg, bytes, sha256, url
 
-### Community 461 - "Community 461"
+### Community 459 - "Community 459"
 Cohesion: 0.50
 Nodes (4): props/plastic_crate_01/textures/plastic_crate_01_nor_gl_1k.jpg, bytes, sha256, url
 
-### Community 462 - "Community 462"
+### Community 460 - "Community 460"
 Cohesion: 0.50
 Nodes (4): props/potted_plant_02/potted_plant_02.bin, bytes, sha256, url
 
-### Community 463 - "Community 463"
+### Community 461 - "Community 461"
 Cohesion: 0.50
 Nodes (4): props/potted_plant_02/potted_plant_02.gltf, bytes, sha256, url
 
-### Community 464 - "Community 464"
+### Community 462 - "Community 462"
 Cohesion: 0.50
 Nodes (4): props/potted_plant_02/textures/potted_plant_02_leaves_diff_1k.jpg, bytes, sha256, url
 
-### Community 465 - "Community 465"
+### Community 463 - "Community 463"
 Cohesion: 0.50
 Nodes (4): props/potted_plant_02/textures/potted_plant_02_leaves_nor_gl_1k.jpg, bytes, sha256, url
 
-### Community 466 - "Community 466"
+### Community 464 - "Community 464"
 Cohesion: 0.50
 Nodes (4): props/potted_plant_02/textures/potted_plant_02_leaves_rough_1k.jpg, bytes, sha256, url
 
-### Community 467 - "Community 467"
+### Community 465 - "Community 465"
 Cohesion: 0.50
 Nodes (4): props/potted_plant_02/textures/potted_plant_02_pot_diff_1k.jpg, bytes, sha256, url
 
-### Community 468 - "Community 468"
+### Community 466 - "Community 466"
 Cohesion: 0.50
 Nodes (4): props/potted_plant_02/textures/potted_plant_02_pot_nor_gl_1k.jpg, bytes, sha256, url
 
-### Community 469 - "Community 469"
+### Community 467 - "Community 467"
 Cohesion: 0.50
 Nodes (4): props/potted_plant_02/textures/potted_plant_02_pot_rough_1k.jpg, bytes, sha256, url
 
-### Community 470 - "Community 470"
+### Community 468 - "Community 468"
 Cohesion: 0.50
 Nodes (4): props/shrub_01/shrub_01.bin, bytes, sha256, url
 
-### Community 471 - "Community 471"
+### Community 469 - "Community 469"
 Cohesion: 0.50
 Nodes (4): props/shrub_01/shrub_01.gltf, bytes, sha256, url
 
-### Community 472 - "Community 472"
+### Community 470 - "Community 470"
 Cohesion: 0.50
 Nodes (4): props/shrub_01/textures/opacity.png, bytes, sha256, url
 
-### Community 473 - "Community 473"
+### Community 471 - "Community 471"
 Cohesion: 0.50
 Nodes (4): props/shrub_01/textures/shrub_01_arm_1k.jpg, bytes, sha256, url
 
-### Community 474 - "Community 474"
+### Community 472 - "Community 472"
 Cohesion: 0.50
 Nodes (4): props/shrub_01/textures/shrub_01_diff_1k.jpg, bytes, sha256, url
 
-### Community 475 - "Community 475"
+### Community 473 - "Community 473"
 Cohesion: 0.50
 Nodes (4): props/shrub_01/textures/shrub_01_nor_gl_1k.jpg, bytes, sha256, url
 
-### Community 476 - "Community 476"
+### Community 474 - "Community 474"
 Cohesion: 0.50
 Nodes (4): props/sofa_03/sofa_03.bin, bytes, sha256, url
 
-### Community 477 - "Community 477"
+### Community 475 - "Community 475"
 Cohesion: 0.50
 Nodes (4): props/sofa_03/sofa_03.gltf, bytes, sha256, url
 
-### Community 478 - "Community 478"
+### Community 476 - "Community 476"
 Cohesion: 0.50
 Nodes (4): props/sofa_03/textures/sofa_03_diff_1k.jpg, bytes, sha256, url
 
-### Community 479 - "Community 479"
+### Community 477 - "Community 477"
 Cohesion: 0.50
 Nodes (4): props/sofa_03/textures/sofa_03_nor_gl_1k.jpg, bytes, sha256, url
 
-### Community 480 - "Community 480"
+### Community 478 - "Community 478"
 Cohesion: 0.50
 Nodes (4): props/sofa_03/textures/sofa_03_rough_1k.jpg, bytes, sha256, url
 
-### Community 481 - "Community 481"
+### Community 479 - "Community 479"
 Cohesion: 0.50
 Nodes (4): props/street_lamp_01/street_lamp_01.bin, bytes, sha256, url
 
-### Community 482 - "Community 482"
+### Community 480 - "Community 480"
 Cohesion: 0.50
 Nodes (4): props/street_lamp_01/street_lamp_01.gltf, bytes, sha256, url
 
-### Community 483 - "Community 483"
+### Community 481 - "Community 481"
 Cohesion: 0.50
 Nodes (4): props/street_lamp_01/textures/street_lamp_01_arm_1k.jpg, bytes, sha256, url
 
-### Community 484 - "Community 484"
+### Community 482 - "Community 482"
 Cohesion: 0.50
 Nodes (4): props/street_lamp_01/textures/street_lamp_01_diff_1k.jpg, bytes, sha256, url
 
-### Community 485 - "Community 485"
+### Community 483 - "Community 483"
 Cohesion: 0.50
 Nodes (4): props/street_lamp_01/textures/street_lamp_01_nor_gl_1k.jpg, bytes, sha256, url
 
-### Community 486 - "Community 486"
+### Community 484 - "Community 484"
 Cohesion: 0.50
 Nodes (4): props/tree_small_02/textures/tree_small_02_arm_1k.jpg, bytes, sha256, url
 
-### Community 487 - "Community 487"
+### Community 485 - "Community 485"
 Cohesion: 0.50
 Nodes (4): props/tree_small_02/textures/tree_small_02_branch_arm_1k.jpg, bytes, sha256, url
 
-### Community 488 - "Community 488"
+### Community 486 - "Community 486"
 Cohesion: 0.50
 Nodes (4): props/tree_small_02/textures/tree_small_02_branch_diff_1k.jpg, bytes, sha256, url
 
-### Community 489 - "Community 489"
+### Community 487 - "Community 487"
 Cohesion: 0.50
 Nodes (4): props/tree_small_02/textures/tree_small_02_branch_nor_gl_1k.jpg, bytes, sha256, url
 
-### Community 490 - "Community 490"
+### Community 488 - "Community 488"
 Cohesion: 0.50
 Nodes (4): props/tree_small_02/textures/tree_small_02_diff_1k.jpg, bytes, sha256, url
 
-### Community 491 - "Community 491"
+### Community 489 - "Community 489"
 Cohesion: 0.50
 Nodes (4): props/tree_small_02/textures/tree_small_02_leaves_arm_1k.jpg, bytes, sha256, url
 
-### Community 492 - "Community 492"
+### Community 490 - "Community 490"
 Cohesion: 0.50
 Nodes (4): props/tree_small_02/textures/tree_small_02_leaves_diff_1k.jpg, bytes, sha256, url
 
-### Community 493 - "Community 493"
+### Community 491 - "Community 491"
 Cohesion: 0.50
 Nodes (4): props/tree_small_02/textures/tree_small_02_leaves_nor_gl_1k.jpg, bytes, sha256, url
 
-### Community 494 - "Community 494"
+### Community 492 - "Community 492"
 Cohesion: 0.50
 Nodes (4): props/tree_small_02/textures/tree_small_02_nor_gl_1k.jpg, bytes, sha256, url
 
-### Community 495 - "Community 495"
+### Community 493 - "Community 493"
 Cohesion: 0.50
 Nodes (4): props/tree_small_02/tree_small_02.bin, bytes, sha256, url
 
-### Community 496 - "Community 496"
+### Community 494 - "Community 494"
 Cohesion: 0.50
 Nodes (4): props/tree_small_02/tree_small_02.gltf, bytes, sha256, url
 
-### Community 497 - "Community 497"
+### Community 495 - "Community 495"
 Cohesion: 0.50
 Nodes (4): props/wooden_crate_01/textures/wooden_crate_01_arm_1k.jpg, bytes, sha256, url
 
-### Community 498 - "Community 498"
+### Community 496 - "Community 496"
 Cohesion: 0.50
 Nodes (4): props/wooden_crate_01/textures/wooden_crate_01_diff_1k.jpg, bytes, sha256, url
 
-### Community 499 - "Community 499"
+### Community 497 - "Community 497"
 Cohesion: 0.50
 Nodes (4): props/wooden_crate_01/textures/wooden_crate_01_nor_gl_1k.jpg, bytes, sha256, url
 
-### Community 500 - "Community 500"
+### Community 498 - "Community 498"
 Cohesion: 0.50
 Nodes (4): props/wooden_crate_01/wooden_crate_01.bin, bytes, sha256, url
 
-### Community 501 - "Community 501"
+### Community 499 - "Community 499"
 Cohesion: 0.50
 Nodes (4): props/wooden_crate_01/wooden_crate_01.gltf, bytes, sha256, url
 
-### Community 502 - "Community 502"
+### Community 500 - "Community 500"
 Cohesion: 0.50
 Nodes (4): surfaces/brick_pavement_02/Diffuse.jpg, bytes, sha256, url
 
-### Community 503 - "Community 503"
+### Community 501 - "Community 501"
 Cohesion: 0.50
 Nodes (4): surfaces/brick_pavement_02/nor_gl.jpg, bytes, sha256, url
 
-### Community 504 - "Community 504"
+### Community 502 - "Community 502"
 Cohesion: 0.50
 Nodes (4): surfaces/brick_pavement_02/Rough.jpg, bytes, sha256, url
 
-### Community 505 - "Community 505"
+### Community 503 - "Community 503"
 Cohesion: 0.50
 Nodes (4): surfaces/brick_wall_001/Diffuse.jpg, bytes, sha256, url
 
-### Community 506 - "Community 506"
+### Community 504 - "Community 504"
 Cohesion: 0.50
 Nodes (4): surfaces/brick_wall_001/nor_gl.jpg, bytes, sha256, url
 
-### Community 507 - "Community 507"
+### Community 505 - "Community 505"
 Cohesion: 0.50
 Nodes (4): surfaces/brick_wall_001/Rough.jpg, bytes, sha256, url
 
-### Community 508 - "Community 508"
+### Community 506 - "Community 506"
 Cohesion: 0.50
 Nodes (4): surfaces/concrete_floor_02/Diffuse.jpg, bytes, sha256, url
 
-### Community 509 - "Community 509"
+### Community 507 - "Community 507"
 Cohesion: 0.50
 Nodes (4): surfaces/concrete_floor_02/nor_gl.jpg, bytes, sha256, url
 
-### Community 510 - "Community 510"
+### Community 508 - "Community 508"
 Cohesion: 0.50
 Nodes (4): surfaces/concrete_floor_02/Rough.jpg, bytes, sha256, url
 
-### Community 511 - "Community 511"
+### Community 509 - "Community 509"
 Cohesion: 0.50
 Nodes (4): surfaces/grass_ground/Diffuse.jpg, bytes, sha256, url
 
-### Community 512 - "Community 512"
+### Community 510 - "Community 510"
 Cohesion: 0.50
 Nodes (4): surfaces/grass_ground/nor_gl.jpg, bytes, sha256, url
 
-### Community 513 - "Community 513"
+### Community 511 - "Community 511"
 Cohesion: 0.50
 Nodes (4): surfaces/grass_ground/Rough.jpg, bytes, sha256, url
 
-### Community 514 - "Community 514"
+### Community 512 - "Community 512"
 Cohesion: 0.50
 Nodes (4): surfaces/wood_floor/Diffuse.jpg, bytes, sha256, url
 
-### Community 515 - "Community 515"
+### Community 513 - "Community 513"
 Cohesion: 0.50
 Nodes (4): surfaces/wood_floor/nor_gl.jpg, bytes, sha256, url
 
-### Community 516 - "Community 516"
+### Community 514 - "Community 514"
 Cohesion: 0.50
 Nodes (4): surfaces/wood_floor/Rough.jpg, bytes, sha256, url
 
-### Community 517 - "Community 517"
+### Community 515 - "Community 515"
 Cohesion: 0.50
 Nodes (4): surfaces/wood_table_001/Diffuse.jpg, bytes, sha256, url
 
-### Community 518 - "Community 518"
+### Community 516 - "Community 516"
 Cohesion: 0.50
 Nodes (4): surfaces/wood_table_001/nor_gl.jpg, bytes, sha256, url
 
-### Community 519 - "Community 519"
+### Community 517 - "Community 517"
 Cohesion: 0.50
 Nodes (4): surfaces/wood_table_001/Rough.jpg, bytes, sha256, url
 
-### Community 520 - "Community 520"
-Cohesion: 0.50
-Nodes (4): Validate the ``mask_gate`` parameter value (``box`` | ``silhouette``)., resolve_mask_gate(), test_resolve_mask_gate_accepts_both_gates(), test_resolve_mask_gate_rejects_unknown_value()
-
-### Community 521 - "Community 521"
+### Community 518 - "Community 518"
 Cohesion: 0.67
 Nodes (3): fetch(), main(), Download CC0 scene assets from their publishers; preserve URLs and hashes.  Run
 
-### Community 522 - "Community 522"
+### Community 519 - "Community 519"
 Cohesion: 0.67
 Nodes (3): measurement(), Segmenting a recorded localization run by scene marks., test_segments_split_at_marks_after_settling_and_shift_to_camera_face()
 
 ## Knowledge Gaps
-- **1325 isolated node(s):** `version`, `configurations`, `PreToolUse`, `PreToolUse`, `isaac-sim-mcp` (+1320 more)
+- **1326 isolated node(s):** `version`, `configurations`, `PreToolUse`, `PreToolUse`, `isaac-sim-mcp` (+1321 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **67 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **69 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `Time` connect `Community 35` to `Community 1`, `Community 2`, `Community 9`, `Community 10`, `Community 13`, `Community 14`, `Community 15`, `Community 16`, `Community 21`, `Community 24`, `Community 27`, `Community 30`, `Community 31`, `Community 37`, `Community 38`, `Community 41`, `Community 48`, `Community 52`, `Community 55`, `Community 58`, `Community 59`, `Community 64`, `Community 66`, `Community 69`, `Community 74`, `Community 80`, `Community 81`, `Community 85`, `Community 89`, `Community 93`, `Community 94`, `Community 96`, `Community 101`, `Community 106`, `Community 109`, `Community 120`, `Community 125`, `Community 127`, `Community 128`, `Community 130`, `Community 133`, `Community 134`, `Community 135`, `Community 140`, `Community 141`, `Community 142`, `Community 144`, `Community 152`, `Community 164`, `Community 166`, `Community 172`, `Community 173`, `Community 176`, `Community 179`, `Community 183`, `Community 184`, `Community 190`, `Community 191`, `Community 193`, `Community 194`, `Community 195`, `Community 225`, `Community 226`, `Community 228`, `Community 233`, `Community 239`, `Community 244`, `Community 251`, `Community 255`, `Community 270`, `Community 273`, `Community 274`, `Community 276`, `Community 278`, `Community 280`, `Community 303`, `Community 306`, `Community 372`, `Community 376`?**
-  _High betweenness centrality (0.199) - this node is a cross-community bridge._
-- **Why does `SimpleNamespace` connect `Community 142` to `Community 256`, `Community 0`, `Community 2`, `Community 4`, `Community 6`, `Community 10`, `Community 11`, `Community 16`, `Community 17`, `Community 18`, `Community 150`, `Community 161`, `Community 34`, `Community 41`, `Community 46`, `Community 176`, `Community 48`, `Community 51`, `Community 57`, `Community 58`, `Community 317`, `Community 64`, `Community 66`, `Community 200`, `Community 204`, `Community 82`, `Community 88`, `Community 96`, `Community 97`, `Community 117`, `Community 118`, `Community 377`, `Community 250`?**
+- **Why does `Time` connect `Community 59` to `Community 0`, `Community 1`, `Community 6`, `Community 10`, `Community 13`, `Community 14`, `Community 18`, `Community 22`, `Community 23`, `Community 27`, `Community 28`, `Community 29`, `Community 37`, `Community 38`, `Community 41`, `Community 43`, `Community 46`, `Community 48`, `Community 51`, `Community 54`, `Community 58`, `Community 60`, `Community 63`, `Community 65`, `Community 70`, `Community 76`, `Community 79`, `Community 82`, `Community 86`, `Community 87`, `Community 90`, `Community 92`, `Community 98`, `Community 101`, `Community 107`, `Community 108`, `Community 110`, `Community 111`, `Community 117`, `Community 128`, `Community 129`, `Community 132`, `Community 134`, `Community 154`, `Community 157`, `Community 164`, `Community 165`, `Community 172`, `Community 173`, `Community 176`, `Community 182`, `Community 183`, `Community 187`, `Community 191`, `Community 192`, `Community 193`, `Community 194`, `Community 195`, `Community 196`, `Community 197`, `Community 216`, `Community 226`, `Community 227`, `Community 229`, `Community 233`, `Community 239`, `Community 244`, `Community 252`, `Community 257`, `Community 270`, `Community 273`, `Community 277`, `Community 279`, `Community 282`, `Community 291`, `Community 293`, `Community 295`, `Community 304`, `Community 305`, `Community 308`, `Community 344`, `Community 368`, `Community 372`, `Community 373`, `Community 382`, `Community 392`?**
+  _High betweenness centrality (0.190) - this node is a cross-community bridge._
+- **Why does `SimpleNamespace` connect `Community 63` to `Community 0`, `Community 258`, `Community 8`, `Community 9`, `Community 11`, `Community 13`, `Community 18`, `Community 147`, `Community 19`, `Community 280`, `Community 26`, `Community 29`, `Community 162`, `Community 166`, `Community 42`, `Community 46`, `Community 174`, `Community 176`, `Community 52`, `Community 316`, `Community 196`, `Community 69`, `Community 201`, `Community 204`, `Community 77`, `Community 79`, `Community 85`, `Community 362`, `Community 106`, `Community 119`, `Community 120`, `Community 249`, `Community 251`?**
   _High betweenness centrality (0.070) - this node is a cross-community bridge._
-- **Why does `TargetDistanceBenchmarkRunner` connect `Community 1` to `Community 2`, `Community 4`, `Community 134`, `Community 199`, `Community 6`, `Community 76`, `Community 13`, `Community 125`?**
-  _High betweenness centrality (0.025) - this node is a cross-community bridge._
+- **Why does `TargetDistanceBenchmarkRunner` connect `Community 6` to `Community 0`, `Community 34`, `Community 132`, `Community 166`, `Community 8`, `Community 362`, `Community 80`, `Community 246`, `Community 125`?**
+  _High betweenness centrality (0.030) - this node is a cross-community bridge._
 - **Are the 190 inferred relationships involving `RuntimeError` (e.g. with `_assets_directory()` and `main()`) actually correct?**
   _`RuntimeError` has 190 INFERRED edges - model-reasoned connections that need verification._
 - **Are the 14 inferred relationships involving `Time` (e.g. with `.transform()` and `replay()`) actually correct?**

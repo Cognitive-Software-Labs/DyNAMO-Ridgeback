@@ -36,7 +36,15 @@ reproduce Isaac's fabric shading. Source pixels remain unchanged.
 Reception counters and doors use wood-grain textures. Office cove lights
 illuminate the ceiling; warehouse clerestory openings admit daylight. Courtyard
 grass and shrub strips use separate publisher opacity maps in both renderers.
-These decorative plants have no collision geometry; trees retain trunk proxies.
+These decorative plants have no collision geometry; trees retain trunk proxies. Gazebo
+interiors add four ceiling point lights and emissive fixture surfaces. Its
+fixture exporter namespaces Collada identifiers and gives copied architectural
+maps unique basenames, preventing Ogre's shared resource registry from reusing
+the wood-floor texture for brick walls or signs. These copies live in each
+run's `fixtures/textures/` directory; publisher files remain unchanged.
+The static converter removes loose wire edges (Collada `<lines>`), which
+Gazebo would draw as unlit white strokes over tree foliage; triangle geometry
+and texture pixels are unchanged.
 
 Trees use a 180,000-triangle visual mesh derived from the source and simple
 cylindrical trunk collisions in both backends. The proxy is approximate and
@@ -141,16 +149,22 @@ mismatched geometry. `benchmarking.annotations --stationary-base` uses recorded
 TF to remove odometry drift for a surveyed stationary observer. This option is
 not valid for a moving robot. These inputs are used only for scoring.
 
-Rendered previews are provided below. Short runtime checks cover sensor and
-ground-truth startup in both simulators. They do not measure recognition
-accuracy or establish successful full-length scenario execution; new
-recognition qualification remains pending.
+Rendered previews are provided below. Full 20-second scene/sensor checks cover all six scenario families in both
+simulators, distributed across office (alone/crossing), warehouse (both
+look-alikes) and courtyard (stop/crowd with eight bystanders). This is twelve
+cases rather than the complete world/scenario/crowd-size matrix. New recognition
+qualification remains pending.
 
 ![Furnished office lobby with textured floor, reception furniture and varied walking pedestrians](assets/environments/office.png)
 
 ![Warehouse aisle with racks, crates, barrels and pedestrians](assets/environments/warehouse.png)
 
 ![Courtyard with trees, benches and windowed buildings](assets/environments/courtyard.png)
+
+![Gazebo robot camera showing distinct floor, brick wall, signs and illuminated fixtures](assets/environments/gazebo-office.png)
+
+Gazebo's robot camera uses different lighting and material support from the
+Isaac overview views above; the same layout and cast are used.
 
 ![Casual and business-clothed pedestrian character variants](assets/environments/humans.png)
 
@@ -159,3 +173,5 @@ recognition qualification remains pending.
 - [Realistic worlds, asset conversion and startup validation](../../archive/engineering/2026-11-05-realistic-worlds.md) — tested population, tree/clock startup failures and verification limits.
 
 - [Material, lighting and vegetation review](../../archive/engineering/2026-11-05-visual-materials.md) — visual population and limited runtime evidence.
+
+- [Gazebo material isolation and full playback review](../../archive/engineering/2026-11-05-gazebo-material-isolation.md) — texture collision diagnosis and scenario coverage.

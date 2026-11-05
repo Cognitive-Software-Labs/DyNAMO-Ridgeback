@@ -3,6 +3,7 @@ from dataclasses import dataclass
 import json
 from pathlib import Path
 import re
+import shutil
 from xml.etree import ElementTree as ET
 
 import numpy as np
@@ -82,7 +83,7 @@ def write_fixture_mesh(box,path):
     data,points=box_mesh_data(box.size,repeat=not box.material.startswith('sign_'))
     root=ET.Element('COLLADA',xmlns='http://www.collada.org/2005/11/COLLADASchema',version='1.4.1')
     asset=ET.SubElement(root,'asset');ET.SubElement(asset,'unit',name='meter',meter='1');ET.SubElement(asset,'up_axis').text='Z_UP'
-    texture=asset_directory()/'surfaces'/box.material/'Diffuse.jpg'
+    texture=fixture_texture(box.material,'Diffuse',path.parent)
     effect=ET.SubElement(ET.SubElement(root,'library_effects'),'effect',id='finish-effect');profile=ET.SubElement(effect,'profile_COMMON')
     if texture.exists():
         image=ET.SubElement(ET.SubElement(root,'library_images'),'image',id='albedo');ET.SubElement(image,'init_from').text=texture.as_uri()
@@ -108,8 +109,27 @@ def write_fixture_mesh(box,path):
     instance=ET.SubElement(node,'instance_geometry',url='#shape');binding=ET.SubElement(ET.SubElement(ET.SubElement(instance,'bind_material'),'technique_common'),'instance_material',symbol='finish',target='#finish')
     ET.SubElement(binding,'bind_vertex_input',semantic='UVMap',input_semantic='TEXCOORD',input_set='0')
     ET.SubElement(ET.SubElement(root,'scene'),'instance_visual_scene',url='#Scene')
+    # Gazebo's imported material registry is shared across mesh files.
+    # Reusing "finish" lets the first fixture's texture leak onto later ones.
+    identifiers={item.get('id') for item in root.iter() if item.get('id')}
+    prefix=re.sub(r'[^A-Za-z0-9_]', '_', box.name)+'_'
+    for item in root.iter():
+        for key,value in list(item.attrib.items()):
+            if value in identifiers:item.set(key,prefix+value)
+            elif value.startswith('#') and value[1:] in identifiers:item.set(key,'#'+prefix+value[1:])
+        if item.tag=='init_from' and item.text in identifiers:item.text=prefix+item.text
     path.parent.mkdir(parents=True,exist_ok=True);ET.ElementTree(root).write(path,encoding='utf-8',xml_declaration=True)
     return path
+
+
+def fixture_texture(material,channel,directory):
+    """Ogre texture resource basenames must be unique across architectural maps."""
+    source=asset_directory()/'surfaces'/material/(channel+'.jpg')
+    target=directory/'textures'/(material+'_'+channel+'.jpg')
+    if source.exists() and not target.exists():
+        target.parent.mkdir(parents=True,exist_ok=True)
+        shutil.copy2(source,target)
+    return target
 
 
 def clothing_color(name,color):
@@ -293,6 +313,15 @@ def gazebo_world(scenario,output,environment):
     for light in list(world.findall('light')):world.remove(light)
     sun=ET.SubElement(world,'light',name='daylight',type='directional');ET.SubElement(sun,'direction').text='-0.3 0.4 -1';ET.SubElement(sun,'diffuse').text='0.95 0.94 0.9 1'
     scene=ET.SubElement(world,'scene');ET.SubElement(scene,'ambient').text='.45 .45 .45 1';ET.SubElement(scene,'background').text='.58 .72 .87 1';ET.SubElement(scene,'shadows').text='true'
+    if environment!='courtyard':
+        for i,x in enumerate((0,5,10,15)):
+            light=ET.SubElement(world,'light',name=f'ceiling_panel_{i}',type='point')
+            ET.SubElement(light,'pose').text=f'{x} 0 {3.65 if environment=="office" else 4.65} 0 0 0'
+            ET.SubElement(light,'diffuse').text='0.9 0.85 0.75 1'
+            ET.SubElement(light,'specular').text='0.3 0.3 0.3 1'
+            attenuation=ET.SubElement(light,'attenuation')
+            for key,value in [('range',16),('constant',.6),('linear',.03),('quadratic',.02)]:
+                ET.SubElement(attenuation,key).text=str(value)
     for actor in world.findall('actor'):
         spec=cast[actor.get('name')]
         for element in (actor.find('skin'),actor.find('animation')):ET.SubElement(element,'scale').text=str(spec.scale)
@@ -317,11 +346,14 @@ def gazebo_world(scenario,output,environment):
             else:ET.SubElement(ET.SubElement(geometry,'box'),'size').text=' '.join(map(str,box.size))
             if tag=='visual':
                 color,rough,metal=PALETTE[box.material];mat=ET.SubElement(item,'material');ET.SubElement(mat,'diffuse').text=' '.join(map(str,(*color,1.)))
+                if box.name.startswith(('LightHousing','CoveLED')):
+                    ET.SubElement(mat,'emissive').text='1 0.94 0.82 1'
                 texture=root/'surfaces'/box.material
                 if texture.exists():
-                    pbr=ET.SubElement(ET.SubElement(mat,'pbr'),'metal');ET.SubElement(pbr,'albedo_map').text=(texture/'Diffuse.jpg').as_uri();
-                    if (texture/'Rough.jpg').exists():ET.SubElement(pbr,'roughness_map').text=(texture/'Rough.jpg').as_uri()
-                    if (texture/'nor_gl.jpg').exists():ET.SubElement(pbr,'normal_map').text=(texture/'nor_gl.jpg').as_uri()
+                    pbr=ET.SubElement(ET.SubElement(mat,'pbr'),'metal')
+                    ET.SubElement(pbr,'albedo_map').text=fixture_texture(box.material,'Diffuse',output.parent/'fixtures').as_uri()
+                    if (texture/'Rough.jpg').exists():ET.SubElement(pbr,'roughness_map').text=fixture_texture(box.material,'Rough',output.parent/'fixtures').as_uri()
+                    if (texture/'nor_gl.jpg').exists():ET.SubElement(pbr,'normal_map').text=fixture_texture(box.material,'nor_gl',output.parent/'fixtures').as_uri()
     for prop in props:
         link=model(prop.name,prop.position,prop.yaw)
         for tag in ('visual','collision') if prop.collision else ('visual',):

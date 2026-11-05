@@ -1,0 +1,205 @@
+diff --git a/src/ridgeback_leader_follow/ridgeback_leader_follow/realistic_scene.py b/src/ridgeback_leader_follow/ridgeback_leader_follow/realistic_scene.py
+index 93d573e..3449f94 100644
+--- a/src/ridgeback_leader_follow/ridgeback_leader_follow/realistic_scene.py
++++ b/src/ridgeback_leader_follow/ridgeback_leader_follow/realistic_scene.py
+@@ -3,6 +3,7 @@ from dataclasses import dataclass
+ import json
+ from pathlib import Path
+ import re
++import shutil
+ from xml.etree import ElementTree as ET
+ 
+ import numpy as np
+@@ -82,7 +83,7 @@ def write_fixture_mesh(box,path):
+     data,points=box_mesh_data(box.size,repeat=not box.material.startswith('sign_'))
+     root=ET.Element('COLLADA',xmlns='http://www.collada.org/2005/11/COLLADASchema',version='1.4.1')
+     asset=ET.SubElement(root,'asset');ET.SubElement(asset,'unit',name='meter',meter='1');ET.SubElement(asset,'up_axis').text='Z_UP'
+-    texture=asset_directory()/'surfaces'/box.material/'Diffuse.jpg'
++    texture=fixture_texture(box.material,'Diffuse',path.parent)
+     effect=ET.SubElement(ET.SubElement(root,'library_effects'),'effect',id='finish-effect');profile=ET.SubElement(effect,'profile_COMMON')
+     if texture.exists():
+         image=ET.SubElement(ET.SubElement(root,'library_images'),'image',id='albedo');ET.SubElement(image,'init_from').text=texture.as_uri()
+@@ -108,10 +109,29 @@ def write_fixture_mesh(box,path):
+     instance=ET.SubElement(node,'instance_geometry',url='#shape');binding=ET.SubElement(ET.SubElement(ET.SubElement(instance,'bind_material'),'technique_common'),'instance_material',symbol='finish',target='#finish')
+     ET.SubElement(binding,'bind_vertex_input',semantic='UVMap',input_semantic='TEXCOORD',input_set='0')
+     ET.SubElement(ET.SubElement(root,'scene'),'instance_visual_scene',url='#Scene')
++    # Gazebo's imported material registry is shared across mesh files.
++    # Reusing "finish" lets the first fixture's texture leak onto later ones.
++    identifiers={item.get('id') for item in root.iter() if item.get('id')}
++    prefix=re.sub(r'[^A-Za-z0-9_]', '_', box.name)+'_'
++    for item in root.iter():
++        for key,value in list(item.attrib.items()):
++            if value in identifiers:item.set(key,prefix+value)
++            elif value.startswith('#') and value[1:] in identifiers:item.set(key,'#'+prefix+value[1:])
++        if item.tag=='init_from' and item.text in identifiers:item.text=prefix+item.text
+     path.parent.mkdir(parents=True,exist_ok=True);ET.ElementTree(root).write(path,encoding='utf-8',xml_declaration=True)
+     return path
+ 
+ 
++def fixture_texture(material,channel,directory):
++    """Ogre texture resource basenames must be unique across architectural maps."""
++    source=asset_directory()/'surfaces'/material/(channel+'.jpg')
++    target=directory/'textures'/(material+'_'+channel+'.jpg')
++    if source.exists() and not target.exists():
++        target.parent.mkdir(parents=True,exist_ok=True)
++        shutil.copy2(source,target)
++    return target
++
++
+ def clothing_color(name,color):
+     # Casual trousers keep their neutral fabric rather than matching every shirt.
+     return (.055,.065,.09) if 'original bottom' in name.lower().replace('_',' ') else color
+@@ -293,6 +313,15 @@ def gazebo_world(scenario,output,environment):
+     for light in list(world.findall('light')):world.remove(light)
+     sun=ET.SubElement(world,'light',name='daylight',type='directional');ET.SubElement(sun,'direction').text='-0.3 0.4 -1';ET.SubElement(sun,'diffuse').text='0.95 0.94 0.9 1'
+     scene=ET.SubElement(world,'scene');ET.SubElement(scene,'ambient').text='.45 .45 .45 1';ET.SubElement(scene,'background').text='.58 .72 .87 1';ET.SubElement(scene,'shadows').text='true'
++    if environment!='courtyard':
++        for i,x in enumerate((0,5,10,15)):
++            light=ET.SubElement(world,'light',name=f'ceiling_panel_{i}',type='point')
++            ET.SubElement(light,'pose').text=f'{x} 0 {3.65 if environment=="office" else 4.65} 0 0 0'
++            ET.SubElement(light,'diffuse').text='0.9 0.85 0.75 1'
++            ET.SubElement(light,'specular').text='0.3 0.3 0.3 1'
++            attenuation=ET.SubElement(light,'attenuation')
++            for key,value in [('range',16),('constant',.6),('linear',.03),('quadratic',.02)]:
++                ET.SubElement(attenuation,key).text=str(value)
+     for actor in world.findall('actor'):
+         spec=cast[actor.get('name')]
+         for element in (actor.find('skin'),actor.find('animation')):ET.SubElement(element,'scale').text=str(spec.scale)
+@@ -317,11 +346,14 @@ def gazebo_world(scenario,output,environment):
+             else:ET.SubElement(ET.SubElement(geometry,'box'),'size').text=' '.join(map(str,box.size))
+             if tag=='visual':
+                 color,rough,metal=PALETTE[box.material];mat=ET.SubElement(item,'material');ET.SubElement(mat,'diffuse').text=' '.join(map(str,(*color,1.)))
++                if box.name.startswith(('LightHousing','CoveLED')):
++                    ET.SubElement(mat,'emissive').text='1 0.94 0.82 1'
+                 texture=root/'surfaces'/box.material
+                 if texture.exists():
+-                    pbr=ET.SubElement(ET.SubElement(mat,'pbr'),'metal');ET.SubElement(pbr,'albedo_map').text=(texture/'Diffuse.jpg').as_uri();
+-                    if (texture/'Rough.jpg').exists():ET.SubElement(pbr,'roughness_map').text=(texture/'Rough.jpg').as_uri()
+-                    if (texture/'nor_gl.jpg').exists():ET.SubElement(pbr,'normal_map').text=(texture/'nor_gl.jpg').as_uri()
++                    pbr=ET.SubElement(ET.SubElement(mat,'pbr'),'metal')
++                    ET.SubElement(pbr,'albedo_map').text=fixture_texture(box.material,'Diffuse',output.parent/'fixtures').as_uri()
++                    if (texture/'Rough.jpg').exists():ET.SubElement(pbr,'roughness_map').text=fixture_texture(box.material,'Rough',output.parent/'fixtures').as_uri()
++                    if (texture/'nor_gl.jpg').exists():ET.SubElement(pbr,'normal_map').text=fixture_texture(box.material,'nor_gl',output.parent/'fixtures').as_uri()
+     for prop in props:
+         link=model(prop.name,prop.position,prop.yaw)
+         for tag in ('visual','collision') if prop.collision else ('visual',):
+diff --git a/src/ridgeback_leader_follow/sim/assets/realistic/props/tree_small_02/conversion.json b/src/ridgeback_leader_follow/sim/assets/realistic/props/tree_small_02/conversion.json
+index 021720c..ab69108 100644
+--- a/src/ridgeback_leader_follow/sim/assets/realistic/props/tree_small_02/conversion.json
++++ b/src/ridgeback_leader_follow/sim/assets/realistic/props/tree_small_02/conversion.json
+@@ -14,11 +14,12 @@
+     4.2956061363220215,
+     4.564810276031494
+   ],
+-  "vertices": 402004,
++  "vertices": 402003,
+   "triangles": 180000,
++  "removed_loose_edges": 87895,
+   "sha256": {
+-    "mesh.npz": "038ad01a92d84c381a3a1a7fec5f94fcac008c5f6fd307848f063d54c4aacd76",
+-    "model.dae": "b45faa900fb2e54833d6586d5dd31db07ca4ec3a0aae7849400798cc8a72e470",
++    "mesh.npz": "49f5fd17fb63b11788d4be223d06a5229b7af10c0ae944c38423a9ff56accfb8",
++    "model.dae": "9e906b4712c8c64a56cbd285356e53aed8a859f76e687cb4d9548ee86125e77a",
+     "materials.json": "31ba67376764334c850bb9614896c70616478055ca745aec5803e0a048b3ce77"
+   }
+ }
+diff --git a/src/ridgeback_leader_follow/sim/assets/realistic/props/tree_small_02/mesh.npz b/src/ridgeback_leader_follow/sim/assets/realistic/props/tree_small_02/mesh.npz
+index eee0f77..54bd100 100644
+--- a/src/ridgeback_leader_follow/sim/assets/realistic/props/tree_small_02/mesh.npz
++++ b/src/ridgeback_leader_follow/sim/assets/realistic/props/tree_small_02/mesh.npz
+@@ -1,3 +1,3 @@
+ version https://git-lfs.github.com/spec/v1
+-oid sha256:038ad01a92d84c381a3a1a7fec5f94fcac008c5f6fd307848f063d54c4aacd76
+-size 11008281
++oid sha256:49f5fd17fb63b11788d4be223d06a5229b7af10c0ae944c38423a9ff56accfb8
++size 11008272
+diff --git a/src/ridgeback_leader_follow/sim/assets/realistic/props/tree_small_02/model.dae b/src/ridgeback_leader_follow/sim/assets/realistic/props/tree_small_02/model.dae
+index 61f519e..1e2fc14 100644
+--- a/src/ridgeback_leader_follow/sim/assets/realistic/props/tree_small_02/model.dae
++++ b/src/ridgeback_leader_follow/sim/assets/realistic/props/tree_small_02/model.dae
+@@ -1,3 +1,3 @@
+ version https://git-lfs.github.com/spec/v1
+-oid sha256:b45faa900fb2e54833d6586d5dd31db07ca4ec3a0aae7849400798cc8a72e470
+-size 48785226
++oid sha256:9e906b4712c8c64a56cbd285356e53aed8a859f76e687cb4d9548ee86125e77a
++size 47614762
+diff --git a/src/ridgeback_leader_follow/sim/prepare_realistic_assets.py b/src/ridgeback_leader_follow/sim/prepare_realistic_assets.py
+index 66fec5f..e2ffc08 100644
+--- a/src/ridgeback_leader_follow/sim/prepare_realistic_assets.py
++++ b/src/ridgeback_leader_follow/sim/prepare_realistic_assets.py
+@@ -7,6 +7,18 @@ import numpy as np
+ sys.path.insert(0,str(Path(__file__).resolve().parent))
+ 
+ 
++def remove_loose_edges(directory):
++    """Drop wire-only edges: Gazebo draws Collada <lines> as unlit white strokes."""
++    from xml.etree import ElementTree as ET
++    namespace='http://www.collada.org/2005/11/COLLADASchema';ns={'c':namespace}
++    ET.register_namespace('',namespace);tree=ET.parse(directory/'model.dae');removed=0
++    for mesh in tree.findall('.//c:mesh',ns):
++        for primitive in mesh.findall('c:lines',ns)+mesh.findall('c:linestrips',ns):
++            removed+=int(primitive.get('count',0));mesh.remove(primitive)
++    tree.write(directory/'model.dae',encoding='utf-8',xml_declaration=True)
++    return removed
++
++
+ def export_opacity(directory):
+     """Keep the publisher's separate grayscale mask in Collada without repacking pixels."""
+     from xml.etree import ElementTree as ET
+@@ -99,7 +111,8 @@ def main():
+     (directory/'materials.json').write_text(json.dumps(specs,indent=2)+'\n')
+     bpy.ops.wm.collada_export(filepath=str(directory/'model.dae'),include_animations=False,triangulate=True,use_texture_copies=True,export_global_up_selection='Z',apply_global_orientation=False)
+     export_opacity(directory)
+-    receipt={'source':source.name,'max_export_pose_deviation_m':deviation,'source_polygon_count':source_triangles,'triangle_budget':180000 if source_triangles>250000 else None,'blender':bpy.app.version_string,'floor_center_translation':center.tolist(),'dimensions_m':(maximum-minimum).tolist(),'vertices':len(points),'triangles':len(faces),'sha256':{p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in [directory/'mesh.npz',directory/'model.dae',directory/'materials.json']}}
++    loose_edges=remove_loose_edges(directory)
++    receipt={'source':source.name,'max_export_pose_deviation_m':deviation,'source_polygon_count':source_triangles,'triangle_budget':180000 if source_triangles>250000 else None,'blender':bpy.app.version_string,'floor_center_translation':center.tolist(),'dimensions_m':(maximum-minimum).tolist(),'vertices':len(points),'triangles':len(faces),'removed_loose_edges':loose_edges,'sha256':{p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in [directory/'mesh.npz',directory/'model.dae',directory/'materials.json']}}
+     (directory/'conversion.json').write_text(json.dumps(receipt,indent=2)+'\n')
+     print('Prepared static asset',directory.name,receipt,flush=True)
+ 
+diff --git a/src/ridgeback_leader_follow/test/test_realistic_scene.py b/src/ridgeback_leader_follow/test/test_realistic_scene.py
+index 88a4b4b..634fcb2 100644
+--- a/src/ridgeback_leader_follow/test/test_realistic_scene.py
++++ b/src/ridgeback_leader_follow/test/test_realistic_scene.py
+@@ -62,6 +62,27 @@ def test_gazebo_preserves_scenario_paths_and_actor_scales(environment,tmp_path):
+         document=ET.parse(skin);ns={'c':'http://www.collada.org/2005/11/COLLADASchema'}
+         for image in document.findall('.//c:library_images/c:image/c:init_from',ns):
+             assert Path(image.text.removeprefix('file://')).is_file(),image.text
++    ns={'c':'http://www.collada.org/2005/11/COLLADASchema'}
++    material_ids=[]
++    for fixture in (tmp_path.parent/'fixtures').glob('*.dae'):
++        document=ET.parse(fixture)
++        ids={element.get('id') for element in document.iter() if element.get('id')}
++        for element in document.iter():
++            for key in ('url','source','target'):
++                reference=element.get(key,'')
++                if reference.startswith('#'):assert reference[1:] in ids
++        material_ids.extend(material.get('id') for material in document.findall('.//c:library_materials/c:material',ns))
++    assert material_ids and len(material_ids)==len(set(material_ids))
++    texture_paths=[Path(item.text.removeprefix('file://')) for item in world.findall('.//pbr/metal/albedo_map')]
++    by_basename={}
++    for path in texture_paths:
++        assert path.is_file()
++        assert by_basename.setdefault(path.name,path)==path
++        assert path.name!='Diffuse.jpg'
++    if environment!='courtyard':
++        assert len([light for light in world.findall('light') if light.get('type')=='point'])==4
++        luminous=[model for model in world.findall('model') if model.get('name','').startswith(('LightHousing','CoveLED'))]
++        assert luminous and all(model.find('link/visual/material/emissive') is not None for model in luminous)
+     plugin=next(p for p in world.findall('plugin') if p.get('name')=='leader_follow::CrowdMotion')
+     for person,config in zip(scenario.people,plugin.findall('person'),strict=True):
+         assert [w.text for w in config.findall('waypoint')]==[f'{w.time} {w.x} {w.y}' for w in person.waypoints]
+@@ -78,3 +99,14 @@ def test_wall_texture_u_axis_is_horizontal_and_signs_are_not_tiled():
+             assert points[offset+2,2]>points[offset+1,2]
+         sign,_=box_mesh_data(size,repeat=False)
+         assert sign['uv'].min()==0 and sign['uv'].max()==1
++
++
++def test_static_props_have_no_wire_edges_and_textures_resolve():
++    """Gazebo renders Collada <lines> as unlit white strokes (seen as white tree foliage)."""
++    ns={'c':'http://www.collada.org/2005/11/COLLADASchema'}
++    for model in sorted((asset_directory()/'props').glob('*/model.dae')):
++        document=ET.parse(model)
++        assert not document.findall('.//c:lines',ns)+document.findall('.//c:linestrips',ns),model
++        for image in document.findall('.//c:library_images/c:image',ns):
++            reference=image.findtext('c:init_from',namespaces=ns).removeprefix('file://')
++            assert (model.parent/reference).is_file(),(model,reference)

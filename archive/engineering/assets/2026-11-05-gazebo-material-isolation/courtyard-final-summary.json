@@ -1,0 +1,65 @@
+{
+  "scope": "final Gazebo courtyard reruns; scene/sensor gates only",
+  "populations": {
+    "realistic-courtyard-final": [
+      {
+        "backend": "gz",
+        "environment": "courtyard",
+        "scenario": "leader_stop",
+        "crowd_size": 4,
+        "people": 4,
+        "duration": 20.0,
+        "truth_rows": 1600,
+        "maximum_pose_error": 0.0,
+        "status": "passed",
+        "tree_model_dae_sha256": "99aeff77983ee4486460538534cd454f2fd03f4642e5315c8ea5068b7f55cc16",
+        "tree_mesh_npz_sha256": "49f5fd17fb63b11788d4be223d06a5229b7af10c0ae944c38423a9ff56accfb8",
+        "base_revision": "ff7df8b93a561a12c63720374cb8d9288a3dd905"
+      },
+      {
+        "backend": "gz",
+        "environment": "courtyard",
+        "scenario": "crowd",
+        "crowd_size": 8,
+        "people": 9,
+        "duration": 20.0,
+        "truth_rows": 3600,
+        "maximum_pose_error": 0.0,
+        "status": "passed",
+        "tree_model_dae_sha256": "99aeff77983ee4486460538534cd454f2fd03f4642e5315c8ea5068b7f55cc16",
+        "tree_mesh_npz_sha256": "49f5fd17fb63b11788d4be223d06a5229b7af10c0ae944c38423a9ff56accfb8",
+        "base_revision": "ff7df8b93a561a12c63720374cb8d9288a3dd905"
+      }
+    ],
+    "realistic-courtyard-loose-edges": [
+      {
+        "backend": "gz",
+        "environment": "courtyard",
+        "scenario": "leader_stop",
+        "crowd_size": 4,
+        "people": 4,
+        "duration": 20.0,
+        "truth_rows": 1600,
+        "maximum_pose_error": 0.0,
+        "status": "passed",
+        "tree_model_dae_sha256": "9e906b4712c8c64a56cbd285356e53aed8a859f76e687cb4d9548ee86125e77a",
+        "tree_mesh_npz_sha256": "49f5fd17fb63b11788d4be223d06a5229b7af10c0ae944c38423a9ff56accfb8",
+        "base_revision": "ff7df8b93a561a12c63720374cb8d9288a3dd905"
+      },
+      {
+        "backend": "gz",
+        "environment": "courtyard",
+        "scenario": "crowd",
+        "crowd_size": 8,
+        "people": 9,
+        "duration": 20.0,
+        "truth_rows": 3600,
+        "maximum_pose_error": 0.0,
+        "status": "passed",
+        "tree_model_dae_sha256": "9e906b4712c8c64a56cbd285356e53aed8a859f76e687cb4d9548ee86125e77a",
+        "tree_mesh_npz_sha256": "49f5fd17fb63b11788d4be223d06a5229b7af10c0ae944c38423a9ff56accfb8",
+        "base_revision": "ff7df8b93a561a12c63720374cb8d9288a3dd905"
+      }
+    ]
+  }
+}
