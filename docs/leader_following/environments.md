@@ -54,11 +54,9 @@ in front of the stationary robot, so its camera sees people large and from the
 front as well as from behind: the alone route jogs left, turns around and
 returns towards the robot; the passer crosses about 3.5 m ahead, between robot
 and leader; look-alikes walk side by side or swap sides; the leader joins a
-standing group of three; and the crowd follows the explainer page's hall
-choreography: the leader curves away down the hall, a brisk crosser cuts
-between robot and leader, a pair crosses the view, walkers pass the robot on
-both sides, one walker converges towards the leader and two people stand
-chatting. Everyone stays at least 0.8 m apart at
+standing group of three; and the crowd is a busy hall with a fast crosser
+between robot and leader, a slow pair crossing the view, walkers passing the
+robot on both sides and a standing trio. Everyone stays at least 0.8 m apart at
 crowd sizes 2, 4 and 8. The earlier
 realistic worlds keep their recorded routes, which walk at 0.2-0.5 m/s.
 All routes are scripted rather than reactive pedestrian navigation.

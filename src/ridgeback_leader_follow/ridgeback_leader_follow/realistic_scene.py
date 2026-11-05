@@ -115,17 +115,16 @@ def natural_scenario(name,crowd_size,baseline):
         people=(person('lf_leader','leader',((1.6,0.),(5.6,.1))),
                 *(person(f'lf_standing_{i}','bystander',(a,b),pace=.6) for i,(a,b) in enumerate(group)))
     elif name=='crowd':
-        # The explainer page's hall choreography at natural walking speeds: the
-        # leader curves away; a brisk crosser cuts between robot and leader; a
-        # pair crosses the view; walkers pass the robot on both sides; one walker
-        # converges towards the leader; two people stand chatting. Larger sizes
-        # add people in this order; everyone stays at least 0.8 m apart.
-        cast=(((7.1,-3.4),(7.1,0.),(7.2,4.1)),4.8,1.3),(((19.,2.1),(2.5,2.1),(.6,3.3)),.1,1.1),\
-             (((12.2,-3.4),(12.2,3.6)),3.,.85),(((13.2,-3.4),(13.2,3.6)),3.,.85),\
-             (((21.,-1.6),(15.,-.7)),6.7,1.),(((19.,-1.6),(2.4,-1.3),(1.,-2.6)),1.3,1.1),\
-             (((15.9,3.3),(15.6,3.6)),0.,.5),(((16.7,4.2),(16.4,3.9)),0.,.5)
-        people=(person('lf_leader','leader',((1.4,0.),(6.4,0.),(10.,.7),(14.2,1.),(17.4,.5),(19.4,-.1)),pace=1.05),
-                *(person(f'lf_crowd_{i}','bystander',points,start=start,pace=pace) for i,(points,start,pace) in enumerate(cast[:crowd_size])))
+        # A busy hall: a fast crosser between robot and leader, a slow pair
+        # crossing the view, walkers passing the robot on both sides and a
+        # standing trio. Start times keep everyone at least 0.8 m apart.
+        lanes=(((3.6,-4.),(3.8,4.)),((13.,-1.1),(2.4,-1.),(1.2,-2.6)),
+               ((6.9,4.),(6.6,-4.)),((7.75,4.1),(7.45,-3.9)),((13.5,2.7),(2.4,2.2),(1.,3.6)),
+               ((9.7,-3.),(9.4,-2.65)),((10.5,-3.4),(10.3,-3.)),((10.75,-1.8),(10.5,-2.1)))
+        starts=(2.4,2.5,7.5,7.5,1.5,0.,0.,0.)
+        paces=(1.35,1.15,.8,.8,1.1,.5,.5,.5)
+        people=(person('lf_leader','leader',((1.6,0.),(6.,0.),(8.5,1.2),(11.,1.)),pace=1.05),
+                *(person(f'lf_crowd_{i}','bystander',lanes[i],start=starts[i],pace=paces[i]) for i in range(crowd_size)))
     else:
         raise ValueError('Unknown scenario '+name)
     return CrowdScenario(name,20.,people)

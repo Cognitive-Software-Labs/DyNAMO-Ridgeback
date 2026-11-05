@@ -202,5 +202,5 @@ def test_modern_office_people_pass_close_to_but_clear_of_the_robot():
     for name in SCENARIOS:
         scenario=load_scenario(name,8,'modern_office')
         distances=[np.hypot(*p.sample(t)[:2]) for p in scenario.people for t in times]
-        assert min(distances)>1.3 and min(distances)<2.5,name
-        assert max(np.hypot(*p.sample(t)[:2]) for p in scenario.people for t in times)<22.,name
+        assert min(distances)>1.4 and min(distances)<2.5,name
+        assert max(np.hypot(*p.sample(t)[:2]) for p in scenario.people for t in times)<15.,name
