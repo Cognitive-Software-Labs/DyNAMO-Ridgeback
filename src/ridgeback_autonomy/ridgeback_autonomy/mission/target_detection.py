@@ -15,6 +15,12 @@ HUMANOID_LABEL = 'humanoid robot'
 ORIGINAL_G1_DETECTION_THRESHOLD = 0.50
 DETECTION_VOTE_WINDOW_SIZE = 5
 DETECTION_VOTE_REQUIRED = 3
+# Relocalizing a G1 that was already confirmed and localized may use weaker views of
+# the same label: OWLv2 scores a side-on Gazebo G1 at 0.49-0.55, deterministically
+# per static view, while Gazebo's walking person scored at most 0.19 and nothing
+# else above 0.22 (2026-11-05). The localization adapter keeps such a view only
+# near the known G1 position.
+RELOCALIZATION_DETECTION_THRESHOLD = 0.40
 
 
 @dataclass(frozen=True)
@@ -86,7 +92,17 @@ class TargetDetectionAdapter:
         self._votes.clear()
         self._last_stamp_ns = None
 
-    def observe(self, msg: TargetDetections) -> TargetDetectionResult:
+    def observe(
+        self,
+        msg: TargetDetections,
+        *,
+        minimum_score: float | None = None,
+    ) -> TargetDetectionResult:
+        """Validate and vote; ``minimum_score`` overrides the floor for this frame only."""
+
+        floor = self.minimum_score if minimum_score is None else float(minimum_score)
+        if not math.isfinite(floor) or not 0.0 <= floor <= 1.0:
+            raise ValueError('minimum_score must be finite and within [0, 1]')
         stamp_ns = stamp_to_nanoseconds(msg.header.stamp)
         if self._last_stamp_ns is not None and stamp_ns < self._last_stamp_ns:
             return self._result_without_vote(
@@ -102,7 +118,7 @@ class TargetDetectionAdapter:
             )
 
         self._last_stamp_ns = stamp_ns
-        selected = self._select_relevant_candidate(candidates)
+        selected = self._select_relevant_candidate(candidates, floor)
         positive = selected is not None
         self._votes.append(positive)
         window = tuple(self._votes)
@@ -179,12 +195,13 @@ class TargetDetectionAdapter:
     def _select_relevant_candidate(
         self,
         candidates: list[TargetDetectionCandidate],
+        floor: float,
     ) -> TargetDetectionCandidate | None:
         relevant = (
             candidate
             for candidate in candidates
             if self._normalize_label(candidate.label) in self.target_labels
-            and candidate.score >= self.minimum_score
+            and candidate.score >= floor
         )
         return max(relevant, key=lambda candidate: candidate.score, default=None)
 

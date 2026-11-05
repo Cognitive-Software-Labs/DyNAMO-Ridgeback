@@ -14,6 +14,13 @@ LPID=$!
   export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp ROS_DOMAIN_ID=83 ROS_LOCALHOST_ONLY=1 CYCLONEDDS_URI="file://$PWD/install/ridgeback_autonomy/share/ridgeback_autonomy/config/parking_demo_cyclonedds.xml"
   exec ros2 bag record -s mcap -o "$D/bag" /r100_0001/parking_mission/state /r100_0001/parking/visualization /r100_0001/plan /r100_0001/map /r100_0001/detections/target/raw /r100_0001/measurements/target/mask > "$D/bag_record.log" 2>&1 ) & RPID=$!
 [ "$B" = gz ] && { python3 "$P/truth_track.py" "$D" & TPID=$!; }
+# FRAMES=1 also keeps camera frames (FRAMES_PERIOD s apart, FRAMES_EXT jpg about 50 KB or lossless png) for detector review.
+# The saver records its own PID (frame_saver.pid) so the stop below reaches exactly it.
+if [ "${FRAMES:-0}" = 1 ]; then
+  ( until [ -s "$D/console.log" ]; do timeout 1 tail -n0 -f /dev/null; done; source install/setup.bash
+    export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp ROS_DOMAIN_ID=83 ROS_LOCALHOST_ONLY=1 CYCLONEDDS_URI="file://$PWD/install/ridgeback_autonomy/share/ridgeback_autonomy/config/parking_demo_cyclonedds.xml"
+    exec python3 "$P/frame_saver.py" "$D/frames" "${FRAMES_PERIOD:-1}" "${FRAMES_EXT:-jpg}" ) &
+fi
 shot() {  # RViz and Gazebo windows of this session only
   for name in rviz2 ruby python kit; do
     for pid in $(ps -eo pid=,sid=,comm= | awk -v s=$LPID -v n=$name '$2==s && index($3,n)==1 {print $1}'); do
@@ -32,6 +39,8 @@ done
 timeout 3 tail -n0 -f /dev/null; shot "END_$result"
 kill -TERM $RPID 2>/dev/null; pkill -TERM -P $RPID 2>/dev/null; timeout 30 tail --pid=$RPID -f /dev/null
 [ -n "$TPID" ] && kill $TPID 2>/dev/null
+if [ -s "$D/frame_saver.pid" ]; then FPID=$(cat "$D/frame_saver.pid")
+  kill -TERM "$FPID" 2>/dev/null; timeout 10 tail --pid="$FPID" -f /dev/null; kill -KILL "$FPID" 2>/dev/null; fi
 kill -TERM -- -$LPID 2>/dev/null
 for k in $(seq 60); do ps -eo sid= | awk -v g=$LPID '$1==g' | grep -q . || break; timeout 1 tail -n0 -f /dev/null; done
 ps -eo sid= | awk -v g=$LPID '$1==g' | grep -q . && kill -KILL -- -$LPID 2>/dev/null

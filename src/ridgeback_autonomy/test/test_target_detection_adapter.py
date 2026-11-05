@@ -207,3 +207,18 @@ def test_reset_starts_a_fresh_search_cycle() -> None:
 
     assert result.message_valid
     assert result.vote_window == (True,)
+
+
+def test_a_per_frame_floor_admits_a_weaker_view_without_changing_the_default() -> None:
+    from ridgeback_autonomy.mission.target_detection import (
+        RELOCALIZATION_DETECTION_THRESHOLD,
+    )
+
+    detector = TargetDetectionAdapter()
+    weak = detector.observe(humanoid_message(1, score=0.45),
+                            minimum_score=RELOCALIZATION_DETECTION_THRESHOLD)
+    assert weak.positive and weak.selected.score == pytest.approx(0.45)
+    # The next frame without an override uses the original G1 floor again.
+    assert not detector.observe(humanoid_message(2, score=0.45)).positive
+    assert not detector.observe(humanoid_message(3, score=0.39),
+                                minimum_score=RELOCALIZATION_DETECTION_THRESHOLD).positive

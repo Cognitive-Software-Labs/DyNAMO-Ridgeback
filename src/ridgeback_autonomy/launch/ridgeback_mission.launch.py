@@ -26,6 +26,8 @@ from launch_ros.actions import Node
 
 from ridgeback_autonomy.mission.parking_rviz import parking_layout
 from ridgeback_autonomy.mission.simulation_config import demo_world, simulation_setup_path
+from ridgeback_autonomy.mission.target_detection import RELOCALIZATION_DETECTION_THRESHOLD
+from ridgeback_common.detector_config import DETECTION_THRESHOLD_DEFAULT
 
 
 def _reject_conflicting_handoff(context):
@@ -183,6 +185,19 @@ def generate_launch_description():
         DeclareLaunchArgument('localization_mode', default_value='local'),
         DeclareLaunchArgument('estimators', default_value='all'),
         DeclareLaunchArgument('detector_debug', default_value='false'),
+        # The detector publishes down to the relocalization floor; the mission
+        # still confirms and first localizes G1 at its original 0.50 floor and
+        # keeps weaker views only near the known G1. The generic 0.55 cut Gazebo
+        # G1 views scoring 0.49-0.55 (archive/engineering/
+        # 2026-11-05-parking-detection-gaps.md). External localization refuses
+        # local detector overrides, so it keeps the generic default.
+        DeclareLaunchArgument(
+            'detection_threshold',
+            default_value=PythonExpression([
+                "'", str(RELOCALIZATION_DETECTION_THRESHOLD), "' if '",
+                LaunchConfiguration('localization_mode'), "' == 'local' else '",
+                str(DETECTION_THRESHOLD_DEFAULT), "'"]),
+            description='Detector confidence floor; the relocalization floor in local mode'),
         DeclareLaunchArgument(
             'slam_source', default_value='merged',
             choices=['front_only', 'merged'],
@@ -250,6 +265,7 @@ def generate_launch_description():
                 'base_frame': LaunchConfiguration('robot_base_frame'),
                 'estimators': LaunchConfiguration('estimators'),
                 'detector_debug': LaunchConfiguration('detector_debug'),
+                'detection_threshold': LaunchConfiguration('detection_threshold'),
                 'gz_gui': LaunchConfiguration('gz_gui'),
                 'headless_rendering': LaunchConfiguration('headless_rendering'),
                 'headless': LaunchConfiguration('headless'),

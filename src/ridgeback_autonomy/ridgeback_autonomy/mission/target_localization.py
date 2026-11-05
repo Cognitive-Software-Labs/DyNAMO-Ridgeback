@@ -194,7 +194,15 @@ class TargetLocalizationAdapter:
         *,
         association: TargetAssociation,
         now_ns: int,
+        known_target: tuple[float, float] | None = None,
+        weak_minimum_score: float | None = None,
     ) -> TargetLocalizationResult:
+        """Accept one associated measurement.
+
+        When relocalizing an already localized target, ``known_target`` (map x, y)
+        and ``weak_minimum_score`` admit a detection scoring below ``minimum_score``
+        only if its position lies within ``max_sample_jump_m`` of the known target.
+        """
         stamp_ns = stamp_to_nanoseconds(msg.header.stamp)
         if self._stabilized is not None:
             return self._result(
@@ -214,7 +222,9 @@ class TargetLocalizationAdapter:
         ):
             return self._result(stamp_ns, reason='nonincreasing_timestamp')
 
-        indices, invalid_reason = self._matching_indices(msg, association)
+        weak = known_target is not None and weak_minimum_score is not None
+        floor = min(self.minimum_score, float(weak_minimum_score)) if weak else self.minimum_score
+        indices, invalid_reason = self._matching_indices(msg, association, floor)
         if invalid_reason is not None:
             return self._result(stamp_ns, reason=invalid_reason)
         if len(indices) != 1:
@@ -306,6 +316,17 @@ class TargetLocalizationAdapter:
         # even if the stabilization jump gate rejects its coordinates below.
         self._last_processed_stamp_ns = stamp_ns
 
+        if weak and float(msg.scores[index]) < self.minimum_score and math.hypot(
+            map_x_m - float(known_target[0]), map_y_m - float(known_target[1]),
+        ) > self.max_sample_jump_m:
+            return self._result(
+                stamp_ns,
+                reason='weak_detection_away_from_known_target',
+                message_valid=True,
+                observation=observation,
+                source_failures=failures,
+            )
+
         source_samples = self._samples_by_source[measurement.source]
         if source_samples:
             center_x = float(median(sample.map_x_m for sample in source_samples))
@@ -350,6 +371,7 @@ class TargetLocalizationAdapter:
         self,
         msg: TargetMeasurements,
         association: TargetAssociation,
+        minimum_score: float,
     ) -> tuple[list[int], str | None]:
         count = int(msg.count)
         width = int(msg.image_width)
@@ -391,7 +413,7 @@ class TargetLocalizationAdapter:
                 return [], 'invalid_score'
             if (
                 self._normalize_label(msg.labels[index]) == association_label
-                and score >= self.minimum_score
+                and score >= minimum_score
                 and self._same_bbox(bbox, association_bbox)
             ):
                 matches.append(index)

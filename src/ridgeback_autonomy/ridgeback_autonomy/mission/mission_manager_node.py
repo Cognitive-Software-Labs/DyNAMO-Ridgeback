@@ -58,6 +58,7 @@ from ridgeback_localization.contracts import (
     RAW_DETECTIONS_TOPIC,
 )
 from ridgeback_autonomy.mission.target_detection import (
+    RELOCALIZATION_DETECTION_THRESHOLD,
     TargetDetectionAdapter,
     TargetDetectionCandidate,
 )
@@ -592,6 +593,8 @@ class MissionManagerNode(Node):
         self._failed_sides = set()        # classes shown blocked as a whole
         self._last_veto_xy = None
         self._retry_after_stop = False
+        # The observation fallback waits for a cancelled turn to be released first.
+        self._observation_after_release = False
         self._g1_best_planned_rank = PREFERENCE_RANKS
         self._plan_rays_grid = None
         self.target_heading = None
@@ -934,7 +937,15 @@ class MissionManagerNode(Node):
                 )
                 return
 
-            result = self.detection_adapter.observe(msg)
+            # Search and the first localization keep the G1 floor; relocalizing a
+            # localized G1 may associate weaker views, gated by position below.
+            result = self.detection_adapter.observe(
+                msg,
+                minimum_score=(
+                    RELOCALIZATION_DETECTION_THRESHOLD
+                    if self.target_position is not None else None
+                ),
+            )
             if not result.message_valid:
                 self._record_recoverable('invalid_detection', result.reason)
                 return
@@ -1018,6 +1029,7 @@ class MissionManagerNode(Node):
                 )
                 return
 
+            known = self.target_position
             result = self.localization_adapter.observe(
                 msg,
                 association=association,
@@ -1025,6 +1037,12 @@ class MissionManagerNode(Node):
                     self.get_clock().now().nanoseconds
                     if now_ns is None
                     else int(now_ns)
+                ),
+                known_target=(
+                    None if known is None else (known.map_x_m, known.map_y_m)
+                ),
+                weak_minimum_score=(
+                    None if known is None else RELOCALIZATION_DETECTION_THRESHOLD
                 ),
             )
             if not result.accepted:
@@ -1112,6 +1130,7 @@ class MissionManagerNode(Node):
             self._parking_attempts, self._failed_bearings = 0, []
             self._failed_labels, self._failed_sides, self._last_veto_xy = [], set(), None
             self._retry_after_stop = False
+            self._observation_after_release = False
             self._plan_rays_grid = None
             self._depth_frames.clear()
             self._observation_pose = self._observation_goal = None
@@ -1414,6 +1433,10 @@ class MissionManagerNode(Node):
         if (self.state == MissionState.RETURNING_TO_OBSERVATION or self._transition(
                 MissionState.RETURNING_TO_OBSERVATION,
                 f'{reason}; returning to the G1 observation pose')):
+            if self._nav_goal_generation is not None:
+                # The cancelled turn is still Nav2's: send nothing until it is released.
+                self._observation_after_release = True
+                return
             self._set_goal_tolerance(self.observation_tolerance, self._send_observation_goal)
 
     def _start_localization(self, reason: str) -> None:
@@ -2440,6 +2463,10 @@ class MissionManagerNode(Node):
             self._settle_before_return()
         if self.state == MissionState.RETURNING_TO_OBSERVATION and self._retry_after_stop:
             self._settle_before_return()
+        elif (self.state == MissionState.RETURNING_TO_OBSERVATION
+              and self._observation_after_release):
+            self._observation_after_release = False
+            self._set_goal_tolerance(self.observation_tolerance, self._send_observation_goal)
 
     def _abandon_navigation(self, detail):
         """Fail the current goal while Nav2 may still own it; nothing new drives before release."""

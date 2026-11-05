@@ -459,3 +459,37 @@ def test_detected_and_count_must_be_consistent() -> None:
 
     assert not result.accepted
     assert result.reason == 'inconsistent_detected_count'
+
+
+def _relocalize(localizer, stamp_ns, score, known, lateral=0.2, forward=2.0):
+    msg = measurement_message(
+        stamp_ns=stamp_ns,
+        detections=[('humanoid robot', score, BBOX)],
+        source_values=euclidean_values(lateral=lateral, forward=forward),
+    )
+    return localizer.observe(msg, association=association(stamp_ns), now_ns=stamp_ns,
+                             known_target=known, weak_minimum_score=0.40)
+
+
+def test_a_weak_view_counts_only_near_the_known_target() -> None:
+    # Euclidean (0.2, 2.0) from the front sensor is map (2.25, 0.2) at the identity TF.
+    near = _relocalize(adapter(), 1_000, 0.45, known=(2.5, 0.0))
+    assert near.accepted
+    far = _relocalize(adapter(), 1_000, 0.45, known=(3.5, 0.0))
+    assert not far.accepted
+    assert far.reason == 'weak_detection_away_from_known_target'
+    # Below the relocalization floor nothing is associated at all.
+    assert _relocalize(adapter(), 1_000, 0.39, known=(2.25, 0.2)).reason == (
+        'target_not_associated')
+
+
+def test_a_full_score_view_is_not_position_gated() -> None:
+    # G1 may have moved: a view at the normal floor is accepted wherever it is.
+    assert _relocalize(adapter(), 1_000, 0.60, known=(9.0, 9.0)).accepted
+
+
+def test_without_a_known_target_a_weak_view_is_not_associated() -> None:
+    msg = measurement_message(
+        stamp_ns=1_000, detections=[('humanoid robot', 0.45, BBOX)],
+        source_values=euclidean_values())
+    assert observe(adapter(), msg).reason == 'target_not_associated'

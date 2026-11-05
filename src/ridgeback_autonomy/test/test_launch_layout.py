@@ -119,6 +119,36 @@ def test_parking_demo_maps_both_lidars_on_both_simulators() -> None:
     assert "default_value='front_only'" in slam_argument[:120]
 
 
+def test_parking_detector_publishes_down_to_the_relocalization_floor_in_local_mode() -> None:
+    from launch.actions import DeclareLaunchArgument
+
+    from ridgeback_autonomy.mission.target_detection import (
+        ORIGINAL_G1_DETECTION_THRESHOLD,
+        RELOCALIZATION_DETECTION_THRESHOLD,
+        TargetDetectionAdapter,
+    )
+    from ridgeback_common.detector_config import DETECTION_THRESHOLD_DEFAULT
+
+    description = _mission_launch_module().generate_launch_description()
+    (argument,) = [entity for entity in description.entities
+                   if isinstance(entity, DeclareLaunchArgument)
+                   and entity.name == 'detection_threshold']
+
+    def default(mode):
+        context = _launch_context(localization_mode=mode)
+        return float(''.join(s.perform(context) for s in argument.default_value))
+
+    assert default('local') == RELOCALIZATION_DETECTION_THRESHOLD == 0.40
+    # Search confirmation and first localization keep the original G1 floor.
+    assert TargetDetectionAdapter().minimum_score == ORIGINAL_G1_DETECTION_THRESHOLD == 0.50
+    # External localization refuses local overrides, so it keeps the generic default.
+    assert default('external') == DETECTION_THRESHOLD_DEFAULT
+    mission_text = (
+        _package_root() / 'launch' / 'ridgeback_mission.launch.py'
+    ).read_text(encoding='utf-8')
+    assert "'detection_threshold': LaunchConfiguration('detection_threshold')" in mission_text
+
+
 def test_exploration_and_stationary_mock_cannot_run_together() -> None:
     import pytest
 

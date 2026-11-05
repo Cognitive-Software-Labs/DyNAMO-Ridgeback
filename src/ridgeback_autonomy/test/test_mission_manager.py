@@ -778,3 +778,38 @@ def test_future_planning_input_is_a_technical_failure(manager_factory, source):
     assert manager.last_issue.code == 'parking_inputs_invalid'
     assert f'{source}_from_future' in manager.last_issue.reason
     assert manager.parking_plan is None
+
+
+def _weak_frame(manager, stamp_ns, score=0.45):
+    manager.process_detection(detection(stamp_ns, score=score))
+    msg = measurement(stamp_ns)
+    msg.scores = [score]
+    manager.process_measurement(msg, now_ns=stamp_ns)
+
+
+def test_first_localization_keeps_the_g1_floor(manager_factory):
+    manager = manager_factory(
+        pause_client=FakePauseClient(trigger_response(True, 'safe')),
+    )
+    enter_localization(manager)
+    for offset in range(5):
+        _weak_frame(manager, 4_000_000_000 + offset)
+    assert manager.state == MissionState.LOCALIZE_G1
+    assert manager.target_position is None
+
+
+def test_relocalization_accepts_weak_views_at_the_known_g1(manager_factory):
+    manager = manager_factory(
+        pause_client=FakePauseClient(trigger_response(True, 'safe')),
+    )
+    enter_localization(manager)
+    localize(manager)
+    known = manager.target_position
+    # Relocalizing: LOCALIZE_G1 again with the earlier position still known.
+    manager.state = MissionState.LOCALIZE_G1
+    manager.localization_adapter.reset()
+    for offset in range(5):
+        _weak_frame(manager, 5_000_000_000 + offset)
+    assert manager.state == MissionState.G1_LOCALIZED
+    assert manager.target_position is not known
+    assert manager.target_position.map_x_m == pytest.approx(known.map_x_m)

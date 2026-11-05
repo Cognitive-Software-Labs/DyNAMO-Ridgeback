@@ -548,6 +548,25 @@ def test_failed_turn_toward_g1_falls_back_to_the_observation_pose(manager_factor
     assert m.state == MissionState.SETTLING_MOTION
 
 
+def test_a_timed_out_turn_is_released_before_the_observation_fallback_drives(manager_factory):
+    # 2026-11-05 no_feasible: the fallback goal was sent while Nav2 still owned the
+    # cancelled turn, so the guard against competing goals ended the mission.
+    m = finish_round_away_from_the_observation_pose(manager_factory)
+    answer(m._goal_checker_set_client)
+    _, accepted, handle = m.navigation_client.calls[-1]
+    accepted.set_result(handle)
+    m._monotonic.value += m.parking_navigation_timeout_s + 1.0
+    m.tick()
+    assert handle.cancels == 1
+    assert m.state == MissionState.RETURNING_TO_OBSERVATION
+    m.tick()
+    assert len(m.navigation_client.calls) == 1                   # nothing while the turn is owned
+    release(handle)
+    assert back_at_observation(m) == pytest.approx((1.0, 2.0, 0.25))
+    assert m.state == MissionState.SETTLING_MOTION
+    assert len(m.navigation_client.calls) == 2
+
+
 def test_g1_too_close_for_the_camera_returns_to_the_observation_pose(manager_factory):
     m = exploring_manager(manager_factory)
     t = m.target_position
