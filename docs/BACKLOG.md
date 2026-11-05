@@ -229,8 +229,8 @@ them. Validate G1's reach into the opening before changing the 0.30-0.60 m band.
 when G1 stood side-on to the robot or close to tall objects, against 28-36% with
 open surroundings. Localization then saw no detection in its 5 s window and the
 mission ended `MISSION_FAILED` before planning, without driving. Retry
-relocalization can time out the same way. See the
-[scenario record](../archive/engineering/2026-11-05-parking-scenarios.md).
+relocalization can time out the same way. The 2026-11-05 parking scenario record
+under archived evidence holds the runs.
 
 **Completion criteria.** Measure detection recall over G1 headings and nearby
 objects in both simulators, decide whether detection or the localization
@@ -304,6 +304,7 @@ in the reference that owns the fact or moved to the item that owns the work.
 
 ## Archived evidence
 
+- [Parking scenarios](../archive/engineering/2026-11-05-parking-scenarios.md) — G1 detection rates by layout and heading, and the localization timeouts they caused.
 - [LiDAR/closed-loop SLAM qualification](../archive/engineering/2026-09-17-isaac-lidar-qualification.md)
 - [paired results and interpretation](../archive/engineering/2026-09-17-isaac-lidar-qualification.md#interpretation)
 - [Isaac port history](../archive/engineering/port-history.md#lidars-detached-from-the-articulation-2026-09-11)

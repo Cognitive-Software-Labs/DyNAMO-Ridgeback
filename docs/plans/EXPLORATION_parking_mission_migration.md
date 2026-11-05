@@ -448,3 +448,5 @@ TF or changing estimator validation.
   — side-first priorities, the body-axis reach correction, and the open leg-clearance limit.
 - [Parking retries and reliability](../../archive/engineering/2026-11-05-parking-retries-and-reliability.md)
   — retry side selection, obstacles above the LiDAR plane, and Gazebo success by revision.
+- [Parking scenarios](../../archive/engineering/2026-11-05-parking-scenarios.md)
+  — blocked sides, tables, rear and front parking, G1 headings, and detection limits.

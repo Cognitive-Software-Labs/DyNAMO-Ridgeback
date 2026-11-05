@@ -5,8 +5,8 @@ scene tests one part of the existing mission: the G1-relative preference order,
 blocked sides, obstacles above the LiDAR plane, a scene with no safe pose, and
 G1 headings. The mission, planner and safety checks are the same in every scene;
 only the spawned objects differ. Results are in the
-[scenario gallery](autonomous_parking_gallery.html) and the dated
-[scenario record](../../archive/engineering/2026-11-05-parking-scenarios.md).
+[scenario gallery](autonomous_parking_gallery.html) and the dated record under
+[archived evidence](#archived-evidence).
 
 ## Running a scenario
 
@@ -109,3 +109,7 @@ and map; scans are not recorded.
   and a retry moves to another side.
 - G1 localization can time out in Gazebo before any parking attempt.
 - One run per scenario shows behaviour, not a rate.
+
+## Archived evidence
+
+- [Parking scenarios](../../archive/engineering/2026-11-05-parking-scenarios.md) — every run by scenario and simulator, the provisional basket, and the layouts stopped by G1 detection.

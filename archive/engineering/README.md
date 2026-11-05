@@ -43,6 +43,7 @@ are excluded from ordinary repository search and the generated knowledge graph.
 - [Parking rays and G1 heading](2026-11-01-parking-rays-and-g1-heading.md) — rays judged at their own poses; G1 heading from depth, measured against ground truth; front and rear parking missions.
 - [Parking beside G1](2026-11-02-parking-beside-g1.md) — left and right first, the body-axis reach correction, leg clearance, and the runs that failed on the way.
 - [Parking retries and reliability](2026-11-05-parking-retries-and-reliability.md) — retry side selection, obstacles above the LiDAR plane, left-right motion, and Gazebo success by revision.
+- [Parking scenarios](2026-11-05-parking-scenarios.md) — named G1 scenes in Gazebo and Isaac, the provisional basket, and the G1 detection limit that stopped some layouts before planning.
 - [Parking demonstration complete](2026-10-30-parking-demo-complete.md) — the remaining-route fix, merged SLAM on Isaac, and complete Gazebo and Isaac missions with Gazebo ground-truth reach and error.
 - [Gazebo pre-parking veto](2026-10-30-gazebo-parking-route-veto.md) — the checked route, Nav2's executed plans and the driven trajectory agree; the veto came from the -45° LiDAR seam bin's phantom returns.
 - [Gazebo G1 reacquisition](2026-10-30-gazebo-g1-reacquisition.md) — OWLv2 scores of the visible G1 around the observation pose, the precise observation return, and the run that relocalized and then met a LiDAR veto on a real obstacle.
