@@ -534,3 +534,57 @@ def test_relocalization_failing_during_a_retry_returns_home(manager_factory, mon
     m.tick()
     assert m.state == MissionState.RETURNING_TO_START
     assert 'target_localization_timeout' in m._parking_failure
+
+
+
+def facing_left_side(m):
+    """The plan's G1 heading puts the failed pose on G1's left (relative bearing +90 degrees)."""
+    from dataclasses import replace
+    sel = m.parking_plan.selected
+    bearing = math.atan2(sel.task_y - m.parking_plan.target.y, sel.task_x - m.parking_plan.target.x)
+    m.parking_plan.target = replace(m.parking_plan.target, facing_yaw_rad=bearing - math.pi / 2)
+    sel.preference_label = 'g1_left'
+    m.target_heading = SimpleNamespace(yaw_rad=bearing - math.pi / 2, support_points=1, inlier_fraction=1)
+    m._observe_target_body = lambda: None          # keep this heading through relocalization
+    return m.parking_plan.target
+
+
+def relocalized(m, handle):
+    stopped(m, handle)
+    back_at_observation(m)
+    hold_still(m)
+    m.tick()
+    m.test_ros_ns = m.tf_buffer.stamp_ns = m.test_ros_ns + 10
+    localize(m, first_stamp_ns=m.test_ros_ns - 4)
+    from ridgeback_autonomy.mission.parking_planner import preference
+    side = lambda c: preference(c.task_x, c.task_y, m.parking_plan.target, None)[1]
+    return {side(c) for c in m.parking_plan.candidates if c.status == 'valid'}
+
+
+@pytest.mark.parametrize('veto_on_g1,side_excluded', [(True, True), (False, False)],
+                         ids=['veto_on_g1_body', 'veto_elsewhere'])
+def test_a_failure_on_g1s_body_moves_the_retry_to_another_side(manager_factory, monkeypatch,
+                                                                 veto_on_g1, side_excluded):
+    m, published = feasible(manager_factory, monkeypatch, attempts=3)
+    aim_camera(m)
+    t = facing_left_side(m)
+    answer(m._goal_checker_set_client)
+    _, accepted, handle = m.navigation_client.calls[-1]
+    accepted.set_result(handle)
+    m._last_veto_xy = (t.x + 0.2, t.y) if veto_on_g1 else (t.x + 1.5, t.y + 1.5)
+    m._parking_navigation_failed('lidar_clearance: lidar_obstacle_in_stopping_path', stop_first=True)
+    assert (m._failed_sides == {'g1_left'}) == side_excluded
+    sides = relocalized(m, handle)
+    assert sides                                               # other safe poses remain
+    assert ('g1_left' in sides) != side_excluded
+
+
+def test_a_second_failure_on_the_same_side_excludes_it(manager_factory, monkeypatch):
+    m, handle, _, _ = vetoed(manager_factory, monkeypatch)
+    m._failed_labels = ['g1_left']
+    m._retry_after_stop = False
+    m.state = MissionState.NAVIGATING_TO_PARKING
+    m.parking_plan.selected = next(c for c in m.parking_plan.candidates if c.clearance_m is not None)
+    m.parking_plan.selected.preference_label = 'g1_left'
+    m._parking_navigation_failed('lidar_clearance: lidar_obstacle_on_route', stop_first=True)
+    assert m._failed_sides == {'g1_left'}

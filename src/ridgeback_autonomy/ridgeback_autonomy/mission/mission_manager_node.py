@@ -68,7 +68,7 @@ from ridgeback_autonomy.mission.target_localization import (
 )
 from ridgeback_autonomy.mission.target_orientation import (
     combined_axis, combined_estimate, depth_metres, depth_to_map_points, estimate_body_axis,
-    estimate_target_yaw, occupied_cells, overhead_obstacle_points,
+    G1_BODY_RADIUS_M, estimate_target_yaw, occupied_cells, overhead_obstacle_points,
 )
 from ridgeback_autonomy.mission.parking_planner import (
     GridSnapshot,
@@ -588,6 +588,9 @@ class MissionManagerNode(Node):
             float(self.get_parameter('parking_retry_exclusion_deg').value))
         self._parking_attempts = 0
         self._failed_bearings = []
+        self._failed_labels = []          # preference class of every failed attempt
+        self._failed_sides = set()        # classes shown blocked as a whole
+        self._last_veto_xy = None
         self._retry_after_stop = False
         self._g1_best_planned_rank = PREFERENCE_RANKS
         self._plan_rays_grid = None
@@ -1107,6 +1110,7 @@ class MissionManagerNode(Node):
             self._overhead_points = None
             self._g1_best_planned_rank = PREFERENCE_RANKS
             self._parking_attempts, self._failed_bearings = 0, []
+            self._failed_labels, self._failed_sides, self._last_veto_xy = [], set(), None
             self._retry_after_stop = False
             self._plan_rays_grid = None
             self._depth_frames.clear()
@@ -1550,6 +1554,7 @@ class MissionManagerNode(Node):
             'g1_exploration': self.g1_exploration_result,
             'parking_attempts': self._parking_attempts,
             'failed_parking_bearings_deg': [round(math.degrees(b), 1) for b in self._failed_bearings],
+            'failed_parking_sides': sorted(self._failed_sides),
             'g1_heading': None if self.target_heading is None else {
                 'yaw_rad': round(self.target_heading.yaw_rad, 3),
                 'support_points': self.target_heading.support_points,
@@ -2579,6 +2584,15 @@ class MissionManagerNode(Node):
             return False
         sel = plan.selected
         self._failed_bearings.append(math.atan2(sel.task_y - plan.target.y, sel.task_x - plan.target.x))
+        # A whole side is shown blocked only by G1's own body there, or by a second failure on
+        # it; any other failure only rules out the nearby directions.
+        label = sel.preference_label or ''
+        on_body = (self._last_veto_xy is not None and math.hypot(
+            self._last_veto_xy[0] - plan.target.x, self._last_veto_xy[1] - plan.target.y) <= G1_BODY_RADIUS_M)
+        if label.startswith('g1_') and (on_body or label in self._failed_labels):
+            self._failed_sides.add(label)
+        self._failed_labels.append(label)
+        self._last_veto_xy = None
         self.get_logger().warning(
             f'Parking attempt {self._parking_attempts}/{self.parking_max_attempts} failed: {reason}; '
             'stopping, then relocalizing G1 for another direction')
@@ -2634,6 +2648,14 @@ class MissionManagerNode(Node):
                     abs(normalize_angle(bearing - failed)) <= self.parking_retry_exclusion_rad
                     for failed in self._failed_bearings):
                 c.status, c.reason = 'rejected', 'failed_attempt_direction'
+        # A side shown blocked as a whole goes behind every other side with a valid pose.
+        if self._failed_sides and plan.target.facing_yaw_rad is not None:
+            label = lambda c: preference(c.task_x, c.task_y, plan.target, None)[1]
+            valid = [c for c in plan.candidates if c.status in ('valid', 'selected')]
+            if any(label(c) not in self._failed_sides for c in valid):
+                for c in valid:
+                    if label(c) in self._failed_sides:
+                        c.status, c.reason = 'rejected', 'failed_attempt_side'
         if not any(c.status in ('valid', 'selected') for c in plan.candidates):
             plan.ok, plan.selected = False, None
             plan.failure_reason = plan.failure_reason or 'no_valid_candidate'
@@ -2692,12 +2714,14 @@ class MissionManagerNode(Node):
             f' G1 gap {result.g1_gap_m if result.g1_gap_m is None else round(result.g1_gap_m, 3)} m)')
         self.get_logger().error(f'Parking LiDAR veto in {self.state.name}: {reason}{detail}')
         robot = self._current_robot_pose()
+        self._last_veto_xy = None
         if result is not None and result.vetoed_by is not None and robot is not None:
             x, y, pose = result.vetoed_by
             c, s = math.cos(robot[2]), math.sin(robot[2])
+            self._last_veto_xy = (robot[0] + c * x - s * y, robot[1] + s * x + c * y)
             self.get_logger().error(
-                f'Vetoing return at map ({robot[0] + c * x - s * y:.3f}, '
-                f'{robot[1] + s * x + c * y:.3f}), robot {tuple(round(v, 3) for v in robot[:3])}, '
+                f'Vetoing return at map ({self._last_veto_xy[0]:.3f}, {self._last_veto_xy[1]:.3f}), '
+                f'robot {tuple(round(v, 3) for v in robot[:3])}, '
                 f'inside the route pose {None if pose is None else tuple(round(v, 3) for v in pose)}')
         self._parking_navigation_failed(f'lidar_clearance: {reason}', stop_first=True)
         return True

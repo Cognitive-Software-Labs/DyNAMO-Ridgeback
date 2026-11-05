@@ -313,8 +313,12 @@ the latest map rejects. The mission moves to `RETURNING_TO_OBSERVATION`. Like
 the return below, it sends nothing until Nav2 has released the goal and fresh
 odometry confirms the stop. It then relocalizes G1 as after exploring, and plans
 again with every valid candidate within `parking_retry_exclusion_deg` (20°) of a
-failed attempt's bearing rejected (`failed_attempt_direction`). The ranking is
-otherwise unchanged, so the next attempt takes the best remaining class and
+failed attempt's bearing rejected (`failed_attempt_direction`). A G1-relative
+side is shown blocked as a whole when the vetoing return lies on G1's own body
+(within 0.45 m of its axis), or when a second attempt on that side fails. Its
+poses are then rejected (`failed_attempt_side`) while another side still has a
+valid pose; otherwise it stays usable away from the failed bearings. The ranking
+is otherwise unchanged, so the next attempt takes the best remaining class and
 direction, and the rays keep their geometric colours. Without an untried
 direction, or if G1 is not relocalized, the robot returns to the start and the
 mission ends `MISSION_FAILED` (`parking_failed`, naming the attempts). An
