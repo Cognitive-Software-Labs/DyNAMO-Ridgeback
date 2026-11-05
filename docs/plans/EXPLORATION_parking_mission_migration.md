@@ -446,3 +446,5 @@ TF or changing estimator validation.
   — rays judged at their own poses, heading accuracy, and front and rear parking missions.
 - [Parking beside G1](../../archive/engineering/2026-11-02-parking-beside-g1.md)
   — side-first priorities, the body-axis reach correction, and the open leg-clearance limit.
+- [Parking retries and reliability](../../archive/engineering/2026-11-05-parking-retries-and-reliability.md)
+  — retry side selection, obstacles above the LiDAR plane, and Gazebo success by revision.

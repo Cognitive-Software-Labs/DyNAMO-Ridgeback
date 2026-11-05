@@ -316,7 +316,7 @@ again with every valid candidate within `parking_retry_exclusion_deg` (20°) of 
 failed attempt's bearing rejected (`failed_attempt_direction`). A G1-relative
 side is shown blocked as a whole when the vetoing return lies on G1's own body
 (within 0.45 m of its axis), or when a second attempt on that side fails. Its
-poses are then rejected (`failed_attempt_side`) while another side still has a
+poses, including the planner's provisional pick, are then rejected (`failed_attempt_side`) while another side still has a
 valid pose; otherwise it stays usable away from the failed bearings. The ranking
 is otherwise unchanged, so the next attempt takes the best remaining class and
 direction, and the rays keep their geometric colours. Without an untried
