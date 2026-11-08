@@ -29,7 +29,7 @@ VIEWS = [('overview', 'Top-down, whole task'), ('workstation', 'Top-down, workst
          ('closeup', 'G1 and table'), ('oblique', 'Oblique (heights)'),
          ('robot_camera', 'Robot camera at start')]
 CAPTION = {
-    'overview': ('Top-down from {h:.0f} m: the robot at its start on the left (facing up), '
+    'overview': ('Top-down from {h:.0f} m: the robot at its start on the left, '
                  'G1 at its worktable on the right'),
     'workstation': 'Top-down from 5.5 m over G1 (worktable at the top): the floor available for parking',
     'closeup': 'G1 and its worktable from behind G1\'s left shoulder',
@@ -37,6 +37,8 @@ CAPTION = {
     'robot_camera': 'The robot\'s own camera at its start: G1 is not in view',
 }
 SIM = {'gz': 'Gazebo (warehouse)', 'isaac': 'Isaac Sim (hospital floor)'}
+# Recorded HEAD -> the code that ran (previews then carried no other code change).
+CODE = {'bb8aa94': 'bb8aa94 plus the changes committed as b4f855b', 'b4f855b': 'b4f855b'}
 ASSET_NAMES = {'table': 'table 1.20 x 0.70 m, top 0.75 m', 'privacy_curtain': 'panel 1.70 m long, 1.60 m high',
                'hospital_bed': 'bed 1.80 x 0.90 m, 0.50 m high'}
 
@@ -116,9 +118,10 @@ def main():
                     rel = pages.export_jpeg(src, os.path.join(
                         ASSETS, entry['file'].replace('.png', '.jpg')))
                     commit, dirty = commits.get((backend, name), ('unknown', False))
+                    code = CODE.get(commit, commit + (' + working tree' if dirty else ''))
                     caption = CAPTION[view].format(h=scene_views.OVERVIEW_HEIGHT_M[backend])
                     grid.append(pages.figure(rel, f'{SIM[backend].split(" ")[0]}: {caption} '
-                                                  f'(captured at {commit}{" + working tree" if dirty else ""})'))
+                                                  f'(captured with {code})'))
         fact_html = ''.join(f'<div><b>{pages.esc(k)}:</b> {pages.esc(v)}</div>' for k, v in facts)
         cards.append(f'<section class="card" id="{name}"><header><h3>{pages.esc(TITLES[name])}</h3>'
                      f'<code>demo_scenario:={name}</code></header><div class="facts">{fact_html}</div>'
@@ -142,10 +145,12 @@ def main():
         f'<tr><th>World</th><td>Clearpath warehouse (<code>depot</code>): shelving, pillars and three '
         'people, one standing beside the start</td><td>Hospital floor (<code>parking_demo</code>): a '
         'corridor with rooms on both sides</td></tr>'
-        f'<tr><th>G1 workstation</th><td>{pose(stations["gz"])}: the aisle south of the long shelf '
-        'beside the start; the robot reaches it round the shelf\'s east end and arrives behind G1</td>'
+        f'<tr><th>G1 workstation</th><td>{pose(stations["gz"])}: in the lane west of the start, '
+        'behind the camera at the start; the explorer heads down this lane and meets G1 from '
+        'behind</td>'
         f'<td>{pose(stations["isaac"])}: the south room, entered through the doorway at x 2.7-5.3 m; the '
-        'robot arrives behind G1\'s left shoulder</td></tr>'
+        'robot arrives behind G1\'s left shoulder. A stretcher that belongs to the room stands about '
+        '1 m to G1\'s right</td></tr>'
         '<tr><th>Robot start</th><td colspan="2">(0, 0) m, yaw 0 deg: the default spawn of both '
         'simulators, so the SLAM map frame is the world frame</td></tr>'
         '<tr><th>Frames</th><td colspan="2"><code>forward</code> points from G1 to its table and '

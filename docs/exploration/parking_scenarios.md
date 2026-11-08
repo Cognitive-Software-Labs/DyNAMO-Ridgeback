@@ -69,7 +69,9 @@ toward G1.
 
 The P7 scenes (G1 3 m in front of the start, schema 1, plus a separate `worktable`
 scene) are retired; their runs keep the scenario file they ran, and the evaluation
-tools still read it. Every scene now fits both worlds.
+tools still read it. A scenario that does not fit a world can list where it does,
+for example `backends: [gz]`, and startup then refuses it elsewhere; every current
+scene fits both worlds.
 
 OWLv2 scores a Gazebo G1 at about 0.42-0.68 depending on the view; side-on and
 partly hidden views sit near 0.50. The depot's walking person scored at most 0.19
@@ -174,3 +176,4 @@ and map; scans are not recorded.
 
 - [Parking scenarios](../../archive/engineering/2026-11-05-parking-scenarios.md) — every run by scenario and simulator, the provisional basket, and the layouts stopped by G1 detection.
 - [Parking detection gaps](../../archive/engineering/2026-11-05-parking-detection-gaps.md) — why G1 detection stopped `heading_90` and `no_feasible`, the detector floor and relocalization hysteresis, the observation-fallback race, and the reruns.
+- [Parking workstation scenes](../../archive/engineering/2026-11-05-parking-workstation-scenes.md) — the workstation layouts tried in Gazebo, every run on them, why routes near the spawn were rejected, and the perception limits that stopped most runs.
