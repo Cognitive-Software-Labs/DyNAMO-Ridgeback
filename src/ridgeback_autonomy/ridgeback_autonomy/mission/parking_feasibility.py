@@ -60,6 +60,10 @@ def candidate_groups(plan, approach, per_class=6):
     return groups
 
 
+# NavFn starts a path at the robot's grid-snapped cell; poses this close are snapping.
+START_SNAP_TOLERANCE_M = 0.10
+
+
 def select_path_candidate(candidates, resolution):
     best_error = min(c.reach_error_m for c in candidates)
     tier = [c for c in candidates if c.reach_error_m <= best_error + resolution]
@@ -90,7 +94,7 @@ def path_rejection(path, candidate, start, grid, target, config, keepout, *, occ
         poses = [pose_xyyaw(p.pose) for p in path.poses]
     except ValueError:
         return 'path_nonfinite_or_invalid_rotation'
-    if math.hypot(poses[0][0] - start[0], poses[0][1] - start[1]) > 0.10:
+    if math.hypot(poses[0][0] - start[0], poses[0][1] - start[1]) > START_SNAP_TOLERANCE_M:
         return 'path_start_mismatch'
     end = poses[-1]
     if math.hypot(end[0] - candidate.base_x, end[1] - candidate.base_y) > 0.10:
@@ -128,17 +132,34 @@ def driven_poses(path, candidate, start, poses=None):
     # cell point, a few cm off), not a place the robot drives to, so the swept route
     # starts at the robot's actual pose. Keep the goal connector rather than
     # trusting the endpoint tolerance.
-    poses = ([tuple(start[:3])] + poses[1 if len(poses) > 1 else 0:]
-             + [(candidate.base_x, candidate.base_y, candidate.yaw)])
+    # NavFn can also begin with more poses inside the snapped start cell's
+    # neighbourhood; they are as undriven as the first. Skip the leading ones
+    # within the start tolerance path_rejection accepts (2026-11-05: a 6 cm
+    # back-step to the cell centre swept the rear edge onto two unseen cells beside
+    # the robot and rejected every route). Anything farther is swept as driven.
+    # A pose there with a real heading is an in-place rotation and is kept.
+    first = 1 if len(poses) > 1 else 0
+    skipped = 0
+    while (first + skipped < len(poses) - 1
+           and _placeholder(path.poses[first + skipped].pose.orientation)
+           and math.hypot(poses[first + skipped][0] - start[0],
+                          poses[first + skipped][1] - start[1]) <= START_SNAP_TOLERANCE_M):
+        skipped += 1
+    rest = poses[first + skipped:]
+    poses = [tuple(start[:3])] + rest + [(candidate.base_x, candidate.base_y, candidate.yaw)]
     # NavFn leaves intermediate orientations as the identity quaternion and the
     # Omni MPPI controller does not follow path orientations, so those are not
     # headings: the robot translates holonomically keeping its current yaw. Any
     # real yaw (the goal pose, the final approach) is still swept.
-    for i in range(1, len(path.poses) - 1):
-        q = path.poses[i].pose.orientation
-        if (q.x, q.y, q.z, q.w) == (0.0, 0.0, 0.0, 1.0):
+    for i in range(1, len(path.poses) - 1 - skipped):
+        if _placeholder(path.poses[i + skipped].pose.orientation):
             poses[i] = poses[i][:2] + (poses[i - 1][2],)
     return poses
+
+
+def _placeholder(q):
+    """NavFn's identity orientation on intermediate poses: not a heading."""
+    return (q.x, q.y, q.z, q.w) == (0.0, 0.0, 0.0, 1.0)
 
 
 def _start_footprint_known(grid, start, config):

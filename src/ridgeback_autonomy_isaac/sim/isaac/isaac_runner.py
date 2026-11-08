@@ -23,6 +23,7 @@ benchmarks — legal because the whole stack runs on sim time.
 """
 import argparse
 import math
+import os
 import signal
 import sys
 import time
@@ -273,6 +274,11 @@ def run(app, args) -> int:
             depth_sink=ros.publish_d455_depth)
     else:
         print("camera disabled (--camera false): lidar-only run", flush=True)
+    # Documentation captures only: fixed world cameras named in a JSON file.
+    from sensors import VIEW_CAMERAS_ENV, attach_view_cameras, load_view_cameras
+    if os.environ.get(VIEW_CAMERAS_ENV):
+        attach_view_cameras(stage, load_view_cameras(os.environ[VIEW_CAMERAS_ENV]),
+                            args.namespace)
 
     rig = RidgebackRig(
         art_root_path, odom_noise=args.odom_noise, seed=args.noise_seed)

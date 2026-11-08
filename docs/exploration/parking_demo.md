@@ -51,6 +51,24 @@ safeguard or motion-settlement threshold is relaxed by this launch change.
 
 ## Parking display
 
+The parking RViz starts with the scene in front: the Displays, Selection, Tool
+Properties and Views docks start hidden (*Panels* reopens any of them; no display is
+removed). RViz ignores the layout's *Hide Left Dock* flag when it restores the saved
+window state, so the launcher clears each dock's visibility in that state instead.
+The camera-image dock is lowered, and a top-down view in the map frame frames the
+robot's start and the scenario's G1 workstation, turned so that their axis runs
+across the screen; pan and zoom work as usual. The screen overlays share one style
+([`hud_style.py`](../../src/ridgeback_common/ridgeback_common/hud_style.py)), set
+by the state-machine panel: 9 pt monospace light-grey text on a dark panel, green
+for completed, blue for active or a section title, grey for pending or a label,
+red for failure. The legend keeps a proportional font so its labels stay narrow,
+and the target-distance columns keep their estimator colours on their titles only,
+matching the 3D rings. The donut rays keep their own colours. The four overlays sit
+in the four corners: velocity, coverage and localization top left, target
+distances top right, state machine bottom left, legend bottom right. They need a
+3D view about 620 px tall, which a 1920 x 1080 screen leaves; on a smaller window
+the left two overlap.
+
 RViz shows the plan on `parking/visualization`, with a colour legend overlay on
 `parking/legend`. The donut is 360 radial lines, one per degree, each drawn in
 one colour from the inner to the outer reach limit (grey rings). A ray is judged

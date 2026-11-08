@@ -235,9 +235,34 @@ walking person scored at most 0.19; Isaac's demo world has no person, and no
 second humanoid robot was tested. The 2026-11-05 detection-gaps record under
 archived evidence holds the runs.
 
+With G1 at a workstation out of the robot's sight (2026-11-08), G1 was confirmed
+while the robot moved but the first static view scored 0.42-0.45, below the 0.50
+first-localization floor, so localization timed out (relocalization's 0.40
+hysteresis needs a known G1). In the pen scene G1 was localized 1.25 m behind
+itself, beyond its table, and the robot parked safely beside that wrong estimate;
+with a panel beside G1 the estimate moved 1.09 m toward the panel. Tall surfaces
+inside G1's detection box pull the depth estimate.
+
 **Completion criteria.** Measure detection over G1 headings, backgrounds and a
-humanoid distractor in both simulators, and decide whether relocalization needs a
-second viewpoint when a static view fails.
+humanoid distractor in both simulators; decide whether relocalization needs a
+second viewpoint when a static view fails, whether a first localization may use a
+confirmed detection's track, and how the depth estimate rejects surfaces behind G1.
+
+## Parking plan invalidated by a delayed odometry stamp
+
+**Gap.** After a feasible parking pose is selected, the plan check counts an
+`odometry_timestamp` motion fault (an odometry stamp ahead of the manager's clock)
+as lost motion evidence and ends the mission in `PARKING_PLANNING_FAILED`, with no
+retry and no return to the start. With G1 at a distant workstation the route
+checks are long (10.5 m); most likely the manager's callbacks back up behind them and an
+odometry message can be handled before the clock catches up. The robot stops
+safely at its observation pose. The 2026-11-05 workstation-scenes record under
+archived evidence holds the run.
+
+**Completion criteria.** Decide whether a timestamp fault seen right after
+blocking path checks should restart the stationary interval, as a restarted
+interval already does, and whether a planning failure after a feasible plan
+should return to the start; then rerun a long-route scene.
 
 ## Collision-envelope and navigation-footprint validation
 
@@ -309,6 +334,7 @@ in the reference that owns the fact or moved to the item that owns the work.
 
 - [Parking scenarios](../archive/engineering/2026-11-05-parking-scenarios.md) — G1 detection rates by layout and heading, and the localization timeouts they caused.
 - [Parking detection gaps](../archive/engineering/2026-11-05-parking-detection-gaps.md) — OWLv2 scores by view, the parking detector floor and relocalization hysteresis, and the `heading_90` and `no_feasible` reruns.
+- [Parking workstation scenes](../archive/engineering/2026-11-05-parking-workstation-scenes.md) — G1 out of the robot's sight at a worktable, the presentation captures and pages, and the planning failure after a delayed odometry stamp.
 - [LiDAR/closed-loop SLAM qualification](../archive/engineering/2026-09-17-isaac-lidar-qualification.md)
 - [paired results and interpretation](../archive/engineering/2026-09-17-isaac-lidar-qualification.md#interpretation)
 - [Isaac port history](../archive/engineering/port-history.md#lidars-detached-from-the-articulation-2026-09-11)

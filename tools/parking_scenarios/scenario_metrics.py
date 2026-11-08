@@ -8,7 +8,9 @@ import xml.etree.ElementTree as ET
 import yaml
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '../..'))
-SCEN = yaml.safe_load(open(f'{ROOT}/src/ridgeback_autonomy/config/parking_scenarios.yaml'))['scenarios']
+sys.path.insert(0, f'{ROOT}/src/ridgeback_autonomy')   # the pure scenario module (no ROS)
+from ridgeback_autonomy.mission import parking_scenarios  # noqa: E402
+SCENARIO_FILE = f'{ROOT}/src/ridgeback_autonomy/config/parking_scenarios.yaml'
 CAT = yaml.safe_load(open(f'{ROOT}/src/ridgeback_autonomy_gz/sim/benchmark_assets.yaml'))['objects']
 TASK_X = -0.28
 # Robot parts in base_link x/y and height above the floor (base_link 0.026 m up in Gazebo).
@@ -54,9 +56,9 @@ def dist(p, q):
     return min(poly_dist(p, q), poly_dist(q, p))
 
 
-def obstacles(scene):
+def obstacles(layout):
     out = []
-    for item in scene.get('objects') or []:
+    for item in layout['objects']:
         sdf = ET.parse(f"{ROOT}/src/ridgeback_autonomy_gz/sim/{CAT[item['asset']]['resource']}").getroot()
         yaw = math.radians(item['yaw_deg'])
         for c in sdf.iter('collision'):
@@ -107,16 +109,18 @@ def run(d):
     name, backend = res[0], res[1]
     # The layout that actually ran: definitions changed during testing.
     own = f'{d}/scenarios.yaml'
-    scene = (yaml.safe_load(open(own))['scenarios'] if os.path.exists(own) else SCEN)[name]
+    data = parking_scenarios.load(own if os.path.exists(own) else SCENARIO_FILE)
+    scene = data['scenarios'][name]
+    layout = parking_scenarios.world_layout(data, name, backend)
     tr = [(float(t), a, b, w) for t, a, b, w in re.findall(
         r'\[(\d+\.\d+)\] \[[^\]]*mission_manager_node\]: Mission state transition: (\w+) -> (\w+); reason=([^\n]*)', log)]
     m = dict(scenario=name, simulator=backend, run=os.path.basename(d),
              commit=open(f'{d}/commit.txt').readline().strip()[:7], expected=scene['expected'],
              description=scene['description'])
-    g = scene['g1']
+    g = layout['g1']
     m['g1_pose'] = f"({g['x']}, {g['y']}) yaw {g['yaw_deg']} deg"
     m['objects'] = ', '.join(f"{o['asset']} {o['name']} ({o['x']}, {o['y']}) {o['yaw_deg']} deg"
-                             for o in scene.get('objects') or []) or 'none'
+                             for o in layout['objects']) or 'none'
     if not tr:
         m['outcome'] = 'no mission transitions'
         return m
@@ -143,7 +147,7 @@ def run(d):
     rows = [r for r in csv.reader(open(path)) if r[1] and r[3]]
     track = [(float(r[0]), float(r[1]), float(r[2]), float(r[3])) for r in rows]
     g1 = next(((float(r[4]), float(r[5]), float(r[6])) for r in rows if r[4]), None)
-    obs = obstacles(scene)
+    obs = obstacles(layout)
     m['g1_truth'] = [round(v, 3) for v in g1] if g1 else None
     if track:
         c = min((clearance(x, y, yaw, obs, g1[:2] if g1 else None) + (t,) for t, x, y, yaw in track),

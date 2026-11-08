@@ -384,3 +384,76 @@ def attach_camera(stage, robot_root: str = "/ridgeback",
           f"{width}x{height}@{tick_rate:g} Hz "
           f"fx={fx:.0f}", flush=True)
     return str(cam.GetPath()), depth_handle
+
+
+VIEW_CAMERAS_ENV = "RIDGEBACK_ISAAC_VIEW_CAMERAS"
+
+
+def load_view_cameras(path: str) -> list[dict]:
+    """Named presentation cameras: [{name, eye: [x,y,z], target: [x,y,z],
+    hfov_deg, width, height}] in world metres. Capture tooling only."""
+    import json
+    import re
+    with open(path, encoding="utf-8") as stream:
+        views = json.load(stream)
+    if not isinstance(views, list):
+        raise ValueError(f"{path}: expected a list of view cameras")
+    for view in views:
+        if not re.fullmatch(r"[a-z0-9_]+", str(view.get("name", ""))):
+            raise ValueError(f"{path}: view names must be lower-case snake case")
+        if len(view["eye"]) != 3 or len(view["target"]) != 3:
+            raise ValueError(f"{path}: {view['name']}: eye and target need x, y, z")
+    return views
+
+
+def attach_view_cameras(stage, views: list[dict], namespace: str = "r100_0001",
+                        skip_frames: int = 30) -> list[str]:
+    """Fixed world cameras that publish ``views/<name>/image`` for documentation.
+
+    Off unless the runner is given a view file; experiment runs never carry
+    them. Each camera renders every frame but publishes one frame in
+    ``skip_frames + 1``, so a capture costs only its render product.
+    """
+    import math
+    import omni.graph.core as og
+    from pxr import Gf, UsdGeom
+
+    nodes = [("view_tick", "omni.graph.action.OnPlaybackTick")]
+    connects, values, topics = [], [], []
+    for view in views:
+        path = f"/parking_views/{view['name']}"
+        camera = UsdGeom.Camera.Define(stage, path)
+        width, height = int(view.get("width", 1600)), int(view.get("height", 1000))
+        focal = 18.0
+        aperture = 2 * focal * math.tan(math.radians(float(view.get("hfov_deg", 70))) / 2)
+        camera.GetFocalLengthAttr().Set(focal)
+        camera.GetHorizontalApertureAttr().Set(aperture)
+        camera.GetVerticalApertureAttr().Set(aperture * height / width)
+        camera.GetClippingRangeAttr().Set(Gf.Vec2f(0.05, 200.0))
+        eye, target = Gf.Vec3d(*view["eye"]), Gf.Vec3d(*view["target"])
+        up = Gf.Vec3d(0, 0, 1)
+        if abs(Gf.GetNormalized(target - eye) * up) > 0.999:   # straight down
+            up = Gf.Vec3d(*view.get("up", (1, 0, 0)))
+        to_world = Gf.Matrix4d().SetLookAt(eye, target, up).GetInverse()
+        UsdGeom.Xformable(camera).AddTransformOp().Set(to_world)
+        product = _render_product(path, [width, height])
+        node = f"view_{view['name']}"
+        topic = f"views/{view['name']}/image"
+        nodes.append((node, "isaacsim.ros2.bridge.ROS2CameraHelper"))
+        connects.append(("view_tick.outputs:tick", f"{node}.inputs:execIn"))
+        values += [
+            (f"{node}.inputs:renderProductPath", product),
+            (f"{node}.inputs:type", "rgb"),
+            (f"{node}.inputs:topicName", topic),
+            (f"{node}.inputs:frameId", "map"),
+            (f"{node}.inputs:nodeNamespace", f"/{namespace}"),
+            (f"{node}.inputs:frameSkipCount", int(skip_frames)),
+        ]
+        topics.append(topic)
+    og.Controller.edit(
+        {"graph_path": "/ros_view_graph", "evaluator_name": "execution"},
+        {og.Controller.Keys.CREATE_NODES: nodes,
+         og.Controller.Keys.CONNECT: connects,
+         og.Controller.Keys.SET_VALUES: values})
+    print(f"view cameras attached: {', '.join(topics)}", flush=True)
+    return topics

@@ -15,8 +15,8 @@ from __future__ import annotations
 
 import html
 
+from ridgeback_common import hud_style
 from rviz_2d_overlay_msgs.msg import OverlayText
-from std_msgs.msg import ColorRGBA
 
 
 # Mission order: the main path, with the optional G1-centred mapping where it
@@ -37,11 +37,12 @@ NOTES = {'EXPLORING_AROUND_G1': 'optional', 'RETURNING_TO_OBSERVATION': 'optiona
          'PARKED': '5 s wait'}
 RESET_REASON = 'explicit manager reset'
 
-VISITED = (90, 200, 120)
-ACTIVE = (80, 170, 255)
-PENDING = (125, 125, 125)
-FAILED = (255, 85, 85)
-TEXT = (235, 235, 235)
+# This panel set the shared overlay style (ridgeback_common.hud_style).
+VISITED = hud_style.SUCCESS
+ACTIVE = hud_style.ACCENT
+PENDING = hud_style.MUTED
+FAILED = hud_style.FAILURE
+TEXT = hud_style.TEXT
 DOWN, TO, FAIL = '↓', '→', '✗'
 NAME_WIDTH = 26
 REASON_WIDTH = 46
@@ -122,10 +123,6 @@ def diagram_text(current, history, allowed):
     return '\n'.join(rows)
 
 
-def _color(rgb, alpha=1.0):
-    return ColorRGBA(r=rgb[0] / 255, g=rgb[1] / 255, b=rgb[2] / 255, a=float(alpha))
-
-
 def state_diagram_overlay(current, history, allowed) -> OverlayText:
     """The panel as a fixed bottom-left RViz overlay (rviz_2d_overlay_plugins)."""
     msg = OverlayText()
@@ -134,8 +131,6 @@ def state_diagram_overlay(current, history, allowed) -> OverlayText:
     # Wide enough for the longest 'last:' line (two 24-character state names).
     msg.width, msg.height = 420, LINE_PX * len(msg.text.split('\n')) + 8
     msg.horizontal_alignment, msg.vertical_alignment = OverlayText.LEFT, OverlayText.BOTTOM
-    msg.horizontal_distance = msg.vertical_distance = 10
-    msg.bg_color = _color((13, 13, 13), 0.8)
-    msg.fg_color = _color(TEXT)
-    msg.line_width, msg.text_size, msg.font = 1, 9.0, 'DejaVu Sans Mono'
+    hud_style.apply_container(msg)
+    msg.line_width = 1
     return msg

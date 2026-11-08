@@ -25,17 +25,18 @@ from ridgeback_common.ros_signals import init_owned, shielded, spin_until_interr
 from rclpy.node import Node
 from rclpy.qos import QoSProfile, ReliabilityPolicy, DurabilityPolicy, HistoryPolicy
 
+from ridgeback_common import hud_style
 from rviz_2d_overlay_msgs.msg import OverlayText
 
 
 LINE_BREAK = '<br/>'
 
-# Per-line height as a multiple of the font size, plus a constant. The plain
-# figure is the long-standing one tuned against the plain-text path. Rich text
-# lays out tighter -- measured at 1.71x the font size against the 1.8x + 4 the
-# plain path assumes -- and reusing the plain figure leaves roughly a third of
-# the panel empty below the last row.
-PLAIN_LINE_FACTOR, PLAIN_LINE_PAD = 1.8, 4.0
+# Per-line height as a multiple of the font size, plus a constant, both taken
+# off screenshots. Rich text measured 1.71x the font size (27.3 px at 16 pt);
+# plain text measured 14 px a row at the shared 9 pt (1.56x), where the older
+# 1.8x + 4 figure made a box 45 % taller than its text, which covered the
+# state-machine panel below it. A little over the measured pitch, so no row clips.
+PLAIN_LINE_FACTOR, PLAIN_LINE_PAD = 1.6, 0.0
 RICH_LINE_FACTOR, RICH_LINE_PAD = 1.72, 0.0
 PANEL_PADDING_PX = 16
 RICH_PANEL_PADDING_PX = 8
@@ -58,11 +59,11 @@ class HudNode(Node):
 
         self.declare_parameter('panels', ['hud/velocity', 'hud/coverage'])
         self.declare_parameter('marker_topic', 'hud_overlay')
-        self.declare_parameter('text_size', 11.0)
+        self.declare_parameter('text_size', hud_style.TEXT_SIZE)
         self.declare_parameter('horizontal_distance', 10)
         self.declare_parameter('vertical_distance', 10)
         self.declare_parameter('overlay_width', 360)
-        self.declare_parameter('font', 'DejaVu Sans Mono')
+        self.declare_parameter('font', hud_style.FONT_MONO)
         self.declare_parameter('publish_rate_hz', 5.0)
         # Which corner to pin to. horizontal_distance/vertical_distance are
         # measured from whichever border the alignment selects, so the inset
@@ -148,14 +149,10 @@ class HudNode(Node):
         m.vertical_distance = self.v_dist
         m.text_size = self.text_size
         m.font = self.font
-        m.bg_color.r = 0.0
-        m.bg_color.g = 0.0
-        m.bg_color.b = 0.0
-        m.bg_color.a = 0.5
-        m.fg_color.r = 0.1
-        m.fg_color.g = 1.0
-        m.fg_color.b = 0.1
-        m.fg_color.a = 1.0
+        # The shared overlay style (the mission state-machine panel's colours).
+        m.bg_color.r, m.bg_color.g, m.bg_color.b, m.bg_color.a = hud_style.rgba(
+            hud_style.BACKGROUND, hud_style.BACKGROUND_ALPHA)
+        m.fg_color.r, m.fg_color.g, m.fg_color.b, m.fg_color.a = hud_style.rgba(hud_style.TEXT)
         m.text = text
         self.pub.publish(m)
 

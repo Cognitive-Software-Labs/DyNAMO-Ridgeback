@@ -182,14 +182,16 @@ def test_real_asset_catalogs_supply_the_two_models_and_world_floor_heights():
         assert (g1.name, table.name) == (DEMO_G1, DEMO_TABLE)
         assert g1.z == table.z == floor
         assert Path(g1.uri).is_file() and Path(table.uri).is_file()
-        assert table.y - g1.y == pytest.approx(1.05)
+        # G1 faces its worktable 0.75 m ahead.
+        ahead = (table.x - g1.x) * math.cos(g1.yaw) + (table.y - g1.y) * math.sin(g1.yaw)
+        assert ahead == pytest.approx(0.75)
 
 
 def test_every_scenario_spawns_catalog_assets_in_both_simulators():
     from ridgeback_autonomy.mission.simulation_startup import load_scenarios
-    names = load_scenarios(share=lambda package: str(ROOT/'src'/package))
-    assert {'standard', 'right_blocked', 'left_blocked', 'both_sides_blocked',
-            'no_feasible'} <= set(names)
+    names = load_scenarios(share=lambda package: str(ROOT/'src'/package))['scenarios']
+    assert set(names) == {'standard', 'right_blocked', 'left_blocked', 'both_sides_blocked',
+                          'restricted', 'no_feasible', 'heading_90', 'heading_away'}
     for backend in ('gz', 'isaac'):
         for name in names:
             if backend not in names[name].get('backends', ('gz', 'isaac')):
@@ -203,10 +205,33 @@ def test_every_scenario_spawns_catalog_assets_in_both_simulators():
             check_demo_entities([])          # names are owned, never pre-existing
 
 
-def test_the_standard_scenario_is_the_original_scene():
-    g1, table = specs('gz')
-    assert (g1.x, g1.y, g1.yaw) == (3.0, 0.0, pytest.approx(math.pi))
-    assert (table.x, table.y, table.yaw) == (3.0, 1.05, 0.0)
+@pytest.mark.parametrize('backend', ['gz', 'isaac'])
+def test_g1_works_out_of_sight_of_the_robot_start(backend):
+    # The robot spawns at the origin facing +x with a 79.6 deg colour camera: the
+    # workstation lies outside that view and several metres away, so G1 must be found.
+    g1 = specs(backend)[0]
+    assert math.hypot(g1.x, g1.y) > 4.0
+    assert abs(math.degrees(math.atan2(g1.y, g1.x))) > 40.0
+
+
+def test_scenarios_share_one_layout_around_g1_in_both_worlds():
+    def relative(backend, name):
+        spawned = demo_specs(backend, name, share=lambda package: str(ROOT/'src'/package))
+        g1 = spawned[0]
+        heading = math.atan2(spawned[1].y - g1.y, spawned[1].x - g1.x)   # toward the worktable
+        return [(round((s.x - g1.x) * math.cos(heading) + (s.y - g1.y) * math.sin(heading), 3),
+                 round(-(s.x - g1.x) * math.sin(heading) + (s.y - g1.y) * math.cos(heading), 3))
+                for s in spawned]
+    for name in ('standard', 'right_blocked', 'no_feasible', 'restricted'):
+        assert relative('gz', name) == relative('isaac', name)
+
+
+def test_g1_turns_relative_to_its_worktable():
+    def turn(name):
+        g1, table = demo_specs('gz', name, share=lambda package: str(ROOT/'src'/package))[:2]
+        bearing = math.atan2(table.y - g1.y, table.x - g1.x)
+        return round(math.degrees(math.remainder(g1.yaw - bearing, 2 * math.pi)))
+    assert (turn('standard'), turn('heading_90'), abs(turn('heading_away'))) == (0, 90, 180)
 
 
 def test_an_unknown_scenario_is_refused():

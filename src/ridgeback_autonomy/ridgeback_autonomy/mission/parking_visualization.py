@@ -25,6 +25,7 @@ from std_msgs.msg import ColorRGBA
 from visualization_msgs.msg import Marker, MarkerArray
 
 from ridgeback_autonomy.mission.parking_geometry import rotated_footprint_vertices
+from ridgeback_common import hud_style
 from ridgeback_autonomy.mission.parking_planner import ParkingPlan, PlannerConfig
 
 
@@ -187,16 +188,15 @@ def legend_overlay(config: PlannerConfig) -> OverlayText:
     """The colour legend as a fixed bottom-right RViz overlay (rviz_2d_overlay_plugins)."""
     rows = ['PARKING LEGEND']
     for title, entries in legend_sections(config):
-        rows.append(f'<span style="color: rgb(150, 200, 255);">{html.escape(title)}</span>')
+        rows.append(hud_style.span(html.escape(title), hud_style.ACCENT))
         rows += [f'&nbsp;&nbsp;{_swatch(glyph, rgba)}&nbsp;&nbsp;{html.escape(label)}'
                  for glyph, rgba, label in entries]
     msg = OverlayText()
     msg.action = OverlayText.ADD
     msg.width, msg.height = 330, LEGEND_LINE_PX * len(rows) + 10
     msg.horizontal_alignment, msg.vertical_alignment = OverlayText.RIGHT, OverlayText.BOTTOM
-    msg.horizontal_distance = msg.vertical_distance = 10
-    msg.bg_color = _color((0.05, 0.05, 0.05, 0.8))
-    msg.fg_color = _color((0.93, 0.93, 0.93, 1.0))
-    msg.line_width, msg.text_size, msg.font = 1, float(LEGEND_TEXT_SIZE), 'DejaVu Sans'
+    # The shared overlay style; prose labels keep the sans font so the panel stays narrow.
+    hud_style.apply_container(msg, mono=False, text_size=LEGEND_TEXT_SIZE)
+    msg.line_width = 1
     msg.text = '\n'.join(rows)
     return msg

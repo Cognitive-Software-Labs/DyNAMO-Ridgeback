@@ -40,7 +40,7 @@ NAV2_NODES = ('controller_server', 'smoother_server', 'planner_server', 'behavio
               'velocity_smoother', 'collision_monitor', 'bt_navigator')
 SENSOR_FRAMES = ('lidar2d_0_laser', 'lidar2d_1_laser', 'camera_0_color_optical_frame')
 DEMO_G1 = 'bench_parking_demo_g1'
-DEMO_TABLE = 'bench_parking_demo_table'
+DEMO_TABLE = 'bench_parking_demo_worktable'
 FAILED_STATES = {'MISSION_FAILED', 'MISSION_CANCELED', 'MOTION_SETTLEMENT_FAILED',
                  'PARKING_PLANNING_FAILED', 'PARKING_EXECUTION_FAILED'}
 
@@ -50,38 +50,27 @@ SCENARIOS_RELATIVE_PATH = 'config/parking_scenarios.yaml'
 
 
 def load_scenarios(*, share=get_package_share_directory):
-    """The named demo scenes; `standard` is the original G1 and table."""
-    import yaml
-    with open(f"{share('ridgeback_autonomy')}/{SCENARIOS_RELATIVE_PATH}") as stream:
-        data = yaml.safe_load(stream)
-    if data.get('schema') != 'ridgeback_parking_scenarios/1':
-        raise ValueError('unsupported parking scenario schema')
-    return data['scenarios']
+    """The demo scenario file: workstations per world and the named scenes."""
+    from ridgeback_autonomy.mission import parking_scenarios
+    return parking_scenarios.load(f"{share('ridgeback_autonomy')}/{SCENARIOS_RELATIVE_PATH}")
 
 
 def demo_specs(backend, scenario='standard', *, share=get_package_share_directory):
-    scenarios = load_scenarios(share=share)
-    if scenario not in scenarios:
-        raise ValueError(f'unknown demo scenario {scenario!r}; known: {", ".join(scenarios)}')
-    scene = scenarios[scenario]
-    if backend not in scene.get('backends', ('gz', 'isaac')):
-        raise ValueError(f'demo scenario {scenario!r} does not fit the {backend} world; '
-                         f'supported: {", ".join(scene["backends"])}')
+    from ridgeback_autonomy.mission import parking_scenarios
+    layout = parking_scenarios.world_layout(load_scenarios(share=share), scenario, backend)
     provider = benchmark_backend(backend)
     catalog = load_asset_catalog(asset_catalog_path(provider, package_share=share))
     # Origin heights follow the selected demo world's floor, not benchmark
     # calibration placement. The original SDF and ground-origin USD are reused.
     floor = 0.05 if backend == 'isaac' else 0.0
-    g1 = scene['g1']
+    g1 = layout['g1']
     specs = [SpawnSpec(DEMO_G1, catalog.targets['g1'].uri, catalog.targets['g1'].resource_format,
                        float(g1['x']), float(g1['y']), floor, math.radians(g1['yaw_deg']))]
-    for item in scene.get('objects') or []:
+    for item in layout['objects']:
         asset = catalog.objects[item['asset']]
         specs.append(SpawnSpec(DEMO_PREFIX + item['name'], asset.uri, asset.resource_format,
                                float(item['x']), float(item['y']), floor,
                                math.radians(item['yaw_deg'])))
-    if len({spec.name for spec in specs}) != len(specs):
-        raise ValueError(f'duplicate object names in demo scenario {scenario!r}')
     return specs
 
 

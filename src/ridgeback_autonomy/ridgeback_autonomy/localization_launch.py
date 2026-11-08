@@ -196,6 +196,7 @@ def distance_hud_node(
     overlay_width,
     marker_topic=None,
     condition=None,
+    text_size=HUD_DISTANCES_TEXT_SIZE,
 ):
     """A hud_node aggregator dedicated to the distance panel.
 
@@ -223,7 +224,7 @@ def distance_hud_node(
             {
                 'use_sim_time': use_sim_time,
                 'panels': [HUD_DISTANCES_PANEL_TOPIC],
-                'text_size': HUD_DISTANCES_TEXT_SIZE,
+                'text_size': float(text_size),
                 'overlay_width': overlay_width,
                 'horizontal_alignment': 'right',
                 'vertical_alignment': 'top',

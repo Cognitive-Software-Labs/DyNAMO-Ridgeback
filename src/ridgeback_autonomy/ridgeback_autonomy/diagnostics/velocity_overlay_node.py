@@ -20,6 +20,7 @@ from rclpy.qos import QoSProfile, ReliabilityPolicy, DurabilityPolicy, HistoryPo
 
 from geometry_msgs.msg import TwistStamped
 from nav_msgs.msg import Odometry
+from ridgeback_common import hud_style
 from rviz_2d_overlay_msgs.msg import OverlayText
 
 
@@ -27,12 +28,12 @@ class VelocityOverlayNode(Node):
     def __init__(self):
         super().__init__('velocity_overlay_node')
 
-        self.declare_parameter('text_size', 11.0)
+        self.declare_parameter('text_size', hud_style.TEXT_SIZE)
         self.declare_parameter('horizontal_distance', 10)
         self.declare_parameter('vertical_distance', 10)
         self.declare_parameter('overlay_width', 320)
         self.declare_parameter('overlay_height', 140)
-        self.declare_parameter('font', 'DejaVu Sans Mono')
+        self.declare_parameter('font', hud_style.FONT_MONO)
         self.declare_parameter('marker_topic', 'hud/velocity')
         self.declare_parameter('publish_rate_hz', 10.0)
 
@@ -90,14 +91,9 @@ class VelocityOverlayNode(Node):
         m.vertical_distance = self.v_dist
         m.text_size = self.text_size
         m.font = self.font
-        m.bg_color.r = 0.0
-        m.bg_color.g = 0.0
-        m.bg_color.b = 0.0
-        m.bg_color.a = 0.5
-        m.fg_color.r = 0.1
-        m.fg_color.g = 1.0
-        m.fg_color.b = 0.1
-        m.fg_color.a = 1.0
+        m.bg_color.r, m.bg_color.g, m.bg_color.b, m.bg_color.a = hud_style.rgba(
+            hud_style.BACKGROUND, hud_style.BACKGROUND_ALPHA)
+        m.fg_color.r, m.fg_color.g, m.fg_color.b, m.fg_color.a = hud_style.rgba(hud_style.TEXT)
         m.text = self._format_text()
         self.pub.publish(m)
 

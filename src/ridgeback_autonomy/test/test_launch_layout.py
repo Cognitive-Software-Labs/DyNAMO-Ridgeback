@@ -1078,13 +1078,47 @@ def test_parking_rviz_layout_adds_one_latched_display_without_touching_the_share
     assert states['Topic']['Durability Policy'] == 'Transient Local'
 
 
+def test_parking_rviz_starts_with_the_scene_in_view_and_the_panels_reachable() -> None:
+    import math
+
+    from ridgeback_autonomy.mission.parking_rviz import BOTTOM_DOCK_STATE, parking_layout, task_view
+
+    source = _package_root() / 'sim' / 'rviz' / 'exploration.rviz'
+    original = yaml.safe_load(source.read_text(encoding='utf-8'))
+    view = task_view((0.0, 0.0), (2.5, -6.0))
+    derived = yaml.safe_load(Path(parking_layout(str(source), 'parking/visualization', view))
+                             .read_text())
+    window = derived['Window Geometry']
+    # Hidden, not removed: every display and dock is still in the layout.
+    assert window['Hide Left Dock'] is True and window['Displays'] == original['Window Geometry']['Displays']
+    assert BOTTOM_DOCK_STATE[1] in window['QMainWindow State']
+    # RViz ignores 'Hide Left Dock' when restoring the state, so the docks' own visible
+    # flags are cleared; the docks stay in the state and in the Panels menu.
+    state = window['QMainWindow State']
+    for name in ('Displays', 'Selection', 'Tool Properties', 'Views'):
+        marker = 'fb' + f'{len(name) * 2:08x}' + name.encode('utf-16-be').hex()
+        assert marker + '00' in state and marker + '01' not in state
+    assert len(derived['Visualization Manager']['Displays']) == len(
+        original['Visualization Manager']['Displays']) + 3
+    current = derived['Visualization Manager']['Views']['Current']
+    assert current['Class'] == 'rviz_default_plugins/TopDownOrtho' and current['Target Frame'] == 'map'
+    # The start-to-G1 axis (here mostly -y) runs across the screen, both ends in view.
+    assert current['Angle'] == pytest.approx(-math.pi / 2, abs=1e-3)
+    assert (current['X'], current['Y']) == (1.25, -3.0)
+    assert 1800 / current['Scale'] >= 6.0 + 2 * 2.5 - 1e-6
+    assert 620 / current['Scale'] >= 2.5 + 2 * 2.5 - 1e-6
+    # Without a demo scene the shared view is kept.
+    plain = yaml.safe_load(Path(parking_layout(str(source), 'parking/visualization')).read_text())
+    assert plain['Visualization Manager']['Views'] == original['Visualization Manager']['Views']
+
+
 def test_mission_launch_owns_the_single_rviz_instance() -> None:
     mission_text = (
         _package_root() / 'launch' / 'ridgeback_mission.launch.py'
     ).read_text(encoding='utf-8')
 
     assert "'exploration_rviz': 'false'" in mission_text
-    assert "parking_layout(source, 'parking/visualization')" in mission_text
+    assert "parking_layout(source, 'parking/visualization', view)" in mission_text
     assert mission_text.count("executable='rviz2'") == 1
     # The include overwrites exploration_rviz in the shared launch context.
     assert (mission_text.index('OpaqueFunction(function=_parking_rviz)')

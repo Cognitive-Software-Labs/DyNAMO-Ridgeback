@@ -24,7 +24,7 @@ from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration, PythonExpression
 from launch_ros.actions import Node
 
-from ridgeback_autonomy.mission.parking_rviz import parking_layout
+from ridgeback_autonomy.mission.parking_rviz import parking_layout, task_view
 from ridgeback_autonomy.mission.simulation_config import demo_world, simulation_setup_path
 from ridgeback_autonomy.mission.target_detection import RELOCALIZATION_DETECTION_THRESHOLD
 from ridgeback_common.detector_config import DETECTION_THRESHOLD_DEFAULT
@@ -47,14 +47,26 @@ def _parking_rviz(context):
 
     if LaunchConfiguration('exploration_rviz').perform(context) != 'true':
         return []
-    source = os.path.join(
-        get_package_share_directory('ridgeback_autonomy'), 'sim', 'rviz', 'exploration.rviz')
+    share = get_package_share_directory('ridgeback_autonomy')
+    source = os.path.join(share, 'sim', 'rviz', 'exploration.rviz')
+    view = None
+    if LaunchConfiguration('demo_scene_enabled').perform(context) == 'true':
+        # Frame the robot's start (the map origin) and the scenario's G1 workstation.
+        from ridgeback_autonomy.mission import parking_scenarios
+        data = parking_scenarios.load(os.path.join(share, 'config', 'parking_scenarios.yaml'))
+        try:
+            g1 = parking_scenarios.world_layout(
+                data, LaunchConfiguration('demo_scenario').perform(context),
+                LaunchConfiguration('backend').perform(context))['g1']
+            view = task_view((0.0, 0.0), (g1['x'], g1['y']))
+        except ValueError:
+            pass   # the startup gate reports an unknown or unsupported scenario
     return [Node(
         package='rviz2',
         executable='rviz2',
         name='rviz2',
         namespace=LaunchConfiguration('namespace'),
-        arguments=['-d', parking_layout(source, 'parking/visualization')],
+        arguments=['-d', parking_layout(source, 'parking/visualization', view)],
         parameters=[{'use_sim_time': LaunchConfiguration('use_sim_time')}],
         remappings=[('/tf', 'tf'), ('/tf_static', 'tf_static')],
         output='screen',

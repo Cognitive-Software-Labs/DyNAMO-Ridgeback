@@ -518,6 +518,20 @@ def test_route_starts_at_the_robot_not_the_planners_grid_snapped_start_cell():
     assert path_rejection(p, c, start, g, target(), CONFIG, .29) == 'path_start_mismatch'
 
 
+def test_every_snapped_start_pose_is_skipped_not_only_the_first():
+    # 2026-11-05 workstation run: NavFn began with two poses at the start cell,
+    # 6 cm behind the robot; sweeping that back-step put the rear edge on unseen
+    # cells beside the robot and rejected all 21 routes.
+    g = grid(size_m=8.)
+    g.data[:, :10] = -1                       # unseen right behind the robot (x < 0.5)
+    c = CandidateDecision(3.5, 4.2, 3., 4.2, 0., 'valid', 'footprint_free', .5)
+    start = (1.02, 4.2, 0.)
+    p = path([(.98, 4.18), (.96, 4.2), (2., 4.2), (3., 4.2)])
+    assert path_rejection(p, c, start, g, target(), CONFIG, .29) is None
+    p = path([(.98, 4.18), (.96, 4.2), (.85, 4.2), (2., 4.2), (3., 4.2)])
+    assert path_rejection(p, c, start, g, target(), CONFIG, .29) == 'path_footprint_unknown'
+
+
 def test_floor_under_the_mission_start_footprint_is_not_unknown_to_the_robot():
     g = grid(size_m=8.)
     g.data[:, :29] = -1                       # never observed: behind the sensor at spawn (x < 1.45)

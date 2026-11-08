@@ -1,86 +1,93 @@
-# Parking demo scenes: G1 and catalog objects spawned into the demo world by
-# parking_simulation_startup (launch argument demo_scenario). Poses are world x/y in
-# metres and yaw in degrees; heights follow the demo world's floor. Assets are the
-# logical names of each backend's sim/benchmark_assets.yaml, so Gazebo and Isaac
-# spawn the same collision geometry. G1's left is +90 degrees from the way it faces.
-# `backends` lists where a scene fits (default both): Isaac's demo world has corridor
-# walls at |y| 1.5-1.7 m, so scenes with objects beyond about 1.45 m are Gazebo-only.
-# `expected` states the intended outcome only; it is never used by the mission.
-schema: ridgeback_parking_scenarios/1
+# Parking demo scenes (launch argument demo_scenario), spawned by
+# parking_simulation_startup and read by tools/parking_scenarios for evaluation.
+#
+# Every scene is built around a workstation: G1 standing at a worktable, facing
+# it, out of the robot's sight from its start (the backend's default spawn at the
+# world origin, facing +x). The robot must explore to find G1. Objects are placed
+# in the workstation frame: `forward` toward the worktable, `left` to G1's left when
+# it faces the table, `yaw_deg` relative to the workstation heading. `g1_turn_deg`
+# turns G1 away from the table. Assets are logical names from each backend's
+# sim/benchmark_assets.yaml, so Gazebo and Isaac spawn the same collision geometry
+# around G1. `expected` and `purpose` document intent; the mission never reads them,
+# and nothing here is passed to the mission.
+schema: ridgeback_parking_scenarios/2
+workstations:
+  # In the lane west of the start, facing west: behind the camera at the start; the
+  # explorer heads down this lane first and meets G1 from behind, the view the
+  # detector localizes reliably. Earlier layouts (2026-11-05/08, see the record): an
+  # aisle behind the long shelf the explorer never entered; the floor north of the
+  # start, where G1 was found before the robot left its spawn, so every route began
+  # in the unscanned wedges beside its flanks and was rightly rejected; and the west
+  # lane's edge, where a front-left view scored below the 0.50 localization floor.
+  gz: {x: -4.5, y: -0.6, yaw_deg: 180}
+  # The south room off the corridor, entered through the doorway at x 2.7-5.3; the
+  # corridor wall hides G1 from the start (the robot arrives from G1's back-left).
+  isaac: {x: 0.5, y: -4.5, yaw_deg: -90}
+robot_start: {x: 0.0, y: 0.0, yaw_deg: 0.0}
 scenarios:
   standard:
-    description: G1 facing the robot's start; a table on G1's right
-    expected: parking beside G1, left preferred over the table side
-    g1: {x: 3.0, y: 0.0, yaw_deg: 180}
-    objects:
-      - {name: table, asset: table, x: 3.0, y: 1.05, yaw_deg: 0}
-  worktable:
-    # Back to the start: seen side-on (yaw 90) the detector found G1 in about 1% of
-    # frames and localization timed out before planning (2026-11-05).
-    description: G1 standing at a worktable 0.40 m ahead and facing it, its back to the start
+    description: G1 at its worktable, facing it, in a pick-and-place position
+    purpose: the reference task; open floor on both sides of G1
     expected: parking on G1's left or right, never under the tabletop
-    g1: {x: 3.0, y: 0.0, yaw_deg: 0}
+    g1_turn_deg: 0
     objects:
-      - {name: table, asset: table, x: 3.75, y: 0.0, yaw_deg: 90}
+      - {name: worktable, asset: table, forward: 0.75, left: 0.0, yaw_deg: 90}
   right_blocked:
-    description: a 1.7 m panel along G1's right side
+    description: G1 at its worktable with a 1.7 m panel along its right side
+    purpose: the preferred sides are unequal; one is blocked
     expected: parking on G1's left
-    g1: {x: 3.0, y: 0.0, yaw_deg: 180}
     objects:
-      - {name: right_panel, asset: privacy_curtain, x: 3.0, y: 0.8, yaw_deg: 90}
+      - {name: worktable, asset: table, forward: 0.75, left: 0.0, yaw_deg: 90}
+      - {name: right_panel, asset: privacy_curtain, forward: 0.0, left: -0.8, yaw_deg: 90}
   left_blocked:
-    description: a 1.7 m panel along G1's left side
+    description: G1 at its worktable with a 1.7 m panel along its left side
+    purpose: the mirror of right_blocked
     expected: parking on G1's right
-    g1: {x: 3.0, y: 0.0, yaw_deg: 180}
     objects:
-      - {name: left_panel, asset: privacy_curtain, x: 3.0, y: -0.8, yaw_deg: 90}
+      - {name: worktable, asset: table, forward: 0.75, left: 0.0, yaw_deg: 90}
+      - {name: left_panel, asset: privacy_curtain, forward: 0.0, left: 0.8, yaw_deg: 90}
   both_sides_blocked:
-    description: panels along both sides of G1, open behind it
+    description: G1 at its worktable between two panels, open behind it
+    purpose: both preferred sides blocked; the next class (behind G1) must be used
     expected: parking behind G1
-    g1: {x: 3.0, y: 0.0, yaw_deg: 180}
     objects:
-      - {name: right_panel, asset: privacy_curtain, x: 3.0, y: 0.8, yaw_deg: 90}
-      - {name: left_panel, asset: privacy_curtain, x: 3.0, y: -0.8, yaw_deg: 90}
+      - {name: worktable, asset: table, forward: 0.75, left: 0.0, yaw_deg: 90}
+      - {name: right_panel, asset: privacy_curtain, forward: 0.0, left: -0.8, yaw_deg: 90}
+      - {name: left_panel, asset: privacy_curtain, forward: 0.0, left: 0.8, yaw_deg: 90}
   restricted:
-    # Facing away: facing the start between the tables, G1 was detected in 0-20% of
-    # frames and none while localizing, so localization timed out (2026-11-05).
     description: >-
-      G1 facing away from the start between two tables whose tops the base fits under
-      but the mast does not, a 0.5 m bed ahead of it and a 2.1 m wide entrance passage
-    expected: parking behind G1 (toward the start); no pose under a tabletop
-    backends: [gz]
-    g1: {x: 3.0, y: 0.0, yaw_deg: 0}
+      G1 at its worktable between two side tables whose tops the base fits under but
+      the mast and basket do not, reached through a 2.1 m passage
+    purpose: obstacles above the LiDAR plane; side poses would put the mast under a tabletop
+    expected: parking behind G1; no pose under a tabletop
     objects:
-      - {name: right_table, asset: table, x: 3.0, y: -1.2, yaw_deg: 0}
-      - {name: left_table, asset: table, x: 3.0, y: 1.2, yaw_deg: 0}
-      - {name: front_bed, asset: hospital_bed, x: 4.1, y: 0.0, yaw_deg: 90}
-      - {name: passage_right, asset: privacy_curtain, x: 1.5, y: 1.1, yaw_deg: 90}
-      - {name: passage_left, asset: privacy_curtain, x: 1.5, y: -1.1, yaw_deg: 90}
+      - {name: worktable, asset: table, forward: 0.75, left: 0.0, yaw_deg: 90}
+      - {name: right_table, asset: table, forward: 0.0, left: -1.2, yaw_deg: 0}
+      - {name: left_table, asset: table, forward: 0.0, left: 1.2, yaw_deg: 0}
+      - {name: passage_right, asset: privacy_curtain, forward: -1.5, left: -1.1, yaw_deg: 90}
+      - {name: passage_left, asset: privacy_curtain, forward: -1.5, left: 1.1, yaw_deg: 90}
   no_feasible:
-    # A closed pen keeps everything near G1 low or far: beds beside G1 with poles in
-    # front of it, or panels 0.38 m away, cut detection and localization timed out.
     description: >-
-      G1 inside a closed pen about 1.5 m around it: 0.5 m beds in front and behind,
-      1.6 m panels along the sides. Poses exist inside, but no route reaches them
-    expected: no parking manoeuvre; bounded planning, return to start, clear reason
-    backends: [gz]
-    g1: {x: 3.0, y: 0.0, yaw_deg: 180}
+      G1 at its worktable inside a pen: panels 0.8 m to each side and a 0.5 m bed
+      behind it, low enough for the camera to see G1 over it
+    purpose: G1 is detectable and localizable, but no robot footprint fits beside it
+    expected: no parking manoeuvre; bounded planning, return to start with no_valid_candidate
     objects:
-      - {name: front_bed_right, asset: hospital_bed, x: 1.6, y: 0.9, yaw_deg: 90}
-      - {name: front_bed_left, asset: hospital_bed, x: 1.6, y: -0.9, yaw_deg: 90}
-      - {name: rear_bed_right, asset: hospital_bed, x: 4.6, y: 0.9, yaw_deg: 90}
-      - {name: rear_bed_left, asset: hospital_bed, x: 4.6, y: -0.9, yaw_deg: 90}
-      - {name: right_panel_front, asset: privacy_curtain, x: 2.0, y: 1.83, yaw_deg: 90}
-      - {name: right_panel_rear, asset: privacy_curtain, x: 3.7, y: 1.83, yaw_deg: 90}
-      - {name: left_panel_front, asset: privacy_curtain, x: 2.0, y: -1.83, yaw_deg: 90}
-      - {name: left_panel_rear, asset: privacy_curtain, x: 3.7, y: -1.83, yaw_deg: 90}
+      - {name: worktable, asset: table, forward: 0.75, left: 0.0, yaw_deg: 90}
+      - {name: right_panel, asset: privacy_curtain, forward: 0.0, left: -0.8, yaw_deg: 90}
+      - {name: left_panel, asset: privacy_curtain, forward: 0.0, left: 0.8, yaw_deg: 90}
+      - {name: rear_bed, asset: hospital_bed, forward: -1.25, left: 0.0, yaw_deg: 90}
   heading_90:
-    description: G1 facing +y, side-on to the start, its left toward the start
-    expected: parking on G1's left (-x) or right (+x), preferences rotated with G1
-    g1: {x: 3.0, y: 0.0, yaw_deg: 90}
-    objects: []
+    description: G1 at its worktable but turned 90 deg to its left, the table on its right
+    purpose: G1's sides rotate with it; its right side now faces the table
+    expected: parking on G1's left; poses on its right would be under the tabletop
+    g1_turn_deg: 90
+    objects:
+      - {name: worktable, asset: table, forward: 0.75, left: 0.0, yaw_deg: 90}
   heading_away:
-    description: G1 facing away from the start, forearms hidden behind its body
-    expected: G1 heading estimated from another view, or the fallback without a heading
-    g1: {x: 3.0, y: 0.0, yaw_deg: 0}
-    objects: []
+    description: G1 turned away from its worktable, its back to the table
+    purpose: G1 faces the way the robot arrives; the camera sees its front first
+    expected: parking on G1's left or right; behind G1 is the table
+    g1_turn_deg: 180
+    objects:
+      - {name: worktable, asset: table, forward: 0.75, left: 0.0, yaw_deg: 90}

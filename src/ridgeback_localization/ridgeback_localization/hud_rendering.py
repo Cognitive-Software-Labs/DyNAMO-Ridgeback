@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import html
 
+from ridgeback_common import hud_style
+
 from ridgeback_localization.estimator_registry import (
     ESTIMATOR_LABELS,
     ESTIMATOR_SHORT_LABELS,
@@ -158,6 +160,10 @@ def parse_hud_layout(raw_layout: str | None) -> str:
     return layout
 
 
+def _rgb_unit(rgb) -> tuple[float, float, float]:
+    return tuple(channel / 255.0 for channel in rgb)
+
+
 def _hud_wide_cell(body: str, colour: tuple[float, float, float]) -> str:
     return hud_line(f'{body:>{HUD_WIDE_CELL_COLUMNS}}', colour)
 
@@ -185,17 +191,23 @@ def hud_wide_text(
     if not has_messages:
         return ''
 
+    # Only the column titles carry the estimator hue that ties them to the 3D
+    # rings; values follow the shared overlay style (ridgeback_common.hud_style).
     headers, distances, ages = [], [], []
     for estimator in estimators:
         reading = readings.get(estimator)
-        colour = hud_text_colour(
-            estimator, aged=reading is not None and reading.aged)
+        aged = reading is not None and reading.aged
+        colour = hud_text_colour(estimator, aged=aged)
+        # A stale column dims whole, in its own hue: the column is what is stale.
+        value = colour if aged else _rgb_unit(
+            hud_style.MUTED if reading is None else hud_style.TEXT)
         headers.append(_hud_wide_cell(ESTIMATOR_SHORT_LABELS[estimator], colour))
         if reading is None:
-            distances.append(_hud_wide_cell('--', colour))
-            ages.append(_hud_wide_cell('', colour))
+            distances.append(_hud_wide_cell('--', value))
+            ages.append(_hud_wide_cell('', value))
             continue
-        distances.append(_hud_wide_cell(f'{reading.distance_m:.3f}', colour))
-        ages.append(_hud_wide_cell(f'{reading.age_s:.1f}s', colour))
+        distances.append(_hud_wide_cell(f'{reading.distance_m:.3f}', value))
+        ages.append(_hud_wide_cell(f'{reading.age_s:.1f}s',
+                                   colour if aged else _rgb_unit(hud_style.MUTED)))
 
     return '<br/>'.join(''.join(cells) for cells in (headers, distances, ages))

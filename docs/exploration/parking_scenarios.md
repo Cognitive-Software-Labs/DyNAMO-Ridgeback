@@ -1,18 +1,22 @@
 # Parking scenarios
 
-The parking demonstration can spawn one of several named scenes around G1. Each
-scene tests one part of the existing mission: the G1-relative preference order,
-blocked sides, obstacles above the LiDAR plane, a scene with no safe pose, and
-G1 headings. The mission, planner and safety checks are the same in every scene;
-only the spawned objects differ. Results are in the
-[scenario gallery](autonomous_parking_gallery.html) and the dated record under
+The parking demonstration spawns one of several named scenes. Every scene puts G1
+at a *workstation*: standing at a worktable, facing it, out of the robot's sight
+from its start. The robot has to explore, detect and localize G1, plan a parking
+pose beside it, park, wait and return. The scenes vary what stands around G1 and
+which way G1 faces, to test the G1-relative preference order, blocked sides,
+obstacles above the LiDAR plane, a scene with no safe pose, and G1 headings. The
+mission, planner and safety checks are the same in every scene, and the mission is
+given nothing about the scene. The [scenario page](autonomous_parking_scenarios.html)
+shows each scene in both simulators; the [results page](autonomous_parking_results.html)
+lists every recorded run; the dated records are under
 [archived evidence](#archived-evidence).
 
 ## Running a scenario
 
 `demo_scenario` selects a scene from
 [`parking_scenarios.yaml`](../../src/ridgeback_autonomy/config/parking_scenarios.yaml);
-the default `standard` is the original G1 and table. The wrapper forwards it:
+the default is `standard`. The wrapper forwards it:
 
 ```bash
 export RIDGEBACK_PERCEPTION_VENV=/path/to/perception_venv
@@ -22,33 +26,58 @@ bash start_parking_demo.sh isaac demo_scenario:=right_blocked
 ```
 
 Startup spawns G1 and each object through the simulator's standard scene
-services, as for the original scene, and refuses a world that already holds a G1
-or a `bench_parking_demo_*` entity. Objects are logical names from each backend's
-`sim/benchmark_assets.yaml`, so Gazebo and Isaac spawn the same collision
-geometry at the same world pose. A scene's `expected` text documents the intent;
-the mission never reads it.
+services and refuses a world that already holds a G1 or a `bench_parking_demo_*`
+entity. Objects are logical names from each backend's `sim/benchmark_assets.yaml`,
+so Gazebo and Isaac spawn the same collision geometry. A scene's `purpose` and
+`expected` texts document intent; the mission never reads them.
 
-| Scenario | Layout around G1 at (3, 0); the robot starts at the origin | Intended outcome |
+## Workstations and layout
+
+The robot starts at both simulators' default spawn, the world origin facing +x,
+so the SLAM map frame is the world frame. Each demo world has one workstation pose
+for G1 (schema `ridgeback_parking_scenarios/2`):
+
+| World | G1 at the workstation | Why the robot cannot see it from the start |
 |---|---|---|
-| `standard` | facing the start; table on G1's right | side parking, left preferred |
-| `worktable` | back to the start, facing a table 0.40 m ahead | left or right, never under the tabletop |
-| `right_blocked` | facing the start; 1.7 m panel along G1's right | left |
-| `left_blocked` | facing the start; 1.7 m panel along G1's left | right |
-| `both_sides_blocked` | facing the start; panels along both sides | behind G1 |
-| `restricted` | facing away; tables both sides (the base fits under, the mast does not), low bed ahead, 2.1 m passage | behind G1, never under a tabletop |
-| `no_feasible` | facing the start inside a closed pen of low beds and side panels | no manoeuvre; bounded planning, return to start with `no_valid_candidate` |
-| `heading_90` | side-on, facing +y, no objects | sides rotate with G1 |
-| `heading_away` | facing away from the start, no objects | heading from behind, or the fallback |
+| Gazebo `depot` (warehouse) | (-4.5, -0.6) m, facing -x | it stands behind the camera at the start; the explorer heads down this lane first and meets G1 from behind |
+| Isaac `parking_demo` (hospital floor) | (0.5, -4.5) m, facing -y | the corridor wall hides the south room; the robot enters through the doorway at x 2.7-5.3 m, behind G1's left shoulder |
 
-`restricted` and `no_feasible` are Gazebo-only (`backends: [gz]`): Isaac's demo
-world has corridor walls at |y| 1.5-1.7 m that their objects would overlap, and
-startup refuses them there. OWLv2 scores a Gazebo G1 at about 0.42-0.68 depending on
-the view; side-on and partly hidden views sit near 0.50. The depot's walking person
-scored at most 0.19 as `humanoid robot`, and nothing else above 0.22. With the generic 0.55 detector floor `heading_90` and `no_feasible`
-stopped before planning; the parking launch now runs the detector at 0.40 with the
-hysteresis described under [observation return](architecture.md#observation-return).
-Keep objects low or away from G1's outline as seen from the start: a static view of a
-side-on G1 in front of a matching background still scores below 0.40 (see the
+Two earlier Gazebo workstations were dropped (2026-11-05/08; see the dated record).
+The explorer never entered an aisle behind the long shelf south of the start. North
+of the start, G1 was found before the robot left its spawn, so every route began in
+the unscanned wedges beside the robot's flanks, where both LiDARs are blocked by the
+chassis, and the planner rightly rejected them. A workstation works when the robot
+has driven into its area before it sees G1.
+
+A scenario places its objects in the workstation frame: `forward` from G1 toward
+its table, `left` to G1's left when it faces the table, `yaw_deg` relative to that
+heading; `g1_turn_deg` turns G1 away from the table. A scenario therefore has the
+same layout around G1 in both worlds, and only the surroundings differ. The
+worktable (1.20 x 0.70 m, top 0.75 m) stands 0.75 m ahead of G1, its long side
+toward G1.
+
+| Scenario | Around G1 at its worktable | Intended outcome |
+|---|---|---|
+| `standard` | nothing else | left or right, never under the tabletop |
+| `right_blocked` | 1.7 m panel 0.8 m to G1's right | left |
+| `left_blocked` | 1.7 m panel 0.8 m to G1's left | right |
+| `both_sides_blocked` | panels on both sides | behind G1 |
+| `restricted` | side tables 1.2 m left and right (the base fits under, the mast and basket do not); a 2.1 m passage behind | behind G1, never under a tabletop |
+| `no_feasible` | panels on both sides and a 0.5 m bed behind: a pen G1 is visible over | no manoeuvre; bounded planning, return to start with `no_valid_candidate` |
+| `heading_90` | G1 turned 90 degrees to its left, the table on its right | left; right-side poses would be under the table |
+| `heading_away` | G1 turned 180 degrees, its back to the table | left or right; behind G1 is the table |
+
+The P7 scenes (G1 3 m in front of the start, schema 1, plus a separate `worktable`
+scene) are retired; their runs keep the scenario file they ran, and the evaluation
+tools still read it. Every scene now fits both worlds.
+
+OWLv2 scores a Gazebo G1 at about 0.42-0.68 depending on the view; side-on and
+partly hidden views sit near 0.50. The depot's walking person scored at most 0.19
+as `humanoid robot`, and nothing else above 0.22. The parking launch runs the
+detector at 0.40 with the hysteresis described under
+[observation return](architecture.md#observation-return). Keep objects low or away
+from G1's outline as seen on the robot's way in: a static view of a side-on G1 in
+front of a matching background still scores below 0.40 (see the
 [G1 detection backlog item](../BACKLOG.md#g1-detection-in-parking-scenes)).
 
 Left and right are G1's, counter-clockwise and clockwise from the way it faces,
@@ -88,14 +117,32 @@ crate's position on the deck and G1's reach are measured.
 
 The tools under [`tools/parking_scenarios/`](../../tools/parking_scenarios/) run
 one scenario in its own process session, sample Gazebo ground truth at about
-1 Hz, take RViz and Gazebo screenshots, and stop only that session with SIGTERM:
+1 Hz, take RViz screenshots and simulator views, and stop only that session with SIGTERM:
 
 ```bash
 tools/parking_scenarios/run_scenario.sh gz right_blocked artifacts/exploration/scenarios/gz_right_blocked
 python3 tools/parking_scenarios/scenario_metrics.py artifacts/exploration/scenarios/gz_right_blocked
-# Rebuild the gallery from chosen runs; CODE in the script labels each recorded HEAD:
-python3 tools/parking_scenarios/make_gallery.py artifacts/exploration/scenarios/gz_*
+# Scene views, then the two pages (CODE in make_results_page.py labels each recorded HEAD):
+tools/parking_scenarios/preview_scenario.sh gz right_blocked artifacts/exploration/scenes
+python3 tools/parking_scenarios/make_scenarios_page.py artifacts/exploration/scenes
+python3 tools/parking_scenarios/make_results_page.py --runs artifacts/exploration/scenarios/*/ \
+    --images artifacts/exploration/scenarios/gz_right_blocked
 ```
+
+`preview_scenario.sh gz|isaac SCENARIO OUT_DIR` starts a scene with
+`--plan-only` (the robot stays at its start) and saves the documentation views:
+top-down views of the whole task and of the workstation, a close-up of G1 and its
+table, an oblique view, and one frame of the robot's own camera.
+`capture_scene_views.py` renders them in the simulator itself, so a locked or
+disconnected desktop cannot blank them: Gazebo through temporary camera sensors
+that are removed afterwards, Isaac through the runner's opt-in view cameras
+(`RIDGEBACK_ISAAC_VIEW_CAMERAS`, a JSON list from `scene_views.py`; experiment runs
+carry only the top-down two). Each image is checked and listed in a manifest.
+`run_scenario.sh` takes the same top-down views while parked and at the end, and
+RViz screenshots at the mission stages. `make_scenarios_page.py` and
+`make_results_page.py` build the two pages; the results page labels every image
+with the mission state active when it was captured and shows a top-down view as
+the parked position only if the robot was `PARKED` then.
 
 `FRAMES=1` also saves a camera frame every `FRAMES_PERIOD` seconds (default 1;
 `FRAMES_EXT=png` is lossless and about 0.4 MB a frame).

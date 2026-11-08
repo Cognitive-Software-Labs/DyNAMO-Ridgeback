@@ -38,14 +38,16 @@ def test_rich_panel_still_covers_its_text() -> None:
                         RICH_PANEL_PADDING_PX) >= MEASURED_RICH_TEXT_HEIGHT_PX
 
 
-def test_rich_panel_is_tighter_than_the_plain_one() -> None:
-    rich = panel_height(HUD_ROWS, RICH_LINE_FACTOR, RICH_LINE_PAD, RICH_PANEL_PADDING_PX)
-    plain = panel_height(HUD_ROWS, PLAIN_LINE_FACTOR, PLAIN_LINE_PAD, PANEL_PADDING_PX)
-
-    assert rich < plain
+MEASURED_PLAIN_PITCH_PX_AT_9PT = 14.0   # the parking HUD's rows, off a screenshot
+PLAIN_HUD_ROWS = 13                      # velocity and coverage with their blank line
 
 
-def test_plain_line_height_is_unchanged() -> None:
-    # The exploration HUD renders plain and was tuned against these figures;
-    # the rich-text work must not move them.
-    assert (PLAIN_LINE_FACTOR, PLAIN_LINE_PAD, PANEL_PADDING_PX) == (1.8, 4.0, 16)
+def test_plain_line_height_matches_the_measured_pitch_without_clipping() -> None:
+    pitch = 9.0 * PLAIN_LINE_FACTOR + PLAIN_LINE_PAD
+    assert MEASURED_PLAIN_PITCH_PX_AT_9PT <= pitch <= MEASURED_PLAIN_PITCH_PX_AT_9PT + 0.6
+
+
+def test_plain_panel_covers_its_text_and_leaves_room_below() -> None:
+    height = int(PLAIN_HUD_ROWS * (9.0 * PLAIN_LINE_FACTOR + PLAIN_LINE_PAD) + PANEL_PADDING_PX)
+    text = PLAIN_HUD_ROWS * MEASURED_PLAIN_PITCH_PX_AT_9PT
+    assert text <= height <= text + 2 * PANEL_PADDING_PX

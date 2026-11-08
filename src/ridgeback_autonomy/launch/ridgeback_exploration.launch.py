@@ -20,6 +20,7 @@ from ridgeback_common.detector_config import (
     DETECTOR_DEFAULT, DETECTION_MODEL_DEFAULT, DETECTION_THRESHOLD_DEFAULT,
     TARGET_LABELS_DEFAULT, resolve_detector_settings,
 )
+from ridgeback_common import hud_style
 from ridgeback_common.camera_profiles import (
     CAMERA_PROFILE_CHOICES,
     DEFAULT_CAMERA_PROFILE,
@@ -64,7 +65,10 @@ HUD_TARGET_MARKER_TOPIC = 'hud_target_overlay'
 # clips rather than wraps, so this covers the wider of the two (40 x 14.4 = 576)
 # with room for the insets. Too narrow silently drops the last estimator's whole
 # column, which reads as that row never reporting rather than as a layout fault.
-HUD_TARGET_OVERLAY_WIDTH = 660
+# Those figures are at 16 pt; this HUD uses the shared 9 pt overlay text
+# (ridgeback_common.hud_style), so 40 x 14.4 x 9/16 = 324 px plus the insets.
+HUD_TARGET_TEXT_SIZE = hud_style.TEXT_SIZE
+HUD_TARGET_OVERLAY_WIDTH = 380
 
 
 def resolve_launch_namespace(context, *args, **kwargs):
@@ -242,6 +246,7 @@ def build_target_localization_nodes(context, *args, **kwargs):
         use_sim_time=use_sim_time,
         name='hud_target_node',
         overlay_width=HUD_TARGET_OVERLAY_WIDTH,
+        text_size=HUD_TARGET_TEXT_SIZE,
         marker_topic=HUD_TARGET_MARKER_TOPIC,
         # The viz node is the only producer of the panel this aggregator merges.
         condition=launch.conditions.IfCondition(estimate_viz),
