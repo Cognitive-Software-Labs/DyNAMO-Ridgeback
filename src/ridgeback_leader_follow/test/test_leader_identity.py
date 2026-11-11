@@ -182,3 +182,29 @@ def test_f3_acquisition_tie_is_deterministic_and_prefers_centre_before_side():
     selected,_=nearest_in_front([(a,1.5,-.8),(c,1.5,0.)],distance_tolerance=.25,lateral_tolerance=.1)
     assert selected.track_id==3
     assert nearest_in_front([left,right])[0].track_id==2
+
+
+def test_weak_detection_keeps_lock_only_with_a_lower_continuity_floor():
+    def run(floor):
+        identity=LeaderIdentity(LeaderLock(acquire_frames=3),2.,math.radians(30),continuity_min_confidence=floor)
+        def update(at,*entries,confidence=.9):
+            msg=people(*entries);msg.header.stamp.nanosec=round(at*1e9)
+            for person in msg.people:person.confidence=confidence
+            return identity.update(msg,IDENTITY)
+        for at in (0.,.05,.1):update(at,(1,1.2,0.,[1.,0.]))
+        return update(.15,(1,1.2,0.,[1.,0.]),confidence=.3)
+    assert run(.5).reason=='track_discontinuity'
+    out=run(.25)
+    assert out.state==LeaderState.LOCKED and out.reason=='identity_verified'
+
+
+def test_low_confidence_neighbour_counts_as_competitor_with_lower_floor():
+    identity=LeaderIdentity(LeaderLock(acquire_frames=3),2.,math.radians(30),continuity_min_confidence=.25)
+    for index in range(3):
+        msg=people((1,1.2,0.,[1.,0.]));msg.header.stamp.nanosec=index*50000000
+        identity.update(msg,IDENTITY)
+    msg=people((1,1.2,.02,[]),(2,1.2,-.02,[1.,0.]))
+    msg.people[1].confidence=.3
+    msg.header.stamp.nanosec=150000000
+    out=identity.update(msg,IDENTITY)
+    assert out.state==LeaderState.UNCERTAIN and out.reason=='track_discontinuity'

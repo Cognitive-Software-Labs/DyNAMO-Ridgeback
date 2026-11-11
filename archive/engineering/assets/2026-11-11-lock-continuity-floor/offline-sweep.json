@@ -1,0 +1,1154 @@
+{
+ "base": {
+  "gz-crossing-4": {
+   "coverage": 0.8932,
+   "wrong": 0,
+   "outside": null,
+   "unrecovered": false,
+   "states": {
+    "SEARCHING": 8,
+    "LOCKED": 326,
+    "UNCERTAIN": 24,
+    "LOST": 7
+   }
+  },
+  "gz-crowd-2": {
+   "coverage": 0.9272,
+   "wrong": 0,
+   "outside": null,
+   "unrecovered": false,
+   "states": {
+    "SEARCHING": 1,
+    "LOCKED": 331,
+    "UNCERTAIN": 25
+   }
+  },
+  "gz-crowd-4": {
+   "coverage": 0.8951,
+   "wrong": 0,
+   "outside": null,
+   "unrecovered": false,
+   "states": {
+    "SEARCHING": 1,
+    "LOCKED": 290,
+    "UNCERTAIN": 33
+   }
+  },
+  "gz-crowd-8": {
+   "coverage": 0.7143,
+   "wrong": 0,
+   "outside": null,
+   "unrecovered": false,
+   "states": {
+    "SEARCHING": 1,
+    "LOCKED": 220,
+    "UNCERTAIN": 76,
+    "LOST": 11
+   }
+  },
+  "gz-leader_alone-4": {
+   "coverage": 0.9978,
+   "wrong": 0,
+   "outside": null,
+   "unrecovered": false,
+   "states": {
+    "SEARCHING": 1,
+    "LOCKED": 455
+   }
+  },
+  "gz-leader_out_of_view-4": {
+   "coverage": 1.0,
+   "wrong": 0,
+   "outside": 1.0,
+   "unrecovered": false,
+   "states": {
+    "LOCKED": 367
+   }
+  },
+  "gz-leader_stop-4": {
+   "coverage": 0.8499,
+   "wrong": 0,
+   "outside": null,
+   "unrecovered": false,
+   "states": {
+    "SEARCHING": 2,
+    "LOCKED": 317,
+    "UNCERTAIN": 42,
+    "LOST": 12
+   }
+  },
+  "gz-lookalike_crossing-4": {
+   "coverage": 0.2401,
+   "wrong": 0,
+   "outside": null,
+   "unrecovered": true,
+   "states": {
+    "SEARCHING": 6,
+    "LOCKED": 97,
+    "UNCERTAIN": 10,
+    "LOST": 291
+   }
+  },
+  "gz-lookalike_parallel-4": {
+   "coverage": 0.6683,
+   "wrong": 0,
+   "outside": null,
+   "unrecovered": false,
+   "states": {
+    "SEARCHING": 1,
+    "LOCKED": 270,
+    "UNCERTAIN": 129,
+    "LOST": 4
+   }
+  },
+  "isaac-crossing-4": {
+   "coverage": 0.8853,
+   "wrong": 0,
+   "outside": null,
+   "unrecovered": false,
+   "states": {
+    "LOCKED": 301,
+    "UNCERTAIN": 32,
+    "LOST": 7
+   }
+  },
+  "isaac-crowd-2": {
+   "coverage": 0.9127,
+   "wrong": 0,
+   "outside": null,
+   "unrecovered": false,
+   "states": {
+    "LOCKED": 324,
+    "UNCERTAIN": 23,
+    "LOST": 8
+   }
+  },
+  "isaac-crowd-4": {
+   "coverage": 0.9331,
+   "wrong": 0,
+   "outside": null,
+   "unrecovered": false,
+   "states": {
+    "SEARCHING": 3,
+    "LOCKED": 279,
+    "UNCERTAIN": 17
+   }
+  },
+  "isaac-crowd-8": {
+   "coverage": 0.6909,
+   "wrong": 0,
+   "outside": null,
+   "unrecovered": false,
+   "states": {
+    "SEARCHING": 1,
+    "LOCKED": 219,
+    "UNCERTAIN": 94,
+    "LOST": 3
+   }
+  },
+  "isaac-leader_alone-4": {
+   "coverage": 1.0,
+   "wrong": 0,
+   "outside": null,
+   "unrecovered": false,
+   "states": {
+    "LOCKED": 359
+   }
+  },
+  "isaac-leader_out_of_view-4": {
+   "coverage": 0.9637,
+   "wrong": 0,
+   "outside": 1.0,
+   "unrecovered": false,
+   "states": {
+    "SEARCHING": 13,
+    "LOCKED": 345
+   }
+  },
+  "isaac-leader_stop-4": {
+   "coverage": 0.4045,
+   "wrong": 0,
+   "outside": null,
+   "unrecovered": true,
+   "states": {
+    "LOCKED": 144,
+    "UNCERTAIN": 187,
+    "LOST": 25
+   }
+  },
+  "isaac-lookalike_crossing-4": {
+   "coverage": 0.8129,
+   "wrong": 0,
+   "outside": null,
+   "unrecovered": false,
+   "states": {
+    "SEARCHING": 1,
+    "LOCKED": 278,
+    "UNCERTAIN": 32,
+    "LOST": 31
+   }
+  },
+  "isaac-lookalike_parallel-4": {
+   "coverage": 0.5812,
+   "wrong": 0,
+   "outside": null,
+   "unrecovered": false,
+   "states": {
+    "LOCKED": 204,
+    "UNCERTAIN": 131,
+    "LOST": 16
+   }
+  }
+ },
+ "c0.5": {
+  "gz-crossing-4": {
+   "coverage": 0.8932,
+   "wrong": 0,
+   "outside": null,
+   "unrecovered": false,
+   "states": {
+    "SEARCHING": 8,
+    "LOCKED": 326,
+    "UNCERTAIN": 24,
+    "LOST": 7
+   }
+  },
+  "gz-crowd-2": {
+   "coverage": 0.9272,
+   "wrong": 0,
+   "outside": null,
+   "unrecovered": false,
+   "states": {
+    "SEARCHING": 1,
+    "LOCKED": 331,
+    "UNCERTAIN": 25
+   }
+  },
+  "gz-crowd-4": {
+   "coverage": 0.8951,
+   "wrong": 0,
+   "outside": null,
+   "unrecovered": false,
+   "states": {
+    "SEARCHING": 1,
+    "LOCKED": 290,
+    "UNCERTAIN": 33
+   }
+  },
+  "gz-crowd-8": {
+   "coverage": 0.7143,
+   "wrong": 0,
+   "outside": null,
+   "unrecovered": false,
+   "states": {
+    "SEARCHING": 1,
+    "LOCKED": 220,
+    "UNCERTAIN": 76,
+    "LOST": 11
+   }
+  },
+  "gz-leader_alone-4": {
+   "coverage": 0.9978,
+   "wrong": 0,
+   "outside": null,
+   "unrecovered": false,
+   "states": {
+    "SEARCHING": 1,
+    "LOCKED": 455
+   }
+  },
+  "gz-leader_out_of_view-4": {
+   "coverage": 1.0,
+   "wrong": 0,
+   "outside": 1.0,
+   "unrecovered": false,
+   "states": {
+    "LOCKED": 367
+   }
+  },
+  "gz-leader_stop-4": {
+   "coverage": 0.8499,
+   "wrong": 0,
+   "outside": null,
+   "unrecovered": false,
+   "states": {
+    "SEARCHING": 2,
+    "LOCKED": 317,
+    "UNCERTAIN": 42,
+    "LOST": 12
+   }
+  },
+  "gz-lookalike_crossing-4": {
+   "coverage": 0.2401,
+   "wrong": 0,
+   "outside": null,
+   "unrecovered": true,
+   "states": {
+    "SEARCHING": 6,
+    "LOCKED": 97,
+    "UNCERTAIN": 10,
+    "LOST": 291
+   }
+  },
+  "gz-lookalike_parallel-4": {
+   "coverage": 0.6683,
+   "wrong": 0,
+   "outside": null,
+   "unrecovered": false,
+   "states": {
+    "SEARCHING": 1,
+    "LOCKED": 270,
+    "UNCERTAIN": 129,
+    "LOST": 4
+   }
+  },
+  "isaac-crossing-4": {
+   "coverage": 0.8853,
+   "wrong": 0,
+   "outside": null,
+   "unrecovered": false,
+   "states": {
+    "LOCKED": 301,
+    "UNCERTAIN": 32,
+    "LOST": 7
+   }
+  },
+  "isaac-crowd-2": {
+   "coverage": 0.9127,
+   "wrong": 0,
+   "outside": null,
+   "unrecovered": false,
+   "states": {
+    "LOCKED": 324,
+    "UNCERTAIN": 23,
+    "LOST": 8
+   }
+  },
+  "isaac-crowd-4": {
+   "coverage": 0.9331,
+   "wrong": 0,
+   "outside": null,
+   "unrecovered": false,
+   "states": {
+    "SEARCHING": 3,
+    "LOCKED": 279,
+    "UNCERTAIN": 17
+   }
+  },
+  "isaac-crowd-8": {
+   "coverage": 0.6909,
+   "wrong": 0,
+   "outside": null,
+   "unrecovered": false,
+   "states": {
+    "SEARCHING": 1,
+    "LOCKED": 219,
+    "UNCERTAIN": 94,
+    "LOST": 3
+   }
+  },
+  "isaac-leader_alone-4": {
+   "coverage": 1.0,
+   "wrong": 0,
+   "outside": null,
+   "unrecovered": false,
+   "states": {
+    "LOCKED": 359
+   }
+  },
+  "isaac-leader_out_of_view-4": {
+   "coverage": 0.9637,
+   "wrong": 0,
+   "outside": 1.0,
+   "unrecovered": false,
+   "states": {
+    "SEARCHING": 13,
+    "LOCKED": 345
+   }
+  },
+  "isaac-leader_stop-4": {
+   "coverage": 0.4045,
+   "wrong": 0,
+   "outside": null,
+   "unrecovered": true,
+   "states": {
+    "LOCKED": 144,
+    "UNCERTAIN": 187,
+    "LOST": 25
+   }
+  },
+  "isaac-lookalike_crossing-4": {
+   "coverage": 0.8129,
+   "wrong": 0,
+   "outside": null,
+   "unrecovered": false,
+   "states": {
+    "SEARCHING": 1,
+    "LOCKED": 278,
+    "UNCERTAIN": 32,
+    "LOST": 31
+   }
+  },
+  "isaac-lookalike_parallel-4": {
+   "coverage": 0.5812,
+   "wrong": 0,
+   "outside": null,
+   "unrecovered": false,
+   "states": {
+    "LOCKED": 204,
+    "UNCERTAIN": 131,
+    "LOST": 16
+   }
+  }
+ },
+ "c0.3": {
+  "gz-crossing-4": {
+   "coverage": 0.9342,
+   "wrong": 0,
+   "outside": null,
+   "unrecovered": false,
+   "states": {
+    "SEARCHING": 8,
+    "LOCKED": 341,
+    "UNCERTAIN": 9,
+    "LOST": 7
+   }
+  },
+  "gz-crowd-2": {
+   "coverage": 0.9972,
+   "wrong": 0,
+   "outside": null,
+   "unrecovered": false,
+   "states": {
+    "SEARCHING": 1,
+    "LOCKED": 356
+   }
+  },
+  "gz-crowd-4": {
+   "coverage": 0.9969,
+   "wrong": 0,
+   "outside": null,
+   "unrecovered": false,
+   "states": {
+    "SEARCHING": 1,
+    "LOCKED": 323
+   }
+  },
+  "gz-crowd-8": {
+   "coverage": 0.8052,
+   "wrong": 0,
+   "outside": null,
+   "unrecovered": false,
+   "states": {
+    "SEARCHING": 1,
+    "LOCKED": 248,
+    "UNCERTAIN": 48,
+    "LOST": 11
+   }
+  },
+  "gz-leader_alone-4": {
+   "coverage": 0.9978,
+   "wrong": 0,
+   "outside": null,
+   "unrecovered": false,
+   "states": {
+    "SEARCHING": 1,
+    "LOCKED": 455
+   }
+  },
+  "gz-leader_out_of_view-4": {
+   "coverage": 1.0,
+   "wrong": 0,
+   "outside": 1.0,
+   "unrecovered": false,
+   "states": {
+    "LOCKED": 367
+   }
+  },
+  "gz-leader_stop-4": {
+   "coverage": 0.9678,
+   "wrong": 0,
+   "outside": null,
+   "unrecovered": false,
+   "states": {
+    "SEARCHING": 2,
+    "LOCKED": 361,
+    "UNCERTAIN": 10
+   }
+  },
+  "gz-lookalike_crossing-4": {
+   "coverage": 0.8787,
+   "wrong": 0,
+   "outside": null,
+   "unrecovered": false,
+   "states": {
+    "SEARCHING": 6,
+    "LOCKED": 355,
+    "UNCERTAIN": 9,
+    "LOST": 34
+   }
+  },
+  "gz-lookalike_parallel-4": {
+   "coverage": 0.9975,
+   "wrong": 0,
+   "outside": null,
+   "unrecovered": false,
+   "states": {
+    "SEARCHING": 1,
+    "LOCKED": 403
+   }
+  },
+  "isaac-crossing-4": {
+   "coverage": 0.9765,
+   "wrong": 0,
+   "outside": null,
+   "unrecovered": false,
+   "states": {
+    "LOCKED": 332,
+    "UNCERTAIN": 8
+   }
+  },
+  "isaac-crowd-2": {
+   "coverage": 1.0,
+   "wrong": 0,
+   "outside": null,
+   "unrecovered": false,
+   "states": {
+    "LOCKED": 355
+   }
+  },
+  "isaac-crowd-4": {
+   "coverage": 0.99,
+   "wrong": 0,
+   "outside": null,
+   "unrecovered": false,
+   "states": {
+    "SEARCHING": 3,
+    "LOCKED": 296
+   }
+  },
+  "isaac-crowd-8": {
+   "coverage": 0.6909,
+   "wrong": 0,
+   "outside": null,
+   "unrecovered": false,
+   "states": {
+    "SEARCHING": 1,
+    "LOCKED": 219,
+    "UNCERTAIN": 87,
+    "LOST": 10
+   }
+  },
+  "isaac-leader_alone-4": {
+   "coverage": 1.0,
+   "wrong": 0,
+   "outside": null,
+   "unrecovered": false,
+   "states": {
+    "LOCKED": 359
+   }
+  },
+  "isaac-leader_out_of_view-4": {
+   "coverage": 0.9637,
+   "wrong": 0,
+   "outside": 1.0,
+   "unrecovered": false,
+   "states": {
+    "SEARCHING": 13,
+    "LOCKED": 345
+   }
+  },
+  "isaac-leader_stop-4": {
+   "coverage": 0.9888,
+   "wrong": 0,
+   "outside": null,
+   "unrecovered": false,
+   "states": {
+    "LOCKED": 352,
+    "UNCERTAIN": 4
+   }
+  },
+  "isaac-lookalike_crossing-4": {
+   "coverage": 0.8684,
+   "wrong": 0,
+   "outside": null,
+   "unrecovered": false,
+   "states": {
+    "SEARCHING": 1,
+    "LOCKED": 297,
+    "UNCERTAIN": 20,
+    "LOST": 24
+   }
+  },
+  "isaac-lookalike_parallel-4": {
+   "coverage": 0.9915,
+   "wrong": 0,
+   "outside": null,
+   "unrecovered": false,
+   "states": {
+    "LOCKED": 348,
+    "UNCERTAIN": 3
+   }
+  }
+ },
+ "c0.25": {
+  "gz-crossing-4": {
+   "coverage": 0.9397,
+   "wrong": 0,
+   "outside": null,
+   "unrecovered": false,
+   "states": {
+    "SEARCHING": 8,
+    "LOCKED": 343,
+    "UNCERTAIN": 8,
+    "LOST": 6
+   }
+  },
+  "gz-crowd-2": {
+   "coverage": 0.9972,
+   "wrong": 0,
+   "outside": null,
+   "unrecovered": false,
+   "states": {
+    "SEARCHING": 1,
+    "LOCKED": 356
+   }
+  },
+  "gz-crowd-4": {
+   "coverage": 0.9969,
+   "wrong": 0,
+   "outside": null,
+   "unrecovered": false,
+   "states": {
+    "SEARCHING": 1,
+    "LOCKED": 323
+   }
+  },
+  "gz-crowd-8": {
+   "coverage": 0.9805,
+   "wrong": 0,
+   "outside": null,
+   "unrecovered": false,
+   "states": {
+    "SEARCHING": 1,
+    "LOCKED": 302,
+    "UNCERTAIN": 5
+   }
+  },
+  "gz-leader_alone-4": {
+   "coverage": 0.9978,
+   "wrong": 0,
+   "outside": null,
+   "unrecovered": false,
+   "states": {
+    "SEARCHING": 1,
+    "LOCKED": 455
+   }
+  },
+  "gz-leader_out_of_view-4": {
+   "coverage": 1.0,
+   "wrong": 0,
+   "outside": 1.0,
+   "unrecovered": false,
+   "states": {
+    "LOCKED": 367
+   }
+  },
+  "gz-leader_stop-4": {
+   "coverage": 0.9678,
+   "wrong": 0,
+   "outside": null,
+   "unrecovered": false,
+   "states": {
+    "SEARCHING": 2,
+    "LOCKED": 361,
+    "UNCERTAIN": 10
+   }
+  },
+  "gz-lookalike_crossing-4": {
+   "coverage": 0.8911,
+   "wrong": 0,
+   "outside": null,
+   "unrecovered": false,
+   "states": {
+    "SEARCHING": 6,
+    "LOCKED": 360,
+    "UNCERTAIN": 8,
+    "LOST": 30
+   }
+  },
+  "gz-lookalike_parallel-4": {
+   "coverage": 0.9975,
+   "wrong": 0,
+   "outside": null,
+   "unrecovered": false,
+   "states": {
+    "SEARCHING": 1,
+    "LOCKED": 403
+   }
+  },
+  "isaac-crossing-4": {
+   "coverage": 0.9765,
+   "wrong": 0,
+   "outside": null,
+   "unrecovered": false,
+   "states": {
+    "LOCKED": 332,
+    "UNCERTAIN": 8
+   }
+  },
+  "isaac-crowd-2": {
+   "coverage": 1.0,
+   "wrong": 0,
+   "outside": null,
+   "unrecovered": false,
+   "states": {
+    "LOCKED": 355
+   }
+  },
+  "isaac-crowd-4": {
+   "coverage": 0.99,
+   "wrong": 0,
+   "outside": null,
+   "unrecovered": false,
+   "states": {
+    "SEARCHING": 3,
+    "LOCKED": 296
+   }
+  },
+  "isaac-crowd-8": {
+   "coverage": 0.959,
+   "wrong": 0,
+   "outside": null,
+   "unrecovered": false,
+   "states": {
+    "SEARCHING": 1,
+    "LOCKED": 304,
+    "UNCERTAIN": 12
+   }
+  },
+  "isaac-leader_alone-4": {
+   "coverage": 1.0,
+   "wrong": 0,
+   "outside": null,
+   "unrecovered": false,
+   "states": {
+    "LOCKED": 359
+   }
+  },
+  "isaac-leader_out_of_view-4": {
+   "coverage": 0.9637,
+   "wrong": 0,
+   "outside": 1.0,
+   "unrecovered": false,
+   "states": {
+    "SEARCHING": 13,
+    "LOCKED": 345
+   }
+  },
+  "isaac-leader_stop-4": {
+   "coverage": 0.9888,
+   "wrong": 0,
+   "outside": null,
+   "unrecovered": false,
+   "states": {
+    "LOCKED": 352,
+    "UNCERTAIN": 4
+   }
+  },
+  "isaac-lookalike_crossing-4": {
+   "coverage": 0.8713,
+   "wrong": 0,
+   "outside": null,
+   "unrecovered": false,
+   "states": {
+    "SEARCHING": 1,
+    "LOCKED": 298,
+    "UNCERTAIN": 18,
+    "LOST": 25
+   }
+  },
+  "isaac-lookalike_parallel-4": {
+   "coverage": 0.9915,
+   "wrong": 0,
+   "outside": null,
+   "unrecovered": false,
+   "states": {
+    "LOCKED": 348,
+    "UNCERTAIN": 3
+   }
+  }
+ },
+ "c0.2": {
+  "gz-crossing-4": {
+   "coverage": 0.9425,
+   "wrong": 0,
+   "outside": null,
+   "unrecovered": false,
+   "states": {
+    "SEARCHING": 8,
+    "LOCKED": 344,
+    "UNCERTAIN": 7,
+    "LOST": 6
+   }
+  },
+  "gz-crowd-2": {
+   "coverage": 0.9972,
+   "wrong": 0,
+   "outside": null,
+   "unrecovered": false,
+   "states": {
+    "SEARCHING": 1,
+    "LOCKED": 356
+   }
+  },
+  "gz-crowd-4": {
+   "coverage": 0.9969,
+   "wrong": 0,
+   "outside": null,
+   "unrecovered": false,
+   "states": {
+    "SEARCHING": 1,
+    "LOCKED": 323
+   }
+  },
+  "gz-crowd-8": {
+   "coverage": 0.9805,
+   "wrong": 0,
+   "outside": null,
+   "unrecovered": false,
+   "states": {
+    "SEARCHING": 1,
+    "LOCKED": 302,
+    "UNCERTAIN": 5
+   }
+  },
+  "gz-leader_alone-4": {
+   "coverage": 0.9978,
+   "wrong": 0,
+   "outside": null,
+   "unrecovered": false,
+   "states": {
+    "SEARCHING": 1,
+    "LOCKED": 455
+   }
+  },
+  "gz-leader_out_of_view-4": {
+   "coverage": 1.0,
+   "wrong": 0,
+   "outside": 1.0,
+   "unrecovered": false,
+   "states": {
+    "LOCKED": 367
+   }
+  },
+  "gz-leader_stop-4": {
+   "coverage": 0.9678,
+   "wrong": 0,
+   "outside": null,
+   "unrecovered": false,
+   "states": {
+    "SEARCHING": 2,
+    "LOCKED": 361,
+    "UNCERTAIN": 10
+   }
+  },
+  "gz-lookalike_crossing-4": {
+   "coverage": 0.9505,
+   "wrong": 0,
+   "outside": null,
+   "unrecovered": false,
+   "states": {
+    "SEARCHING": 6,
+    "LOCKED": 384,
+    "UNCERTAIN": 14
+   }
+  },
+  "gz-lookalike_parallel-4": {
+   "coverage": 0.9975,
+   "wrong": 0,
+   "outside": null,
+   "unrecovered": false,
+   "states": {
+    "SEARCHING": 1,
+    "LOCKED": 403
+   }
+  },
+  "isaac-crossing-4": {
+   "coverage": 0.9765,
+   "wrong": 0,
+   "outside": null,
+   "unrecovered": false,
+   "states": {
+    "LOCKED": 332,
+    "UNCERTAIN": 8
+   }
+  },
+  "isaac-crowd-2": {
+   "coverage": 1.0,
+   "wrong": 0,
+   "outside": null,
+   "unrecovered": false,
+   "states": {
+    "LOCKED": 355
+   }
+  },
+  "isaac-crowd-4": {
+   "coverage": 0.99,
+   "wrong": 0,
+   "outside": null,
+   "unrecovered": false,
+   "states": {
+    "SEARCHING": 3,
+    "LOCKED": 296
+   }
+  },
+  "isaac-crowd-8": {
+   "coverage": 0.959,
+   "wrong": 0,
+   "outside": null,
+   "unrecovered": false,
+   "states": {
+    "SEARCHING": 1,
+    "LOCKED": 304,
+    "UNCERTAIN": 12
+   }
+  },
+  "isaac-leader_alone-4": {
+   "coverage": 1.0,
+   "wrong": 0,
+   "outside": null,
+   "unrecovered": false,
+   "states": {
+    "LOCKED": 359
+   }
+  },
+  "isaac-leader_out_of_view-4": {
+   "coverage": 0.9637,
+   "wrong": 0,
+   "outside": 1.0,
+   "unrecovered": false,
+   "states": {
+    "SEARCHING": 13,
+    "LOCKED": 345
+   }
+  },
+  "isaac-leader_stop-4": {
+   "coverage": 0.9888,
+   "wrong": 0,
+   "outside": null,
+   "unrecovered": false,
+   "states": {
+    "LOCKED": 352,
+    "UNCERTAIN": 4
+   }
+  },
+  "isaac-lookalike_crossing-4": {
+   "coverage": 0.8713,
+   "wrong": 0,
+   "outside": null,
+   "unrecovered": false,
+   "states": {
+    "SEARCHING": 1,
+    "LOCKED": 298,
+    "UNCERTAIN": 18,
+    "LOST": 25
+   }
+  },
+  "isaac-lookalike_parallel-4": {
+   "coverage": 0.9915,
+   "wrong": 0,
+   "outside": null,
+   "unrecovered": false,
+   "states": {
+    "LOCKED": 348,
+    "UNCERTAIN": 3
+   }
+  }
+ },
+ "c0.1": {
+  "gz-crossing-4": {
+   "coverage": 0.9781,
+   "wrong": 0,
+   "outside": null,
+   "unrecovered": false,
+   "states": {
+    "SEARCHING": 8,
+    "LOCKED": 357
+   }
+  },
+  "gz-crowd-2": {
+   "coverage": 0.9972,
+   "wrong": 0,
+   "outside": null,
+   "unrecovered": false,
+   "states": {
+    "SEARCHING": 1,
+    "LOCKED": 356
+   }
+  },
+  "gz-crowd-4": {
+   "coverage": 0.9969,
+   "wrong": 0,
+   "outside": null,
+   "unrecovered": false,
+   "states": {
+    "SEARCHING": 1,
+    "LOCKED": 323
+   }
+  },
+  "gz-crowd-8": {
+   "coverage": 0.9805,
+   "wrong": 0,
+   "outside": null,
+   "unrecovered": false,
+   "states": {
+    "SEARCHING": 1,
+    "LOCKED": 302,
+    "UNCERTAIN": 5
+   }
+  },
+  "gz-leader_alone-4": {
+   "coverage": 0.9978,
+   "wrong": 0,
+   "outside": null,
+   "unrecovered": false,
+   "states": {
+    "SEARCHING": 1,
+    "LOCKED": 455
+   }
+  },
+  "gz-leader_out_of_view-4": {
+   "coverage": 1.0,
+   "wrong": 0,
+   "outside": 1.0,
+   "unrecovered": false,
+   "states": {
+    "LOCKED": 367
+   }
+  },
+  "gz-leader_stop-4": {
+   "coverage": 0.9678,
+   "wrong": 0,
+   "outside": null,
+   "unrecovered": false,
+   "states": {
+    "SEARCHING": 2,
+    "LOCKED": 361,
+    "UNCERTAIN": 10
+   }
+  },
+  "gz-lookalike_crossing-4": {
+   "coverage": 0.9505,
+   "wrong": 0,
+   "outside": null,
+   "unrecovered": false,
+   "states": {
+    "SEARCHING": 6,
+    "LOCKED": 384,
+    "UNCERTAIN": 14
+   }
+  },
+  "gz-lookalike_parallel-4": {
+   "coverage": 0.9975,
+   "wrong": 0,
+   "outside": null,
+   "unrecovered": false,
+   "states": {
+    "SEARCHING": 1,
+    "LOCKED": 403
+   }
+  },
+  "isaac-crossing-4": {
+   "coverage": 0.9765,
+   "wrong": 0,
+   "outside": null,
+   "unrecovered": false,
+   "states": {
+    "LOCKED": 332,
+    "UNCERTAIN": 8
+   }
+  },
+  "isaac-crowd-2": {
+   "coverage": 1.0,
+   "wrong": 0,
+   "outside": null,
+   "unrecovered": false,
+   "states": {
+    "LOCKED": 355
+   }
+  },
+  "isaac-crowd-4": {
+   "coverage": 0.99,
+   "wrong": 0,
+   "outside": null,
+   "unrecovered": false,
+   "states": {
+    "SEARCHING": 3,
+    "LOCKED": 296
+   }
+  },
+  "isaac-crowd-8": {
+   "coverage": 0.959,
+   "wrong": 0,
+   "outside": null,
+   "unrecovered": false,
+   "states": {
+    "SEARCHING": 1,
+    "LOCKED": 304,
+    "UNCERTAIN": 12
+   }
+  },
+  "isaac-leader_alone-4": {
+   "coverage": 1.0,
+   "wrong": 0,
+   "outside": null,
+   "unrecovered": false,
+   "states": {
+    "LOCKED": 359
+   }
+  },
+  "isaac-leader_out_of_view-4": {
+   "coverage": 0.9637,
+   "wrong": 0,
+   "outside": 1.0,
+   "unrecovered": false,
+   "states": {
+    "SEARCHING": 13,
+    "LOCKED": 345
+   }
+  },
+  "isaac-leader_stop-4": {
+   "coverage": 0.9888,
+   "wrong": 0,
+   "outside": null,
+   "unrecovered": false,
+   "states": {
+    "LOCKED": 352,
+    "UNCERTAIN": 4
+   }
+  },
+  "isaac-lookalike_crossing-4": {
+   "coverage": 0.924,
+   "wrong": 0,
+   "outside": null,
+   "unrecovered": false,
+   "states": {
+    "SEARCHING": 1,
+    "LOCKED": 316,
+    "UNCERTAIN": 22,
+    "LOST": 3
+   }
+  },
+  "isaac-lookalike_parallel-4": {
+   "coverage": 0.9915,
+   "wrong": 0,
+   "outside": null,
+   "unrecovered": false,
+   "states": {
+    "LOCKED": 348,
+    "UNCERTAIN": 3
+   }
+  }
+ }
+}

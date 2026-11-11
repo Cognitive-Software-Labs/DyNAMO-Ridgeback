@@ -24,6 +24,7 @@ def main():
     p.add_argument('--acquire-interval',type=int,default=8)
     p.add_argument('--acquire-distance-tolerance',type=float,default=0.)
     p.add_argument('--acquire-lateral-tolerance',type=float,default=0.)
+    p.add_argument('--continuity-min-confidence',type=float,default=.5)
     p.add_argument('--match-threshold',type=float,default=.72)
     p.add_argument('--recovery-margin',type=float,default=.05)
     p.add_argument('--appearance-model-dir',type=Path,default=Path('artifacts/leader-following/f3-models'))
@@ -61,6 +62,7 @@ def main():
                     '-p',f'acquire_interval:={a.acquire_interval}',
                     '-p',f'acquire_distance_tolerance:={a.acquire_distance_tolerance}',
                     '-p',f'acquire_lateral_tolerance:={a.acquire_lateral_tolerance}',
+                    '-p',f'continuity_min_confidence:={a.continuity_min_confidence}',
                     '-p',f'match_threshold:={a.match_threshold}','-p',f'recovery_margin:={a.recovery_margin}'],
                     stdout=log,stderr=subprocess.STDOUT,start_new_session=True)
                 processes.append(leader)
@@ -110,7 +112,8 @@ def main():
         'track_maximum_age':a.track_maximum_age,'observation_timeout':a.observation_timeout,
         'identity_parameters':{'match_threshold':a.match_threshold,'recovery_margin':a.recovery_margin,
             'acquire_interval':a.acquire_interval,'acquire_distance_tolerance':a.acquire_distance_tolerance,
-            'acquire_lateral_tolerance':a.acquire_lateral_tolerance},
+            'acquire_lateral_tolerance':a.acquire_lateral_tolerance,
+            'continuity_min_confidence':a.continuity_min_confidence},
         'appearance_dimensions':sorted({len(p['appearance']) for m in messages for p in m['people'] if p['appearance']}),
         'leader_messages':len(leaders),'locked_messages':sum(m['state']==LeaderState.LOCKED for m in leaders),'scope':('real ROS feature/LeaderState publication; no identity-accuracy qualification' if a.appearance != 'none' else 'real ROS node, sensors/TF from bag, People publication; no motion command')},indent=2)+'\n')
 

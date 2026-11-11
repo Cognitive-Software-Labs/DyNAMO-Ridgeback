@@ -9,7 +9,8 @@ per-case reports ([benchmark reference](../leader_following/benchmarks.md)).
 F3 simulation checks pass: five appearance candidates compared, OSNet-AIN
 selected, and eighteen ROS cases reached correct locks with zero wrong locks.
 Both camera-exit cases held every sampled outside-camera observation; visible
-lock coverage remains variable ([reference](../leader_following/recognition.md)).
+lock coverage is 87–100% with the profile's continuity confidence floor
+([reference](../leader_following/recognition.md)).
 Robot/Thor performance is deferred until hardware access. F4–F6 remain open;
 no leader-following controller has driven a robot.
 

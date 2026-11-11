@@ -1,0 +1,404 @@
+{
+  "status": "passed",
+  "cases": {
+    "isaac-leader_out_of_view-4": {
+      "identity_label_policy": "selected target nearest truth within 0.75 m, separated by 0.1 m; unselected duplicate tracks cannot steal its label",
+      "frames": 349,
+      "states": {
+        "LOCKED": 349
+      },
+      "locked_frames": 349,
+      "correct_locked_frames": 349,
+      "wrong_locked_frames": 0,
+      "correct_lock_fraction": 1.0,
+      "correct_locked_without_appearance_frames": 188,
+      "outside_camera_frames": 121,
+      "correct_locked_outside_camera_frames": 121,
+      "outside_camera_lock_fraction": 1.0,
+      "recovery_seconds": [],
+      "unrecovered_loss": false,
+      "passed_zero_wrong_lock": true,
+      "status": "passed",
+      "scope": "real ROS tracker plus identity node, recorded sensors, stationary observer; no driving or hardware timing claim"
+    },
+    "gz-leader_out_of_view-4": {
+      "identity_label_policy": "selected target nearest truth within 0.75 m, separated by 0.1 m; unselected duplicate tracks cannot steal its label",
+      "frames": 326,
+      "states": {
+        "SEARCHING": 1,
+        "LOCKED": 325
+      },
+      "locked_frames": 325,
+      "correct_locked_frames": 325,
+      "wrong_locked_frames": 0,
+      "correct_lock_fraction": 0.9969325153374233,
+      "correct_locked_without_appearance_frames": 178,
+      "outside_camera_frames": 108,
+      "correct_locked_outside_camera_frames": 108,
+      "outside_camera_lock_fraction": 1.0,
+      "recovery_seconds": [],
+      "unrecovered_loss": false,
+      "passed_zero_wrong_lock": true,
+      "status": "passed",
+      "scope": "real ROS tracker plus identity node, recorded sensors, stationary observer; no driving or hardware timing claim"
+    },
+    "gz-lookalike_crossing-4": {
+      "identity_label_policy": "selected target nearest truth within 0.75 m, separated by 0.1 m; unselected duplicate tracks cannot steal its label",
+      "frames": 311,
+      "states": {
+        "SEARCHING": 1,
+        "LOCKED": 296,
+        "UNCERTAIN": 14
+      },
+      "locked_frames": 296,
+      "correct_locked_frames": 296,
+      "wrong_locked_frames": 0,
+      "correct_lock_fraction": 0.9517684887459807,
+      "correct_locked_without_appearance_frames": 39,
+      "outside_camera_frames": 0,
+      "correct_locked_outside_camera_frames": 0,
+      "outside_camera_lock_fraction": null,
+      "recovery_seconds": [
+        0.3959999999999999,
+        0.2969999999999997,
+        0.1980000000000004
+      ],
+      "unrecovered_loss": false,
+      "passed_zero_wrong_lock": true,
+      "status": "passed",
+      "scope": "real ROS tracker plus identity node, recorded sensors, stationary observer; no driving or hardware timing claim"
+    },
+    "isaac-crossing-4": {
+      "identity_label_policy": "selected target nearest truth within 0.75 m, separated by 0.1 m; unselected duplicate tracks cannot steal its label",
+      "frames": 316,
+      "states": {
+        "SEARCHING": 1,
+        "LOCKED": 307,
+        "UNCERTAIN": 8
+      },
+      "locked_frames": 307,
+      "correct_locked_frames": 307,
+      "wrong_locked_frames": 0,
+      "correct_lock_fraction": 0.9715189873417721,
+      "correct_locked_without_appearance_frames": 35,
+      "outside_camera_frames": 0,
+      "correct_locked_outside_camera_frames": 0,
+      "outside_camera_lock_fraction": null,
+      "recovery_seconds": [
+        0.23333333300000003,
+        0.2916666670000003
+      ],
+      "unrecovered_loss": false,
+      "passed_zero_wrong_lock": true,
+      "status": "passed",
+      "scope": "real ROS tracker plus identity node, recorded sensors, stationary observer; no driving or hardware timing claim"
+    },
+    "isaac-lookalike_crossing-4": {
+      "identity_label_policy": "selected target nearest truth within 0.75 m, separated by 0.1 m; unselected duplicate tracks cannot steal its label",
+      "frames": 328,
+      "states": {
+        "LOCKED": 297,
+        "UNCERTAIN": 9,
+        "LOST": 22
+      },
+      "locked_frames": 297,
+      "correct_locked_frames": 297,
+      "wrong_locked_frames": 0,
+      "correct_lock_fraction": 0.9054878048780488,
+      "correct_locked_without_appearance_frames": 33,
+      "outside_camera_frames": 0,
+      "correct_locked_outside_camera_frames": 0,
+      "outside_camera_lock_fraction": null,
+      "recovery_seconds": [
+        1.9333333330000002
+      ],
+      "unrecovered_loss": false,
+      "passed_zero_wrong_lock": true,
+      "status": "passed",
+      "scope": "real ROS tracker plus identity node, recorded sensors, stationary observer; no driving or hardware timing claim"
+    },
+    "isaac-crowd-4": {
+      "identity_label_policy": "selected target nearest truth within 0.75 m, separated by 0.1 m; unselected duplicate tracks cannot steal its label",
+      "frames": 334,
+      "states": {
+        "LOCKED": 334
+      },
+      "locked_frames": 334,
+      "correct_locked_frames": 334,
+      "wrong_locked_frames": 0,
+      "correct_lock_fraction": 1.0,
+      "correct_locked_without_appearance_frames": 30,
+      "outside_camera_frames": 0,
+      "correct_locked_outside_camera_frames": 0,
+      "outside_camera_lock_fraction": null,
+      "recovery_seconds": [],
+      "unrecovered_loss": false,
+      "passed_zero_wrong_lock": true,
+      "status": "passed",
+      "scope": "real ROS tracker plus identity node, recorded sensors, stationary observer; no driving or hardware timing claim"
+    },
+    "isaac-leader_alone-4": {
+      "identity_label_policy": "selected target nearest truth within 0.75 m, separated by 0.1 m; unselected duplicate tracks cannot steal its label",
+      "frames": 370,
+      "states": {
+        "LOCKED": 370
+      },
+      "locked_frames": 370,
+      "correct_locked_frames": 370,
+      "wrong_locked_frames": 0,
+      "correct_lock_fraction": 1.0,
+      "correct_locked_without_appearance_frames": 81,
+      "outside_camera_frames": 0,
+      "correct_locked_outside_camera_frames": 0,
+      "outside_camera_lock_fraction": null,
+      "recovery_seconds": [],
+      "unrecovered_loss": false,
+      "passed_zero_wrong_lock": true,
+      "status": "passed",
+      "scope": "real ROS tracker plus identity node, recorded sensors, stationary observer; no driving or hardware timing claim"
+    },
+    "gz-leader_stop-4": {
+      "identity_label_policy": "selected target nearest truth within 0.75 m, separated by 0.1 m; unselected duplicate tracks cannot steal its label",
+      "frames": 310,
+      "states": {
+        "SEARCHING": 1,
+        "LOCKED": 309
+      },
+      "locked_frames": 309,
+      "correct_locked_frames": 309,
+      "wrong_locked_frames": 0,
+      "correct_lock_fraction": 0.9967741935483871,
+      "correct_locked_without_appearance_frames": 46,
+      "outside_camera_frames": 0,
+      "correct_locked_outside_camera_frames": 0,
+      "outside_camera_lock_fraction": null,
+      "recovery_seconds": [],
+      "unrecovered_loss": false,
+      "passed_zero_wrong_lock": true,
+      "status": "passed",
+      "scope": "real ROS tracker plus identity node, recorded sensors, stationary observer; no driving or hardware timing claim"
+    },
+    "isaac-lookalike_parallel-4": {
+      "identity_label_policy": "selected target nearest truth within 0.75 m, separated by 0.1 m; unselected duplicate tracks cannot steal its label",
+      "frames": 371,
+      "states": {
+        "LOCKED": 371
+      },
+      "locked_frames": 371,
+      "correct_locked_frames": 371,
+      "wrong_locked_frames": 0,
+      "correct_lock_fraction": 1.0,
+      "correct_locked_without_appearance_frames": 67,
+      "outside_camera_frames": 0,
+      "correct_locked_outside_camera_frames": 0,
+      "outside_camera_lock_fraction": null,
+      "recovery_seconds": [],
+      "unrecovered_loss": false,
+      "passed_zero_wrong_lock": true,
+      "status": "passed",
+      "scope": "real ROS tracker plus identity node, recorded sensors, stationary observer; no driving or hardware timing claim"
+    },
+    "isaac-leader_stop-4": {
+      "identity_label_policy": "selected target nearest truth within 0.75 m, separated by 0.1 m; unselected duplicate tracks cannot steal its label",
+      "frames": 351,
+      "states": {
+        "LOCKED": 335,
+        "UNCERTAIN": 16
+      },
+      "locked_frames": 335,
+      "correct_locked_frames": 335,
+      "wrong_locked_frames": 0,
+      "correct_lock_fraction": 0.9544159544159544,
+      "correct_locked_without_appearance_frames": 62,
+      "outside_camera_frames": 0,
+      "correct_locked_outside_camera_frames": 0,
+      "outside_camera_lock_fraction": null,
+      "recovery_seconds": [
+        0.7333333340000001,
+        0.16666666699999944
+      ],
+      "unrecovered_loss": false,
+      "passed_zero_wrong_lock": true,
+      "status": "passed",
+      "scope": "real ROS tracker plus identity node, recorded sensors, stationary observer; no driving or hardware timing claim"
+    },
+    "isaac-crowd-2": {
+      "identity_label_policy": "selected target nearest truth within 0.75 m, separated by 0.1 m; unselected duplicate tracks cannot steal its label",
+      "frames": 353,
+      "states": {
+        "SEARCHING": 1,
+        "LOCKED": 352
+      },
+      "locked_frames": 352,
+      "correct_locked_frames": 352,
+      "wrong_locked_frames": 0,
+      "correct_lock_fraction": 0.9971671388101983,
+      "correct_locked_without_appearance_frames": 71,
+      "outside_camera_frames": 0,
+      "correct_locked_outside_camera_frames": 0,
+      "outside_camera_lock_fraction": null,
+      "recovery_seconds": [],
+      "unrecovered_loss": false,
+      "passed_zero_wrong_lock": true,
+      "status": "passed",
+      "scope": "real ROS tracker plus identity node, recorded sensors, stationary observer; no driving or hardware timing claim"
+    },
+    "isaac-crowd-8": {
+      "identity_label_policy": "selected target nearest truth within 0.75 m, separated by 0.1 m; unselected duplicate tracks cannot steal its label",
+      "frames": 303,
+      "states": {
+        "SEARCHING": 18,
+        "LOCKED": 264,
+        "UNCERTAIN": 21
+      },
+      "locked_frames": 264,
+      "correct_locked_frames": 264,
+      "wrong_locked_frames": 0,
+      "correct_lock_fraction": 0.8712871287128713,
+      "correct_locked_without_appearance_frames": 34,
+      "outside_camera_frames": 0,
+      "correct_locked_outside_camera_frames": 0,
+      "outside_camera_lock_fraction": null,
+      "recovery_seconds": [
+        0.25,
+        0.20000000000000018,
+        0.4666666669999997,
+        0.1999999999999993,
+        0.2666666669999991
+      ],
+      "unrecovered_loss": false,
+      "passed_zero_wrong_lock": true,
+      "status": "passed",
+      "scope": "real ROS tracker plus identity node, recorded sensors, stationary observer; no driving or hardware timing claim"
+    },
+    "gz-leader_alone-4": {
+      "identity_label_policy": "selected target nearest truth within 0.75 m, separated by 0.1 m; unselected duplicate tracks cannot steal its label",
+      "frames": 261,
+      "states": {
+        "SEARCHING": 1,
+        "LOCKED": 260
+      },
+      "locked_frames": 260,
+      "correct_locked_frames": 260,
+      "wrong_locked_frames": 0,
+      "correct_lock_fraction": 0.9961685823754789,
+      "correct_locked_without_appearance_frames": 7,
+      "outside_camera_frames": 0,
+      "correct_locked_outside_camera_frames": 0,
+      "outside_camera_lock_fraction": null,
+      "recovery_seconds": [],
+      "unrecovered_loss": false,
+      "passed_zero_wrong_lock": true,
+      "status": "passed",
+      "scope": "real ROS tracker plus identity node, recorded sensors, stationary observer; no driving or hardware timing claim"
+    },
+    "gz-crossing-4": {
+      "identity_label_policy": "selected target nearest truth within 0.75 m, separated by 0.1 m; unselected duplicate tracks cannot steal its label",
+      "frames": 276,
+      "states": {
+        "SEARCHING": 1,
+        "LOCKED": 264,
+        "UNCERTAIN": 7,
+        "LOST": 4
+      },
+      "locked_frames": 264,
+      "correct_locked_frames": 264,
+      "wrong_locked_frames": 0,
+      "correct_lock_fraction": 0.9565217391304348,
+      "correct_locked_without_appearance_frames": 14,
+      "outside_camera_frames": 0,
+      "correct_locked_outside_camera_frames": 0,
+      "outside_camera_lock_fraction": null,
+      "recovery_seconds": [
+        0.5609999999999999
+      ],
+      "unrecovered_loss": false,
+      "passed_zero_wrong_lock": true,
+      "status": "passed",
+      "scope": "real ROS tracker plus identity node, recorded sensors, stationary observer; no driving or hardware timing claim"
+    },
+    "gz-lookalike_parallel-4": {
+      "identity_label_policy": "selected target nearest truth within 0.75 m, separated by 0.1 m; unselected duplicate tracks cannot steal its label",
+      "frames": 284,
+      "states": {
+        "SEARCHING": 1,
+        "LOCKED": 283
+      },
+      "locked_frames": 283,
+      "correct_locked_frames": 283,
+      "wrong_locked_frames": 0,
+      "correct_lock_fraction": 0.9964788732394366,
+      "correct_locked_without_appearance_frames": 16,
+      "outside_camera_frames": 0,
+      "correct_locked_outside_camera_frames": 0,
+      "outside_camera_lock_fraction": null,
+      "recovery_seconds": [],
+      "unrecovered_loss": false,
+      "passed_zero_wrong_lock": true,
+      "status": "passed",
+      "scope": "real ROS tracker plus identity node, recorded sensors, stationary observer; no driving or hardware timing claim"
+    },
+    "gz-crowd-4": {
+      "identity_label_policy": "selected target nearest truth within 0.75 m, separated by 0.1 m; unselected duplicate tracks cannot steal its label",
+      "frames": 263,
+      "states": {
+        "SEARCHING": 2,
+        "LOCKED": 261
+      },
+      "locked_frames": 261,
+      "correct_locked_frames": 261,
+      "wrong_locked_frames": 0,
+      "correct_lock_fraction": 0.9923954372623575,
+      "correct_locked_without_appearance_frames": 14,
+      "outside_camera_frames": 0,
+      "correct_locked_outside_camera_frames": 0,
+      "outside_camera_lock_fraction": null,
+      "recovery_seconds": [],
+      "unrecovered_loss": false,
+      "passed_zero_wrong_lock": true,
+      "status": "passed",
+      "scope": "real ROS tracker plus identity node, recorded sensors, stationary observer; no driving or hardware timing claim"
+    },
+    "gz-crowd-8": {
+      "identity_label_policy": "selected target nearest truth within 0.75 m, separated by 0.1 m; unselected duplicate tracks cannot steal its label",
+      "frames": 243,
+      "states": {
+        "LOCKED": 243
+      },
+      "locked_frames": 243,
+      "correct_locked_frames": 243,
+      "wrong_locked_frames": 0,
+      "correct_lock_fraction": 1.0,
+      "correct_locked_without_appearance_frames": 6,
+      "outside_camera_frames": 0,
+      "correct_locked_outside_camera_frames": 0,
+      "outside_camera_lock_fraction": null,
+      "recovery_seconds": [],
+      "unrecovered_loss": false,
+      "passed_zero_wrong_lock": true,
+      "status": "passed",
+      "scope": "real ROS tracker plus identity node, recorded sensors, stationary observer; no driving or hardware timing claim"
+    },
+    "gz-crowd-2": {
+      "identity_label_policy": "selected target nearest truth within 0.75 m, separated by 0.1 m; unselected duplicate tracks cannot steal its label",
+      "frames": 271,
+      "states": {
+        "SEARCHING": 2,
+        "LOCKED": 269
+      },
+      "locked_frames": 269,
+      "correct_locked_frames": 269,
+      "wrong_locked_frames": 0,
+      "correct_lock_fraction": 0.992619926199262,
+      "correct_locked_without_appearance_frames": 17,
+      "outside_camera_frames": 0,
+      "correct_locked_outside_camera_frames": 0,
+      "outside_camera_lock_fraction": null,
+      "recovery_seconds": [],
+      "unrecovered_loss": false,
+      "passed_zero_wrong_lock": true,
+      "status": "passed",
+      "scope": "real ROS tracker plus identity node, recorded sensors, stationary observer; no driving or hardware timing claim"
+    }
+  }
+}

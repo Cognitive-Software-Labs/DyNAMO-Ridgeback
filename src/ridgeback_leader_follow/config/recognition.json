@@ -13,6 +13,7 @@
   "acquire_distance_tolerance": 0.25,
   "acquire_lateral_tolerance": 0.1,
   "acquire_interval": 1,
+  "continuity_min_confidence": 0.25,
   "track_maximum_age": 3.0,
   "observation_timeout": 0.25,
   "validation_scope": "18 recorded ROS cases; no wrong locks; full sampled camera-exit continuity; visible lock coverage varies; no driving or target-hardware qualification"

@@ -54,8 +54,12 @@ class LeaderIdentity:
     """ROS-free core: People + (people frame -> base frame) in, LeaderState out."""
 
     def __init__(self, lock: LeaderLock, max_range: float, half_angle: float,
-                 acquire_distance_tolerance: float = 0., acquire_lateral_tolerance: float = 0.) -> None:
+                 acquire_distance_tolerance: float = 0., acquire_lateral_tolerance: float = 0.,
+                 continuity_min_confidence: float = .5) -> None:
         self.lock = lock
+        # Track continuity ignores observations below this confidence, and
+        # nearby people at or above it count as competing hypotheses.
+        self.continuity_min_confidence = float(continuity_min_confidence)
         self.max_range = max_range
         self.half_angle = half_angle
         self.acquire_distance_tolerance=acquire_distance_tolerance
@@ -104,7 +108,7 @@ class LeaderIdentity:
             elapsed = current_stamp-reference_stamp if reference_stamp is not None else None
             if (previous is None or int(previous.id) != track.track_id or elapsed is None
                     or not 0 < elapsed <= .75 or reference_frame != msg.header.frame_id
-                    or not math.isfinite(track.score) or track.score < .5):
+                    or not math.isfinite(track.score) or track.score < self.continuity_min_confidence):
                 return False
             predicted = (previous.position.x + previous.velocity.x*elapsed,
                          previous.position.y + previous.velocity.y*elapsed)
@@ -112,7 +116,7 @@ class LeaderIdentity:
             if not math.isfinite(error) or error > .75:
                 return False
             for other_id, other in observations.items():
-                if other_id == track.track_id or other.confidence < .5:
+                if other_id == track.track_id or other.confidence < self.continuity_min_confidence:
                     continue
                 competing = math.hypot(other.position.x-predicted[0],other.position.y-predicted[1])
                 if math.isfinite(competing) and competing <= error+.1:
@@ -185,7 +189,8 @@ class LeaderIdentityNode(Node):
         defaults = dict(people_topic="leader_follow/people", leader_topic="leader_follow/leader",
                         base_frame="base_link", acquire_range=2.0, acquire_half_angle_deg=30.0,
                         acquire_interval=8, acquire_frames=3, lost_frames=8, match_threshold=0.72, recovery_margin=0.05, tf_wait_timeout=0.25,
-                        acquire_distance_tolerance=0.0, acquire_lateral_tolerance=0.0)
+                        acquire_distance_tolerance=0.0, acquire_lateral_tolerance=0.0,
+                        continuity_min_confidence=0.5)
         for name, value in defaults.items():
             self.declare_parameter(name, value)
         p = lambda name: self.get_parameter(name).value
@@ -194,7 +199,8 @@ class LeaderIdentityNode(Node):
                           lost_frames=p("lost_frames"), match_threshold=p("match_threshold"),
                           recovery_margin=p("recovery_margin"))
         self.identity = LeaderIdentity(lock, p("acquire_range"), math.radians(p("acquire_half_angle_deg")),
-                                       p("acquire_distance_tolerance"),p("acquire_lateral_tolerance"))
+                                       p("acquire_distance_tolerance"),p("acquire_lateral_tolerance"),
+                                       p("continuity_min_confidence"))
         self.tf_wait_timeout = float(p("tf_wait_timeout"))
         self.pending = deque(maxlen=100)
         self.last_received_stamp = -math.inf

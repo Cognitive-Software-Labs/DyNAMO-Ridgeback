@@ -8,10 +8,12 @@ correct lock with zero wrong locks; both camera-exit cases held every sampled
 outside-camera observation. Robot movement remains later-phase work.
 
 This is bounded stationary-observer evidence, with one recording per case.
-Visible-frame lock coverage varies from about 24% to 100%; Gazebo look-alike
-crossing remains the weakest case. Rejections and temporary losses remain
-possible. These results do not establish continuous following or hardware
-performance.
+With the profile's continuity confidence floor, visible-frame lock coverage is
+87–100% (mean 98%) in the latest ROS replay of all eighteen cases. Isaac crowd-8
+and both look-alike crossings are the weakest cases. When the leader walks
+directly behind an identical look-alike, the lock deliberately stays
+uncertain, so coverage in those cases varies with tracker timing between runs.
+These results do not establish continuous following or hardware performance.
 
 ## Implemented boundary
 
@@ -85,10 +87,14 @@ cores. These recognition and integrated-lock scores have different meanings.
 ## Continuity and recovery
 
 A verified lock can persist without appearance only for the same track ID,
-with confidence at least `.5`, unchanged frame, successive observations at most
+with confidence at least `continuity_min_confidence`, unchanged frame, successive observations at most
 750 ms apart, and position within `.75 m` of the previous velocity prediction.
-A competing observation with prediction error within `.1 m` of the selected
-track makes continuity ambiguous and drops the lock.
+A competing observation at or above that confidence, with prediction error
+within `.1 m` of the selected track, makes continuity ambiguous and drops the
+lock. The node default floor is `.5`; the F3 profile uses `.25`. Partly
+occluded leaders often produce camera boxes scored around `.3` that still carry
+a matching appearance. At `.5`, those single frames caused almost every lock
+drop in the F3 cases. Appearance is still checked on every frame that has it.
 This uses the physically gated lidar-supported tracker; it does not retain a
 lock on an unobserved prediction. Missing observations or incompatible visible
 appearance make identity uncertain. Gallery updates require visible appearance.
@@ -244,3 +250,5 @@ separate from appearance availability and publication checks.
 ## Archived evidence
 
 - [F3 recognition and ROS qualification investigation](../../archive/engineering/2026-11-03-f3-recognition.md) — comparison populations, evaluation corrections and actual ROS failures/fixes.
+
+- [Lock continuity confidence floor](../../archive/engineering/2026-11-11-lock-continuity-floor.md) — drop-cause analysis, offline floor sweep and the eighteen-case ROS replay.
