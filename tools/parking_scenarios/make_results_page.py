@@ -38,8 +38,16 @@ CODE = {'fe60a88': ('P7 scenarios (G1 in front of the start)',
                     'bb8aa94 plus the changes committed as b4f855b'),
         'b4f855b': ('Workstation scenes (G1 out of sight)', 'b4f855b'),
         '8dd2a1e': ('G1 position check (G1 out of sight)',
-                    '8dd2a1e plus the changes committed as 3becd27')}
-LATEST = ('8dd2a1e',)
+                    '8dd2a1e plus the changes committed as 3becd27'),
+        'a67d3c6': ('Reacquisition and recorded demonstration (G1 out of sight)',
+                    'a67d3c6 plus the changes committed as 640e8ec')}
+LATEST = ('a67d3c6', '8dd2a1e')
+
+
+def run_name(run):
+    """A run folder's name; recorded demonstrations keep their run in OUT_DIR/run."""
+    name = os.path.basename(os.path.normpath(run))
+    return os.path.basename(os.path.dirname(os.path.normpath(run))) if name == 'run' else name
 STAGES = [('EXPLORING', 'Searching for G1'), ('G1_LOCALIZED', 'G1 detected and localized'),
           ('NAVIGATING_TO_PREPARKING', 'Parking pose selected: rays, footprint and route'),
           ('NAVIGATING_TO_PARKING', 'Pre-parking pose reached'),
@@ -170,7 +178,7 @@ def main():
                              ORDER.index(d[0]['scenario']) if d[0]['scenario'] in ORDER else 99,
                              d[0]['simulator'], d[3]))
     for m, run, transitions, start, campaign, code in data:
-        tag = f'{m["simulator"]}_{m["scenario"]}_{m["commit"]}_{os.path.basename(run)}'
+        tag = f'{m["simulator"]}_{m["scenario"]}_{m["commit"]}_{run_name(run)}'
         kind, label = badge(m)
         latest = m['commit'] in LATEST
         when = datetime.datetime.fromtimestamp(start).strftime('%Y-%m-%d %H:%M')
@@ -185,7 +193,7 @@ def main():
         heading_error = fmt(m.get('heading_error_deg'), ' deg',
                             'no truth (Isaac)' if not truth else 'no heading')
         cells = [f'<a href="#{tag}">{pages.esc(m["scenario"])}</a>' if latest else pages.esc(m['scenario']),
-                 'Gazebo' if truth else 'Isaac', pages.esc(campaign), f'<code>{pages.esc(os.path.basename(run))}</code>',
+                 'Gazebo' if truth else 'Isaac', pages.esc(campaign), f'<code>{pages.esc(run_name(run))}</code>',
                  when, pages.esc(m['outcome']), f'<span class="badge {kind}">{pages.esc(label)}</span>',
                  pages.esc(', '.join(m.get('selected_sides') or []) or '-'), fmt(m.get('attempts')),
                  fmt(m.get('exploration_s'), ' s'), fmt(m.get('mission_s'), ' s'), g1_error, heading_error,
@@ -197,7 +205,7 @@ def main():
             continue
         figures = stage_images(run, m, transitions, tag)
         facts = [('Simulator', 'Gazebo' if truth else 'Isaac Sim'), ('Code', code),
-                 ('Run', os.path.basename(run)), ('Started', when), ('Final state', m['outcome']),
+                 ('Run', run_name(run)), ('Started', when), ('Final state', m['outcome']),
                  ('Sides tried (estimated)', ', '.join(m.get('selected_sides') or []) or '-'),
                  ('Attempts', fmt(m.get('attempts'))),
                  ('Exploration / mission', f"{fmt(m.get('exploration_s'), ' s')} / {fmt(m.get('mission_s'), ' s')}"),
@@ -218,7 +226,7 @@ def main():
                        for label, rel, caption in figures) or pages.missing('No verified screenshots')
         cards.append(f'<section class="card" id="{tag}"><header><h3>{pages.esc(m["scenario"])}</h3>'
                      f'<span class="badge {kind}">{pages.esc(label)}</span>'
-                     f'<span class="meta">{"Gazebo" if truth else "Isaac"} · {pages.esc(os.path.basename(run))}</span>'
+                     f'<span class="meta">{"Gazebo" if truth else "Isaac"} · {pages.esc(run_name(run))}</span>'
                      f'</header><p class="note">{pages.esc(m["description"])}. Expected: {pages.esc(m["expected"])}.</p>'
                      f'<div class="facts">{fact_html}</div><div class="stages">{figs}</div></section>')
     head = ['Scenario', 'Simulator', 'Campaign', 'Run', 'Date', 'Final state', 'Outcome', 'Sides tried',
@@ -235,7 +243,12 @@ def main():
         'non-blank capture of that run, and its caption names the mission state active when it was '
         'taken. Screenshots of the earlier campaigns were withdrawn after an audit found simulator views '
         'dominated by a bystander, wrong areas and overlapping overlays; their runs, logs and images stay '
-        'in the dated records and run folders.</p>')
+        'in the dated records and run folders.</p>'
+        '<p class="note">A video of one complete run, <code>isaac_standard_run3</code> (2026-11-11, '
+        '<code>MISSION_COMPLETE</code>, parked at G1\'s right), shows its Isaac views, RViz and mission '
+        'state together at 8x speed: <code>artifacts/exploration/demo_2026-11-11/isaac_standard_run3/'
+        'demo.mp4</code>, kept outside the repository; <code>tools/parking_scenarios/record_demo_run.sh'
+        '</code> records another.</p>')
     legend = ('<p><span class="badge ok">parked, returned</span> parking completed &nbsp; '
               '<span class="badge safe">refused to park</span> the planner found no safe pose and said why &nbsp; '
               '<span class="badge bad">perception</span> G1 not (re)localized in time, its position not '
@@ -251,7 +264,8 @@ def main():
             'scenarios</a>, <a href="../../archive/engineering/2026-11-05-parking-detection-gaps.md">detection '
             'gaps</a>, <a href="../../archive/engineering/2026-11-05-parking-workstation-scenes.md">workstation '
             'scenes</a>, <a href="../../archive/engineering/2026-11-09-parking-g1-position-check.md">G1 '
-            'position check</a>.</p></main>')
+            'position check</a>, <a href="../../archive/engineering/2026-11-11-parking-reacquisition-and-demo.md">'
+            'reacquisition and demonstration</a>.</p></main>')
     with open(OUT, 'w') as stream:
         stream.write(pages.page('Autonomous parking: experiments and results', pages.RESULTS_PAGE, intro, body))
     print('wrote', OUT, len(data), 'runs', len(cards), 'with screenshots')
