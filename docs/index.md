@@ -72,6 +72,8 @@ troubleshooting, planning, and historical documentation.
 - [Exploration evaluation](exploration/evaluation.md)
 - [Simulation parking demonstration](exploration/parking_demo.md) — `start_parking_demo.sh`
   modes, spawned G1 scene, startup gates and the parking RViz display
+- [Parking mission states and timing](exploration/parking_mission_states.md) — every
+  mission state, its configured limit and its measured duration in the recorded runs
 - [Parking scenarios](exploration/parking_scenarios.md) — G1 workstation scenes, the
   provisional basket, the [scenario page](exploration/autonomous_parking_scenarios.html)
   and the [results page](exploration/autonomous_parking_results.html)

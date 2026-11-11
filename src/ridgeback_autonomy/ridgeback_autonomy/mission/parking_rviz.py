@@ -77,7 +77,16 @@ VIEW_AREA_PX = (1800.0, 620.0)   # the 3D view left by the docks, toolbars and s
 VIEW_MARGIN_M = 2.5              # around the start and G1's workstation
 
 
-def task_view(start_xy, g1_xy):
+# A compact layout for small screens (a 1280 x 598 remote session): the camera-image
+# dock starts hidden too, and the general HUD (velocity, coverage, localization) starts
+# off, so the state machine, legend and target distances fit without overlapping.
+# Panels > Perception overlay and the HUD display's checkbox bring them back.
+COMPACT_WINDOW_PX = (1280, 598)
+COMPACT_VIEW_AREA_PX = (1240.0, 420.0)
+COMPACT_DISABLED_DISPLAYS = ('HUD',)
+
+
+def task_view(start_xy, g1_xy, view_area_px=VIEW_AREA_PX):
     """A top-down view framing the robot's start and G1's workstation.
 
     The view turns in 90-degree steps so that the start-to-G1 axis runs across
@@ -89,7 +98,7 @@ def task_view(start_xy, g1_xy):
     angle = round(math.atan2(dy, dx) / (math.pi / 2)) * (math.pi / 2)
     along = abs(dx * math.cos(angle) + dy * math.sin(angle)) + 2 * VIEW_MARGIN_M
     across = abs(-dx * math.sin(angle) + dy * math.cos(angle)) + 2 * VIEW_MARGIN_M
-    scale = min(VIEW_AREA_PX[0] / along, VIEW_AREA_PX[1] / across)
+    scale = min(view_area_px[0] / along, view_area_px[1] / across)
     return {
         'Class': 'rviz_default_plugins/TopDownOrtho',
         'Name': 'Current View',
@@ -118,27 +127,34 @@ def hide_docks(state_hex: str, names=HIDDEN_DOCKS) -> str:
     return state_hex
 
 
-def with_presentation(layout: dict, view: dict | None = None) -> dict:
-    """The layout with the Displays dock hidden, a lower image dock and ``view``."""
+def with_presentation(layout: dict, view: dict | None = None, *, compact: bool = False) -> dict:
+    """The layout with the Displays dock hidden, a lower image dock and ``view``;
+    ``compact`` also hides the image dock and starts the general HUD off."""
 
     window = layout.setdefault('Window Geometry', {})
     window['Hide Left Dock'] = True
-    window['Width'], window['Height'] = WINDOW_WIDTH_PX, WINDOW_HEIGHT_PX
+    window['Width'], window['Height'] = COMPACT_WINDOW_PX if compact else (WINDOW_WIDTH_PX, WINDOW_HEIGHT_PX)
     state = str(window.get('QMainWindow State', ''))
     if BOTTOM_DOCK_STATE[0] in state:
         state = state.replace(*BOTTOM_DOCK_STATE, 1)
-    window['QMainWindow State'] = hide_docks(state)
+    window['QMainWindow State'] = hide_docks(
+        state, HIDDEN_DOCKS + (('Perception overlay',) if compact else ()))
+    if compact:
+        for display in layout['Visualization Manager']['Displays']:
+            if display.get('Name') in COMPACT_DISABLED_DISPLAYS:
+                display['Enabled'] = display['Value'] = False
     if view is not None:
         layout['Visualization Manager'].setdefault('Views', {})['Current'] = dict(view)
     return layout
 
 
-def parking_layout(source_path: str, topic: str, view: dict | None = None) -> str:
+def parking_layout(source_path: str, topic: str, view: dict | None = None, *,
+                   compact: bool = False) -> str:
     """Write the parking copy of ``source_path`` and return its path."""
 
     with open(source_path, encoding='utf-8') as source:
         layout = yaml.safe_load(source)
-    layout = with_presentation(with_parking_display(layout, topic), view)
+    layout = with_presentation(with_parking_display(layout, topic), view, compact=compact)
     with tempfile.NamedTemporaryFile(
             'w', encoding='utf-8', prefix='ridgeback_parking_', suffix='.rviz',
             delete=False) as output:

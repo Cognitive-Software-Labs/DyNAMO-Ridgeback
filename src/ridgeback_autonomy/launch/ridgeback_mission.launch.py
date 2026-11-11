@@ -24,7 +24,7 @@ from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration, PythonExpression
 from launch_ros.actions import Node
 
-from ridgeback_autonomy.mission.parking_rviz import parking_layout, task_view
+from ridgeback_autonomy.mission.parking_rviz import COMPACT_VIEW_AREA_PX, parking_layout, task_view
 from ridgeback_autonomy.mission.simulation_config import demo_world, simulation_setup_path
 from ridgeback_autonomy.mission.target_detection import RELOCALIZATION_DETECTION_THRESHOLD
 from ridgeback_common.detector_config import DETECTION_THRESHOLD_DEFAULT
@@ -50,6 +50,7 @@ def _parking_rviz(context):
     share = get_package_share_directory('ridgeback_autonomy')
     source = os.path.join(share, 'sim', 'rviz', 'exploration.rviz')
     view = None
+    compact = LaunchConfiguration('rviz_layout').perform(context) == 'compact'
     if LaunchConfiguration('demo_scene_enabled').perform(context) == 'true':
         # Frame the robot's start (the map origin) and the scenario's G1 workstation.
         from ridgeback_autonomy.mission import parking_scenarios
@@ -58,7 +59,8 @@ def _parking_rviz(context):
             g1 = parking_scenarios.world_layout(
                 data, LaunchConfiguration('demo_scenario').perform(context),
                 LaunchConfiguration('backend').perform(context))['g1']
-            view = task_view((0.0, 0.0), (g1['x'], g1['y']))
+            view = (task_view((0.0, 0.0), (g1['x'], g1['y']), COMPACT_VIEW_AREA_PX) if compact
+                    else task_view((0.0, 0.0), (g1['x'], g1['y'])))
         except ValueError:
             pass   # the startup gate reports an unknown or unsupported scenario
     return [Node(
@@ -66,7 +68,7 @@ def _parking_rviz(context):
         executable='rviz2',
         name='rviz2',
         namespace=LaunchConfiguration('namespace'),
-        arguments=['-d', parking_layout(source, 'parking/visualization', view)],
+        arguments=['-d', parking_layout(source, 'parking/visualization', view, compact=compact)],
         parameters=[{'use_sim_time': LaunchConfiguration('use_sim_time')}],
         remappings=[('/tf', 'tf'), ('/tf_static', 'tf_static')],
         output='screen',
@@ -193,6 +195,8 @@ def generate_launch_description():
         DeclareLaunchArgument('startup_timeout_s', default_value='300.0'),
         DeclareLaunchArgument('localization_required', default_value='false'),
         DeclareLaunchArgument('exploration_rviz', default_value='true'),
+        # compact: for screens below 1920 x 1080 (e.g. a 1280 x 598 remote session).
+        DeclareLaunchArgument('rviz_layout', default_value='wide', choices=['wide', 'compact']),
         DeclareLaunchArgument('target_localization_enabled', default_value='true'),
         DeclareLaunchArgument('localization_mode', default_value='local'),
         DeclareLaunchArgument('estimators', default_value='all'),

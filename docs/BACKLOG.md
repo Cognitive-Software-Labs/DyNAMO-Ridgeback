@@ -252,6 +252,22 @@ and hardware depth (the real D455 is noisier beyond 4 m, where Gazebo G1s were
 localized from up to 10 m); decide whether a static view that still fails needs a
 second viewpoint.
 
+## More than one G1 in a scene
+
+**Gap.** The detector reports every humanoid without an identity. Once a G1 is
+chosen, the mission keeps it by geometry only: among several detections it takes the
+one at the chosen G1's expected image column, and relocalization samples must lie
+within 0.75 m of the known position (2026-11-11, unit-tested). Nothing tells two G1s
+apart by appearance, the first choice is the highest-scoring confirmed detection,
+two G1s standing within 0.75 m cannot be separated, and no scene with two G1s has
+been run: the demo startup spawns exactly one G1 and refuses existing ones.
+
+**Completion criteria.** Add an optional scenario with a second G1 (a spawn name
+other than the demo G1, and the metrics told about it), run it in both simulators
+with the second G1 in view during search and during relocalization, and decide
+whether target choice needs a rule (nearest, or operator-selected) and whether
+identity needs more than geometry (tracking, appearance).
+
 ## Parking clearance beside G1
 
 **Gap.** The reach band (task point 0.30-0.60 m from G1's axis, planned to 0.54 m),

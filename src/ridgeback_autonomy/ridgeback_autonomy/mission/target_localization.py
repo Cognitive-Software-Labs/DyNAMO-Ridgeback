@@ -197,6 +197,7 @@ class TargetLocalizationAdapter:
         known_target: tuple[float, float] | None = None,
         weak_minimum_score: float | None = None,
         known_ray: tuple[tuple[float, float], tuple[float, float]] | None = None,
+        gate_known_target: bool = False,
     ) -> TargetLocalizationResult:
         """Accept one associated measurement.
 
@@ -206,6 +207,8 @@ class TargetLocalizationAdapter:
         Before the first localization, ``known_ray`` ((x, y) origin and unit direction
         in the map: the camera ray of the confirmed detection) does the same: a weak
         detection is admitted only within ``max_sample_jump_m`` of that ray, ahead of it.
+        ``gate_known_target`` applies the known-target gate to every sample, so a second
+        humanoid elsewhere is never sampled as the localized G1.
         """
         stamp_ns = stamp_to_nanoseconds(msg.header.stamp)
         if self._stabilized is not None:
@@ -320,11 +323,15 @@ class TargetLocalizationAdapter:
         # even if the stabilization jump gate rejects its coordinates below.
         self._last_processed_stamp_ns = stamp_ns
 
-        if weak and float(msg.scores[index]) < self.minimum_score and _away_from_known(
+        gated = (gate_known_target and known_target is not None) or (
+            weak and float(msg.scores[index]) < self.minimum_score)
+        if gated and _away_from_known(
                 map_x_m, map_y_m, known_target, known_ray, self.max_sample_jump_m):
             return self._result(
                 stamp_ns,
-                reason='weak_detection_away_from_known_target',
+                reason=('weak_detection_away_from_known_target'
+                        if float(msg.scores[index]) < self.minimum_score
+                        else 'detection_away_from_known_target'),
                 message_valid=True,
                 observation=observation,
                 source_failures=failures,

@@ -97,8 +97,13 @@ class TargetDetectionAdapter:
         msg: TargetDetections,
         *,
         minimum_score: float | None = None,
+        closest_to=None,
     ) -> TargetDetectionResult:
-        """Validate and vote; ``minimum_score`` overrides the floor for this frame only."""
+        """Validate and vote; ``minimum_score`` overrides the floor for this frame only.
+
+        ``closest_to(candidate)`` (smaller is closer), when given, picks among several
+        relevant detections the one that is the already chosen G1, instead of the
+        highest score: with two humanoids in view the target must not switch."""
 
         floor = self.minimum_score if minimum_score is None else float(minimum_score)
         if not math.isfinite(floor) or not 0.0 <= floor <= 1.0:
@@ -118,7 +123,7 @@ class TargetDetectionAdapter:
             )
 
         self._last_stamp_ns = stamp_ns
-        selected = self._select_relevant_candidate(candidates, floor)
+        selected = self._select_relevant_candidate(candidates, floor, closest_to)
         positive = selected is not None
         self._votes.append(positive)
         window = tuple(self._votes)
@@ -196,13 +201,18 @@ class TargetDetectionAdapter:
         self,
         candidates: list[TargetDetectionCandidate],
         floor: float,
+        closest_to=None,
     ) -> TargetDetectionCandidate | None:
-        relevant = (
+        relevant = [
             candidate
             for candidate in candidates
             if self._normalize_label(candidate.label) in self.target_labels
             and candidate.score >= floor
-        )
+        ]
+        if closest_to is not None and len(relevant) > 1:
+            distances = [closest_to(candidate) for candidate in relevant]
+            if all(d is not None for d in distances):
+                return relevant[distances.index(min(distances))]
         return max(relevant, key=lambda candidate: candidate.score, default=None)
 
     def _result_without_vote(self, *, stamp_ns: int, reason: str) -> TargetDetectionResult:

@@ -236,6 +236,7 @@ _ALLOWED_TRANSITIONS = {
         MissionState.MISSION_CANCELED},
     MissionState.G1_LOCALIZED: {
         MissionState.EXPLORING_AROUND_G1,
+        MissionState.RETURNING_TO_OBSERVATION,
         MissionState.PARKING_CANDIDATES_READY,
         MissionState.PARKING_PLANNING_FAILED,
         MissionState.RETURNING_TO_START,
@@ -344,11 +345,13 @@ class MissionManagerNode(Node):
         self.declare_parameter('g1_exploration_max_rounds', 3)
         self.declare_parameter('g1_exploration_min_round_s', 5.0)
         self.declare_parameter('g1_exploration_refresh_s', 2.0)
-        # After exploring, G1 is relocalized by turning toward it in place when it is
-        # within this camera range; otherwise, or if that fails, from the observation pose.
-        # The colour camera is 1.03 m up with a 32 degree vertical half view, so G1's feet
-        # leave the image below about 1.65 m; at 1.01 m it was not detected (2026-10-30).
-        self.declare_parameter('g1_reacquire_min_range_m', 1.7)
+        # After exploring or a failed attempt, G1 is relocalized by turning toward it in
+        # place when it is within this camera range. Closer, the robot first steps straight
+        # back to the near end of the range when that pose is free in the map; otherwise,
+        # or if that fails, it returns to the observation pose. G1's feet leave the image
+        # below about 1.65 m, but the position check uses its head and torso: G1 was
+        # localized from 1.35 m (2026-11-09) and not detected at 1.01 m (2026-10-30).
+        self.declare_parameter('g1_reacquire_min_range_m', 1.3)
         self.declare_parameter('g1_reacquire_max_range_m', 3.5)
         self.declare_parameter('g1_exploration_protected_margin_m', 0.15)
         # G1's heading from the depth frames of each stationary localization; it only
@@ -657,6 +660,7 @@ class MissionManagerNode(Node):
         self.first_view_turn_min_rad = math.radians(
             float(self.get_parameter('first_view_turn_min_deg').value))
         self._confirmed_ray = None
+        self._planning_step_back_done = False
         self._g1_exploration_deadline_s = None
         self._g1_explorer_resumed = False
         self._g1_frontiers_exhausted = False
@@ -989,6 +993,7 @@ class MissionManagerNode(Node):
                         self._confirmed_ray is not None and self.state != MissionState.SEARCH_G1)
                     else None
                 ),
+                closest_to=self._expected_column_distance(msg),
             )
             if not result.message_valid:
                 self._record_recoverable('invalid_detection', result.reason)
@@ -1095,6 +1100,7 @@ class MissionManagerNode(Node):
                     else RELOCALIZATION_DETECTION_THRESHOLD
                 ),
                 known_ray=None if known is not None else self._confirmed_ray,
+                gate_known_target=True,
             )
             if not result.accepted:
                 details = result.reason
@@ -1148,6 +1154,8 @@ class MissionManagerNode(Node):
                     'planning uses the larger keep-out margin'
                 )
                 self._planning_deadline_s = self._monotonic() + self.parking_input_timeout_s
+                if self._step_back_before_planning():
+                    return
                 # A later relocalization falls back to the latest pose G1 was localized and
                 # verified from: the first one can be 10 m away (2026-11-09), and the return
                 # to it then ran past its deadline.
@@ -1247,6 +1255,7 @@ class MissionManagerNode(Node):
             self.localization_adapter.reset()
             self.confirmed_detection = None
             self._confirmed_ray = None
+            self._planning_step_back_done = False
             self.target_committed = False
             self.target_position = None
             self.approach_pose = None
@@ -1505,6 +1514,32 @@ class MissionManagerNode(Node):
         self._transition(MissionState.SETTLING_MOTION,
                          f'{reason}; waiting for physical motion settlement')
 
+    def _expected_column_distance(self, msg):
+        """For a frame with several humanoids: how far a detection's centre column lies from
+        where the chosen G1 (its position, else the confirmed ray) should appear, or None
+        before a G1 is chosen or without camera geometry."""
+        if self.target_position is None and self._confirmed_ray is None:
+            return None
+        if self._camera_intrinsics is None or int(msg.detected and msg.count or 0) < 2:
+            return None
+        stamp = Time(nanoseconds=int(msg.header.stamp.sec) * 1_000_000_000 + int(msg.header.stamp.nanosec))
+        view = self._camera_view_at(stamp) or self._camera_view_at(Time())
+        if view is None:
+            return None
+        if self.target_position is not None:
+            bearing = math.atan2(self.target_position.map_y_m - view[1],
+                                 self.target_position.map_x_m - view[0])
+        else:
+            _, (ux, uy) = self._confirmed_ray
+            bearing = math.atan2(uy, ux)
+        offset = normalize_angle(bearing - view[2])
+        if abs(offset) >= math.pi / 2:
+            return None
+        fx, _, cx, _ = self._camera_intrinsics
+        scale = (2.0 * cx / msg.image_width) if msg.image_width > 0 and cx > 0 else 1.0
+        expected = cx - fx * math.tan(offset)
+        return lambda c: abs(0.5 * (c.bbox_xyxy[0] + c.bbox_xyxy[2]) * scale - expected)
+
     def _detection_ray(self, candidate, stamp_ns, image_width):
         """((x, y), (ux, uy)): the map camera ray through the detection's centre column,
         from the camera pose at the detection's stamp."""
@@ -1548,6 +1583,11 @@ class MissionManagerNode(Node):
             return origin, 'returning to the G1 observation pose'
         distance = math.hypot(target.map_x_m - view[0], target.map_y_m - view[1])
         low, high = self.g1_reacquire_range_m
+        if distance < low:
+            step = self._step_back_goal(robot, view, target, low + 0.2)
+            if step is not None:
+                return step, (f'stepping {math.hypot(step[0] - robot[0], step[1] - robot[1]):.2f} m '
+                              f'back to view G1 ({distance:.2f} m from the camera, below {low:.1f} m)')
         if not low <= distance <= high:
             return origin, (f'returning to the G1 observation pose (G1 {distance:.2f} m from the '
                             f'camera, outside {low:.1f}-{high:.1f} m)')
@@ -1555,6 +1595,61 @@ class MissionManagerNode(Node):
         bearing = math.atan2(target.map_y_m - view[1], target.map_x_m - view[0])
         yaw = normalize_angle(bearing - normalize_angle(view[2] - robot[2]))
         return (robot[0], robot[1], yaw), f'turning toward G1 in place ({distance:.2f} m away)'
+
+    def _step_back_before_planning(self):
+        """Once per localization cycle: when the robot stands inside G1's keep-out plus the
+        planner's clearance, step straight back and relocalize before planning; every route
+        from there is rejected (path_g1_keepout), as on 2026-11-11 when the search ended
+        with the camera 0.4 m from G1. True when the step back was started."""
+        if self._planning_step_back_done:
+            return False
+        robot, view, target = self._current_robot_pose(), self._camera_view(), self.target_position
+        if robot is None or view is None or target is None:
+            return False
+        polygon = rotated_footprint_vertices(self.planner_config.footprint, *robot[:3])
+        gap = float(points_to_polygon_distance([target.map_x_m], [target.map_y_m], polygon)[0])
+        reference = TargetReference(
+            x=target.map_x_m, y=target.map_y_m, frame_id=self.map_frame, stamp_ns=target.last_stamp_ns,
+            reference=target.reference, is_foot_midpoint=target.is_foot_midpoint, source=target.source)
+        limit = keepout_radius_m(reference, self.planner_config) + self.planner_config.min_obstacle_clearance_m
+        if gap >= limit:
+            return False
+        goal = self._step_back_goal(robot, view, target, self.g1_reacquire_range_m[0] + 0.2,
+                                    max_step_m=1.5)
+        if goal is None:
+            return False          # plan from here; the route checks refuse it if unsafe
+        self._planning_step_back_done = True
+        self._observation_goal, self._observation_fallback = goal, False
+        if self._transition(MissionState.RETURNING_TO_OBSERVATION,
+                            f'G1 localized {gap:.2f} m from the robot, inside its keep-out; stepping '
+                            f'{math.hypot(goal[0] - robot[0], goal[1] - robot[1]):.2f} m back to plan'):
+            self._set_goal_tolerance(self.observation_tolerance, self._send_observation_goal)
+        return True
+
+    def _step_back_goal(self, robot, view, target, camera_range_m, *, max_step_m=1.0):
+        """A pose on the line from G1 through the robot that puts the camera
+        ``camera_range_m`` from G1, facing it: only when it is less than 1 m away and its
+        footprint is free in the latest map, else None. Nav2 plans the route to it."""
+        dx, dy = robot[0] - target.map_x_m, robot[1] - target.map_y_m
+        norm = math.hypot(dx, dy)
+        if norm < 0.05 or self.latest_map is None:
+            return None
+        ux, uy = dx / norm, dy / norm
+        mount = normalize_angle(view[2] - robot[2])           # camera axis relative to the base
+        ahead = math.hypot(view[0] - robot[0], view[1] - robot[1])
+        base_range = camera_range_m + ahead
+        x, y = target.map_x_m + ux * base_range, target.map_y_m + uy * base_range
+        yaw = normalize_angle(math.atan2(-uy, -ux) - mount)
+        if math.hypot(x - robot[0], y - robot[1]) > max_step_m:
+            return None
+        try:
+            grid = self._planning_grid(self.latest_map)
+        except ValueError:
+            return None
+        polygon = rotated_footprint_vertices(self.planner_config.footprint, x, y, yaw)
+        if footprint_rejection_reason(polygon, grid, self.planner_config.occupied_threshold) is not None:
+            return None
+        return x, y, yaw
 
     def _fall_back_to_observation_pose(self, reason):
         """After a failed in-place relocalization: the single return to the observation pose."""

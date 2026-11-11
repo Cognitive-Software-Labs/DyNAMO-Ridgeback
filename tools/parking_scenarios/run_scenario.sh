@@ -3,7 +3,7 @@
 # Waits for a free workstation, starts start_parking_demo.sh in its own session, records a small
 # bag (with both 2D scans, for parking-clearance review), samples Gazebo ground truth, takes RViz screenshots at mission stages and
 # server-rendered top-down views of the scene (capture_scene_views.py) when parked and at the
-# end, and stops only that session with SIGTERM. LIMIT (s) bounds the run.
+# end, and stops only that session with SIGTERM. LIMIT (s) bounds the run; DEMO_ARGS adds launch arguments (e.g. rviz_layout:=compact).
 B=$1; SC=$2; D=$(realpath -m "$3"); P=$(cd "$(dirname "$0")" && pwd); ROOT=$(cd "$P/../.." && pwd); LIMIT=${LIMIT:-900}
 : "${RIDGEBACK_PERCEPTION_VENV:?set RIDGEBACK_PERCEPTION_VENV}"; export DISPLAY="${DISPLAY:?a display is needed for screenshots}"
 mkdir -p "$D/shots"; cd "$ROOT"
@@ -13,10 +13,10 @@ LOCK="${XDG_RUNTIME_DIR:-/tmp}/ridgeback-parking-${UID}.lock"
 until flock -n "$LOCK" true 2>/dev/null; do timeout 2 tail -n0 -f /dev/null; done
 git rev-parse HEAD > "$D/commit.txt"; git status --short >> "$D/commit.txt"; cp src/ridgeback_autonomy/config/parking_scenarios.yaml "$D/scenarios.yaml"
 if [ "$B" = isaac ]; then   # the runner's opt-in top-down cameras for the stage views
-  python3 -c "import json,sys; sys.path.insert(0,'$P'); import scene_views as v; json.dump([x for x in v.views('isaac','$SC') if x['name'] in ('overview','workstation')], open('$D/isaac_views.json','w'))" || exit 1
+  python3 -c "import json,sys; sys.path.insert(0,'$P'); import scene_views as v; json.dump([x for x in v.views('isaac','$SC') if x['name'] in '${ISAAC_VIEWS:-overview,workstation}'.split(',')], open('$D/isaac_views.json','w'))" || exit 1
   export RIDGEBACK_ISAAC_VIEW_CAMERAS="$D/isaac_views.json"
 fi
-setsid bash start_parking_demo.sh $B demo_scenario:=$SC > "$D/console.log" 2>&1 &
+setsid bash start_parking_demo.sh $B demo_scenario:=$SC ${DEMO_ARGS:-} > "$D/console.log" 2>&1 &
 LPID=$!
 ( until [ -s "$D/console.log" ]; do timeout 1 tail -n0 -f /dev/null; done; source install/setup.bash
   export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp ROS_DOMAIN_ID=83 ROS_LOCALHOST_ONLY=1 CYCLONEDDS_URI="file://$PWD/install/ridgeback_autonomy/share/ridgeback_autonomy/config/parking_demo_cyclonedds.xml"

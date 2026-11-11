@@ -137,6 +137,9 @@ be used as the handoff acknowledgment.
 
 ### Parking mission coordination
 
+[Parking mission states and timing](parking_mission_states.md) lists every state, its
+limits and its measured duration.
+
 `mission_manager_node.py` captures one start pose from the configured TF
 frames, consumes the shared target detection/localization interfaces, pauses
 the frontier owner through the terminal handoff above, and publishes
@@ -214,6 +217,16 @@ recorded at the 2026-11-08 run poses, the checked position was 0.018-0.034 m fro
 G1's ground truth, including both mislocalized views; there was no torso on the
 table edge the run had parked beside. The shared estimators and benchmarks are
 unchanged. `target_body_check` turns the check off only for tests without depth.
+
+Once a G1 is chosen the target does not switch to another humanoid. In a frame with
+several humanoid detections the mission takes the one whose box centre lies nearest
+the image column where the chosen G1 should appear (from its position, or before the
+first localization from the confirmed detection's ray), not the highest score; and
+once G1 has a position, every localization sample, however confident, must lie
+within the 0.75 m sample jump of it (`detection_away_from_known_target`
+otherwise). Before the first localization only weak views are held to the ray,
+because a bearing error of a few degrees at 9 m exceeds 0.75 m. Nothing identifies a
+humanoid by appearance; see the backlog for several G1s.
 
 Before the first localization the robot turns its camera in place toward the
 confirmed detection when the stop left it more than `first_view_turn_min_deg`
@@ -317,12 +330,23 @@ still touches unknown space, as before.
 
 ### Observation return
 
-After exploring, G1 is relocalized from where the robot stopped when possible.
-If the camera is `g1_reacquire_min_range_m`–`g1_reacquire_max_range_m`
-(1.7–3.5 m) from the G1 estimate, the robot turns in place to point the camera
-at it. Closer, G1's feet leave the image: the camera is 1.03 m up with a 32°
-vertical half view. Otherwise, and once if the turn, its view check or the localization
-fails, it returns to the observation pose: the latest pose from which G1 was
+After exploring or a failed parking attempt, G1 is relocalized from where the
+robot stopped when possible. If the camera is
+`g1_reacquire_min_range_m`–`g1_reacquire_max_range_m` (1.3–3.5 m) from the G1
+estimate, the robot turns in place to point the camera at it. G1's feet leave the
+image below about 1.65 m (the camera is 1.03 m up with a 32° vertical half view),
+but the position check uses its head and torso: G1 was localized from 1.35 m on
+2026-11-09 and not detected at 1.01 m on 2026-10-30. Closer than 1.3 m, the robot
+steps straight back, less than 1 m, to put the camera 1.5 m from G1, when that
+footprint is free in the map; Nav2 plans that route. On 2026-11-09 a robot 1.2-1.3 m
+from G1 after a vetoed attempt instead drove toward an observation pose 4.3 m away,
+and the controller stalled 1 m short of it until the 90 s deadline. The same step
+back, up to 1.5 m, runs once before planning when G1 is localized while the robot
+stands inside G1's keep-out plus the planner's clearance: every route from there
+starts in the protected region (`path_g1_keepout`), as on 2026-11-11 when a search
+ended with the camera 0.4 m from G1. Otherwise, and
+once if the turn, the step back, its view check or the localization fails, it
+returns to the observation pose: the latest pose from which G1 was
 localized and verified, where the detector has already found it. (The first
 localization can be 10 m away; returning there ran past its deadline.) The detector's score near
 its threshold depends on the exact view: a lateral shift of 0.1 m or an 18°

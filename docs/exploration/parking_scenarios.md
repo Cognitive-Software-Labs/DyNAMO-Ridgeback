@@ -170,7 +170,12 @@ the world frame (both start at the spawn), so it includes SLAM drift.
 saves what the camera sees of G1 there: depth frames, the camera pose, the
 detector's boxes and G1's ground truth, for offline localization review. The
 robot is moved, so that session's map is not usable afterwards.
-`make_g1_view_fixture.py` cuts small test fixtures from those recordings
+`state_timing.py RUN_DIR...` measures how long each mission state lasted in recorded
+runs ([states and timing](parking_mission_states.md)). `record_demo_run.sh gz|isaac
+SCENARIO OUT_DIR` runs one scenario with the Isaac task and angled view cameras and
+the compact RViz layout, and writes `OUT_DIR/demo.mp4` at 8x speed: every frame holds
+those views, the RViz screen and the mission state at the same moment of that run
+(`record_demo.py`). `make_g1_view_fixture.py` cuts small test fixtures from those recordings
 (`test/data/g1_views_2026-11-09.npz`).
 
 ## Limitations

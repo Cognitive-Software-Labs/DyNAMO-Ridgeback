@@ -567,13 +567,40 @@ def test_a_timed_out_turn_is_released_before_the_observation_fallback_drives(man
     assert len(m.navigation_client.calls) == 2
 
 
-def test_g1_too_close_for_the_camera_returns_to_the_observation_pose(manager_factory):
+def test_g1_at_1_6_m_is_reacquired_in_place(manager_factory):
+    """The head and torso check does not need G1's feet in view (2026-11-09)."""
     m = exploring_manager(manager_factory)
     t = m.target_position
-    stand(m, t.map_x_m - 1.5, t.map_y_m - 0.5, -1.0)           # 1.58 m: G1's feet out of view
+    stand(m, t.map_x_m - 1.5, t.map_y_m - 0.5, -1.0)           # 1.58 m: feet out of view
     m._on_map(occupancy_map())
     m.tick()
-    assert 'outside 1.7-3.5 m' in m.transition_history[-1].reason
+    assert 'turning toward G1 in place' in m.transition_history[-1].reason
+
+
+def test_g1_too_close_steps_back_to_view_it(manager_factory):
+    """gz_standard_run6 (2026-11-09): 1.2-1.3 m from G1 after a vetoed attempt, the robot
+    drove back to an observation pose 4.3 m away and stalled 1 m short of it."""
+    m = exploring_manager(manager_factory)
+    t = m.target_position
+    stand(m, t.map_x_m - 0.9, t.map_y_m, 0.0)                  # 0.9 m from G1, facing it
+    m._on_map(occupancy_map())
+    m.tick()
+    assert 'back to view G1' in m.transition_history[-1].reason
+    assert m._observation_fallback                             # the observation pose stays the fallback
+    x, y, yaw = m._observation_goal
+    assert math.hypot(x - t.map_x_m, y - t.map_y_m) == pytest.approx(1.5)
+    assert y == pytest.approx(t.map_y_m) and abs(yaw) < 1e-9
+
+
+def test_g1_too_close_with_no_free_step_back_returns_to_the_observation_pose(manager_factory):
+    m = exploring_manager(manager_factory)
+    t = m.target_position
+    stand(m, t.map_x_m - 0.9, t.map_y_m, 0.0)
+    blocked = occupancy_map()
+    m._on_map(blocked)
+    m._step_back_goal = lambda *a: None                        # e.g. occupied behind the robot
+    m.tick()
+    assert 'outside 1.3-3.5 m' in m.transition_history[-1].reason
     assert back_at_observation(m) == pytest.approx((1.0, 2.0, 0.25))
 
 
@@ -864,3 +891,14 @@ def test_a_tabletop_the_lidars_pass_under_blocks_parking_beneath_it(manager_fact
     assert beneath and all(c.status != 'valid' for c in beneath)
     assert any(c.status == 'valid' for c in m.parking_plan.candidates)
     assert (np.array(m.latest_map.data) < 50).all()      # the SLAM map itself is untouched
+
+
+def test_a_step_back_into_occupied_space_is_never_planned(manager_factory):
+    m = exploring_manager(manager_factory)
+    t = m.target_position
+    stand(m, t.map_x_m - 0.9, t.map_y_m, 0.0)
+    m._on_map(occupancy_map(value=100))
+    view = m._camera_view()
+    assert m._step_back_goal(m._current_robot_pose(), view, t, 1.5) is None
+    m._on_map(occupancy_map())
+    assert m._step_back_goal(m._current_robot_pose(), view, t, 1.5) is not None

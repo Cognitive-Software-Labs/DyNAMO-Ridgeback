@@ -1112,13 +1112,38 @@ def test_parking_rviz_starts_with_the_scene_in_view_and_the_panels_reachable() -
     assert plain['Visualization Manager']['Views'] == original['Visualization Manager']['Views']
 
 
+def test_compact_parking_rviz_fits_a_small_screen_without_dropping_data() -> None:
+    from ridgeback_autonomy.mission.parking_rviz import (
+        COMPACT_VIEW_AREA_PX, COMPACT_WINDOW_PX, parking_layout, task_view)
+
+    source = _package_root() / 'sim' / 'rviz' / 'exploration.rviz'
+    original = yaml.safe_load(source.read_text(encoding='utf-8'))
+    view = task_view((0.0, 0.0), (0.5, -4.5), COMPACT_VIEW_AREA_PX)
+    derived = yaml.safe_load(Path(parking_layout(
+        str(source), 'parking/visualization', view, compact=True)).read_text())
+    window = derived['Window Geometry']
+    assert (window['Width'], window['Height']) == COMPACT_WINDOW_PX
+    state = window['QMainWindow State']
+    for name in ('Displays', 'Perception overlay'):
+        marker = 'fb' + f'{len(name) * 2:08x}' + name.encode('utf-16-be').hex()
+        assert marker + '00' in state and marker + '01' not in state
+    displays = {d['Name']: d for d in derived['Visualization Manager']['Displays']}
+    # Only the general HUD starts off; every display is still there.
+    assert displays['HUD']['Enabled'] is False and displays['Target HUD']['Enabled'] is True
+    assert len(displays) == len({d['Name'] for d in original['Visualization Manager']['Displays']}) + 3
+    current = derived['Visualization Manager']['Views']['Current']
+    assert COMPACT_VIEW_AREA_PX[1] / current['Scale'] >= 0.5 + 2 * 2.5 - 1e-6
+    mission_text = (_package_root() / 'launch' / 'ridgeback_mission.launch.py').read_text()
+    assert "DeclareLaunchArgument('rviz_layout', default_value='wide'" in mission_text
+
+
 def test_mission_launch_owns_the_single_rviz_instance() -> None:
     mission_text = (
         _package_root() / 'launch' / 'ridgeback_mission.launch.py'
     ).read_text(encoding='utf-8')
 
     assert "'exploration_rviz': 'false'" in mission_text
-    assert "parking_layout(source, 'parking/visualization', view)" in mission_text
+    assert "parking_layout(source, 'parking/visualization', view, compact=compact)" in mission_text
     assert mission_text.count("executable='rviz2'") == 1
     # The include overwrites exploration_rviz in the shared launch context.
     assert (mission_text.index('OpaqueFunction(function=_parking_rviz)')

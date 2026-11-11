@@ -352,3 +352,77 @@ def test_after_a_turn_a_failed_first_localization_turns_back_once(manager_factor
     m.tick()
     assert m.state == MissionState.MISSION_FAILED
     assert m.last_issue.code == 'target_localization_timeout'
+
+
+# Once a G1 is chosen, a second humanoid must not become the target.
+
+def test_with_two_humanoids_in_view_the_chosen_one_is_kept():
+    from ridgeback_autonomy.mission.target_detection import (
+        TargetDetectionAdapter, TargetDetectionCandidate)
+    adapter = TargetDetectionAdapter()
+    chosen = TargetDetectionCandidate(0, 'humanoid robot', 0.52, (100.0, 200.0, 140.0, 400.0))
+    other = TargetDetectionCandidate(1, 'humanoid robot', 0.71, (500.0, 200.0, 540.0, 400.0))
+    assert adapter._select_relevant_candidate([chosen, other], 0.40) is other     # by score
+    near_column_120 = lambda c: abs(0.5 * (c.bbox_xyxy[0] + c.bbox_xyxy[2]) - 120.0)
+    assert adapter._select_relevant_candidate([chosen, other], 0.40, near_column_120) is chosen
+
+
+def test_a_confident_view_of_another_humanoid_is_not_sampled_as_the_known_g1(manager_factory):
+    from test_mission_manager import detection, measurement
+    m = manager_factory(pause_client=FakePauseClient(trigger_response(True, 'safe')))
+    enter_localization(m)
+    localize(m)
+    known = m.target_position
+    m.state = MissionState.LOCALIZE_G1
+    m.localization_adapter.reset()
+    for offset in range(5):          # a confident humanoid 1.5 m beyond the known G1
+        stamp_ns = 9_000_000_000 + offset
+        m.process_detection(detection(stamp_ns, score=0.9))
+        msg = measurement(stamp_ns)
+        msg.euclidean_reconstruction_forward_m = [3.5]
+        msg.euclidean_reconstruction_distance_m = [math.hypot(3.5, 0.2)]
+        m.process_measurement(msg, now_ns=stamp_ns)
+    assert m.state == MissionState.LOCALIZE_G1 and m.target_position == known
+    assert m.last_issue.reason.startswith('detection_away_from_known_target')
+
+
+def test_the_expected_column_follows_the_chosen_g1(manager_factory):
+    from test_mission_manager import detection
+    m = manager_factory()
+    m._camera_intrinsics = (384.0, 384.0, 320.0, 240.0)
+    m._camera_view_at = lambda stamp: (0.0, 0.0, 0.0)
+    m._confirmed_ray = ((0.0, 0.0), (math.cos(0.3), math.sin(0.3)))   # 0.3 rad to the left
+    msg = detection(5_000_000_000)
+    msg.count, msg.labels, msg.scores = 2, ['humanoid robot'] * 2, [0.5, 0.7]
+    msg.bbox_xyxy = [180.0, 200.0, 220.0, 400.0, 500.0, 200.0, 540.0, 400.0]
+    distance = m._expected_column_distance(msg)
+    left = SimpleNamespace(bbox_xyxy=(180.0, 200.0, 220.0, 400.0))
+    right = SimpleNamespace(bbox_xyxy=(500.0, 200.0, 540.0, 400.0))
+    assert distance(left) < 10.0 < distance(right)      # expected column 320 - 384 tan 0.3 = 202
+
+
+def test_g1_localized_from_inside_its_keep_out_steps_back_before_planning(manager_factory):
+    """Demo attempt 2 on 2026-11-11: the search ended with the camera 0.4 m from G1, the
+    robot inside G1's keep-out, and every route was rejected (path_g1_keepout)."""
+    m = manager_factory(pause_client=FakePauseClient(trigger_response(True, 'safe')))
+    enter_localization(m)
+    m._step_back_goal = lambda robot, view, target, rng, max_step_m=1.0: (0.0, 2.0, 0.25)
+    m._camera_view = lambda: (1.27, 2.07, 0.25)
+    localize(m)                                # G1 about 2 m ahead: outside the keep-out
+    assert m.state == MissionState.G1_LOCALIZED
+    m2 = manager_factory(pause_client=FakePauseClient(trigger_response(True, 'safe')))
+    enter_localization(m2)
+    m2._step_back_goal = lambda robot, view, target, rng, max_step_m=1.0: (0.0, 2.0, 0.25)
+    m2._camera_view = lambda: (1.27, 2.07, 0.25)
+    from test_mission_manager import detection, measurement
+    for offset in range(5):                      # G1 0.2 m ahead of the front: inside the keep-out
+        stamp_ns = 4_000_000_000 + offset
+        m2.process_detection(detection(stamp_ns))
+        msg = measurement(stamp_ns)
+        msg.euclidean_reconstruction_forward_m = [0.2]
+        msg.euclidean_reconstruction_lateral_m = [0.0]
+        msg.euclidean_reconstruction_distance_m = [0.2]
+        m2.process_measurement(msg, now_ns=stamp_ns)
+    reasons = [t.reason for t in m2.transition_history]
+    assert any('inside its keep-out; stepping' in r for r in reasons)
+    assert m2._planning_step_back_done

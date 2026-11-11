@@ -67,7 +67,12 @@ matching the 3D rings. The donut rays keep their own colours. The four overlays 
 in the four corners: velocity, coverage and localization top left, target
 distances top right, state machine bottom left, legend bottom right. They need a
 3D view about 620 px tall, which a 1920 x 1080 screen leaves; on a smaller window
-the left two overlap.
+the left two overlap. For a smaller screen, `rviz_layout:=compact` (for example
+`bash start_parking_demo.sh isaac rviz_layout:=compact`) opens a 1280 x 598 window
+without the camera-image dock and with the general HUD (velocity, coverage,
+localization) switched off, which gives the state machine, the legend and the
+target distances their corners at the same text size; *Panels > Perception
+overlay* and the HUD display's checkbox bring the others back.
 
 RViz shows the plan on `parking/visualization`, with a colour legend overlay on
 `parking/legend`. The donut is 360 radial lines, one per degree, each drawn in
