@@ -65,6 +65,11 @@ CSS = """
   .compare { display: grid; grid-template-columns: 9rem 1fr 1fr; gap: .6rem; align-items: start; }
   .compare .rowlabel { font-size: .82rem; color: var(--faint); padding-top: .3rem; }
   .compare .colhead { font-weight: 600; color: var(--ink); font-size: .9rem; }
+  .views { display: grid; gap: .8rem; grid-template-columns: repeat(auto-fill, minmax(min(100%, 460px), 1fr)); }
+  .views figure img { cursor: zoom-in; }
+  details.secondary { margin-top: .9rem; }
+  details.secondary summary { cursor: pointer; color: var(--faint); font-size: .9rem; }
+  details.secondary .views { grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr)); margin-top: .6rem; }
   .stages { display: grid; gap: .7rem; grid-template-columns: repeat(auto-fill, minmax(min(100%, 400px), 1fr)); }
   @media (max-width: 760px) { .compare { grid-template-columns: 1fr; } .compare .rowlabel { padding-top: .8rem; } }
   figure { margin: 0; }

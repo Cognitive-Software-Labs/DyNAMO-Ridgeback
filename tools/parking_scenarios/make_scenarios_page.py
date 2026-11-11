@@ -1,10 +1,13 @@
 """Build docs/exploration/autonomous_parking_scenarios.html: what each scene looks like.
 
-Usage: make_scenarios_page.py SCENES_DIR
-SCENES_DIR holds preview_scenario.sh captures (manifest.json plus PNGs). Only images
-whose manifest entry passed its check are used; a view that is missing or failed is
-shown as missing, never replaced by another simulator's image. Layouts come from
-src/ridgeback_autonomy/config/parking_scenarios.yaml.
+Usage: make_scenarios_page.py SCENES_DIR [SCENES_DIR ...]
+Each SCENES_DIR holds preview_scenario.sh captures (manifest.json plus PNGs); a later
+directory's passing capture of a view replaces an earlier one. Only images whose
+manifest entry passed its check are used. Isaac Sim captures lead each scenario in
+three slots (top-down, close-up of G1 at its table, angled view), each filled by the
+first captured view in its preference list; Gazebo captures of the same layout follow
+in a collapsed section. A missing view is shown as missing, never replaced by another
+simulator's image. Layouts come from src/ridgeback_autonomy/config/parking_scenarios.yaml.
 """
 import json
 import math
@@ -25,9 +28,11 @@ TITLES = {'standard': 'Standard: G1 at its worktable', 'right_blocked': 'Right s
           'left_blocked': 'Left side blocked', 'both_sides_blocked': 'Both sides blocked',
           'restricted': 'Restricted space', 'no_feasible': 'No feasible parking position',
           'heading_90': 'G1 turned 90 deg', 'heading_away': 'G1 facing away from its table'}
-VIEWS = [('overview', 'Top-down, whole task'), ('workstation', 'Top-down, workstation'),
-         ('closeup', 'G1 and table'), ('oblique', 'Oblique (heights)'),
-         ('robot_camera', 'Robot camera at start')]
+# (slot label, views in order of preference) for the leading Isaac Sim images, and the
+# Gazebo views shown in the collapsed section.
+PRIMARY = [('Top-down', ('task', 'workstation')), ('G1 at its table', ('closeup',)),
+           ('Angled view', ('isometric',))]
+SECONDARY = ('workstation', 'closeup')
 CAPTION = {
     'overview': ('Top-down from {h:.0f} m: the robot at its start on the left, '
                  'G1 at its worktable on the right'),
@@ -35,6 +40,8 @@ CAPTION = {
     'closeup': 'G1 and its worktable from behind G1\'s left shoulder',
     'oblique': 'Oblique view: tabletop, panel and bed heights against the robot\'s mast and basket',
     'robot_camera': 'The robot\'s own camera at its start: G1 is not in view',
+    'task': 'Top-down: the robot at its start and G1 at its workstation, framed together',
+    'isometric': 'Angled view from above: the robot with its mast and basket at its start, and G1 at its table',
 }
 SIM = {'gz': 'Gazebo (warehouse)', 'isaac': 'Isaac Sim (hospital floor)'}
 # Recorded HEAD -> the code that ran (previews then carried no other code change).
@@ -47,22 +54,32 @@ def pose(p):
     return f'({p["x"]:.2f}, {p["y"]:.2f}) m, yaw {p["yaw_deg"]:.0f} deg'
 
 
-def load_captures(scenes_dir):
-    manifest = json.load(open(os.path.join(scenes_dir, 'manifest.json')))
+def load_captures(scenes_dirs):
+    """{(backend, scenario, view): (entry, dir, (commit, dirty))}: the latest passing capture."""
     best = {}
-    for entry in manifest:     # the latest passing capture of each view wins
-        if entry.get('ok') and entry.get('stage') == 'scene':
-            best[(entry['backend'], entry['scenario'], entry['view'])] = entry
-    commits = {}
-    for backend in ('gz', 'isaac'):
-        for name in ORDER:
-            path = os.path.join(scenes_dir, f'{backend}_{name}_commit.txt')
+    for scenes_dir in scenes_dirs:
+        manifest = json.load(open(os.path.join(scenes_dir, 'manifest.json')))
+        for entry in manifest:
+            if not (entry.get('ok') and entry.get('stage') == 'scene'):
+                continue
+            path = os.path.join(scenes_dir, f'{entry["backend"]}_{entry["scenario"]}_commit.txt')
+            commit = ('unknown', False)
             if os.path.exists(path):
                 lines = open(path).read().split('\n')
-                commits[(backend, name)] = (lines[0][:7], any(
+                commit = (lines[0][:7], any(
                     l.strip() and not l.startswith('??') and 'start_parking_demo.sh' not in l
                     for l in lines[1:]))
-    return best, commits
+            best[(entry['backend'], entry['scenario'], entry['view'])] = (entry, scenes_dir, commit)
+    return best
+
+
+def image(best, backend, name, view, scene):
+    entry, scenes_dir, (commit, dirty) = best[(backend, name, view)]
+    rel = pages.export_jpeg(os.path.join(scenes_dir, entry['file']), os.path.join(
+        ASSETS, entry['file'].replace('.png', '.jpg')), 1600)
+    code = CODE.get(commit, commit + (' + working tree' if dirty else ''))
+    caption = CAPTION[view].format(h=scene_views.OVERVIEW_HEIGHT_M[backend])
+    return pages.figure(rel, f'{SIM[backend].split(" ")[0]}: {caption} (captured with {code})')
 
 
 def layout_facts(data, name, backend):
@@ -80,9 +97,8 @@ def layout_facts(data, name, backend):
 
 
 def main():
-    scenes_dir = sys.argv[1]
     data = parking_scenarios.load(scene_views.SCENARIO_FILE)
-    best, commits = load_captures(scenes_dir)
+    best = load_captures(sys.argv[1:])
     stations = data['workstations']
     rows, cards = [], []
     for name in ORDER:
@@ -96,36 +112,34 @@ def main():
                  ('G1 relative to its table', {0: 'facing it', 90: 'turned 90 deg to its left',
                                                180: 'its back to the table'}.get(
                                                    int(scene.get('g1_turn_deg', 0)), '-'))]
-        grid = ['<div></div>'] + [f'<div class="colhead">{SIM[b]}</div>' for b in ('gz', 'isaac')]
-        per_sim = {}
-        for backend in ('gz', 'isaac'):
-            per_sim[backend] = layout_facts(data, name, backend)
-        for key in ('G1', 'Worktable', 'Other objects', 'Robot start'):
-            grid.append(f'<div class="rowlabel">{key}</div>')
-            for backend in ('gz', 'isaac'):
-                value = per_sim[backend][key] if per_sim[backend] else 'not supported in this world'
-                grid.append(f'<div style="font-size:.84rem">{pages.esc(value)}</div>')
-        for view, label in VIEWS:
-            grid.append(f'<div class="rowlabel">{label}</div>')
-            for backend in ('gz', 'isaac'):
-                entry = best.get((backend, name, view))
-                if per_sim[backend] is None:
-                    grid.append(pages.missing(f'{TITLES[name]} is not set up in this world'))
-                elif entry is None:
-                    grid.append(pages.missing('Not captured'))
-                else:
-                    src = os.path.join(scenes_dir, entry['file'])
-                    rel = pages.export_jpeg(src, os.path.join(
-                        ASSETS, entry['file'].replace('.png', '.jpg')))
-                    commit, dirty = commits.get((backend, name), ('unknown', False))
-                    code = CODE.get(commit, commit + (' + working tree' if dirty else ''))
-                    caption = CAPTION[view].format(h=scene_views.OVERVIEW_HEIGHT_M[backend])
-                    grid.append(pages.figure(rel, f'{SIM[backend].split(" ")[0]}: {caption} '
-                                                  f'(captured with {code})'))
+        per_sim = {backend: layout_facts(data, name, backend) for backend in ('gz', 'isaac')}
+        lead = 'isaac' if per_sim['isaac'] else 'gz'
+        slots = []
+        for label, preferred in PRIMARY:
+            view = next((v for v in preferred if (lead, name, v) in best), None)
+            slots.append(f'<div><div class="rowlabel">{pages.esc(label)}</div>'
+                         + (image(best, lead, name, view, scene) if view
+                            else pages.missing(f'{label}: not captured in {SIM[lead]}')) + '</div>')
+        positions = ''.join(
+            f'<div><b>{SIM[b]}:</b> G1 {pages.esc(per_sim[b]["G1"])}; {pages.esc(per_sim[b]["Worktable"])}; '
+            f'other objects: {pages.esc(per_sim[b]["Other objects"])}</div>'
+            for b in ('isaac', 'gz') if per_sim[b])
+        other = 'gz' if lead == 'isaac' else 'isaac'
+        secondary = ''
+        if per_sim[other]:
+            shots = ''.join(image(best, other, name, v, scene) for v in SECONDARY if (other, name, v) in best)
+            secondary = (f'<details class="secondary"><summary>{SIM[other]}: the same layout around G1 '
+                         f'in its own world</summary><div class="views">'
+                         f'{shots or pages.missing("Not captured")}</div></details>')
+        note = ('<p class="note">The leading images are Isaac Sim: the same objects stand around G1 as in '
+                'Gazebo, in the workstation frame, but the world (and so the room, the robot\'s route and '
+                'what else stands nearby) is Isaac\'s hospital floor.</p>' if lead == 'isaac' else
+                '<p class="note">This scenario exists only in Gazebo.</p>')
+        grid = [f'<div class="facts">{positions}</div>{note}<div class="views">{"".join(slots)}</div>{secondary}']
         fact_html = ''.join(f'<div><b>{pages.esc(k)}:</b> {pages.esc(v)}</div>' for k, v in facts)
         cards.append(f'<section class="card" id="{name}"><header><h3>{pages.esc(TITLES[name])}</h3>'
                      f'<code>demo_scenario:={name}</code></header><div class="facts">{fact_html}</div>'
-                     f'<div class="compare">{"".join(grid)}</div></section>')
+                     f'{"".join(grid)}</section>')
     jump = ''.join(f'<a href="#{n}">{pages.esc(TITLES[n])}</a>' for n in ORDER)
     intro = (
         '<p>Each scene places G1 at a <strong>workstation</strong>: standing 0.75 m from a worktable and '
@@ -136,9 +150,10 @@ def main():
         'faces; the mission, planner and safety checks are the same, and nothing about the scene is '
         'given to the mission.</p>'
         '<p class="note">Every image on this page is a capture of the running simulator with the '
-        'robot at its start: Gazebo images come from temporary camera sensors rendered by the Gazebo '
-        'server, Isaac images from opt-in view cameras in the Isaac runner, and the robot-camera row '
-        'from the robot\'s own camera topic. Results of running the scenarios are on the '
+        'robot at its start: Isaac images from opt-in view cameras in the Isaac runner, Gazebo images '
+        'from temporary camera sensors rendered by the Gazebo server. Each scenario leads with Isaac Sim, '
+        'whose plain rooms show G1 more clearly; the Gazebo views of the same layout are under each '
+        'scenario. Click an image to enlarge it. Results of running the scenarios are on the '
         f'<a href="{pages.RESULTS_PAGE}">results page</a>.</p>')
     worlds = (
         '<h2>The two worlds</h2><div class="wrap"><table><tr><th></th><th>Gazebo</th><th>Isaac Sim</th></tr>'

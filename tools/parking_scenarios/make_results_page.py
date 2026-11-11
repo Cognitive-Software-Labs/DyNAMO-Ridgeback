@@ -36,8 +36,10 @@ CODE = {'fe60a88': ('P7 scenarios (G1 in front of the start)',
                     '622a0c0 plus the changes committed as 2ecaecf'),
         'bb8aa94': ('Workstation scenes (G1 out of sight)',
                     'bb8aa94 plus the changes committed as b4f855b'),
-        'b4f855b': ('Workstation scenes (G1 out of sight)', 'b4f855b')}
-LATEST = ('bb8aa94', 'b4f855b')
+        'b4f855b': ('Workstation scenes (G1 out of sight)', 'b4f855b'),
+        '8dd2a1e': ('G1 position check (G1 out of sight)',
+                    '8dd2a1e plus the changes committed as 3becd27')}
+LATEST = ('8dd2a1e',)
 STAGES = [('EXPLORING', 'Searching for G1'), ('G1_LOCALIZED', 'G1 detected and localized'),
           ('NAVIGATING_TO_PREPARKING', 'Parking pose selected: rays, footprint and route'),
           ('NAVIGATING_TO_PARKING', 'Pre-parking pose reached'),
@@ -63,10 +65,19 @@ def badge(m):
     back = ', returned' if m.get('returned_to_start') else ', stopped'
     if m['outcome'] == 'MISSION_COMPLETE':
         # The mission's own success can rest on a wrong G1 estimate; Gazebo truth shows it.
-        reach = m.get('reach_truth_m')
+        reach, error = m.get('reach_truth_m'), m.get('localization_error_m')
         if reach is not None and not 0.30 - 0.10 <= reach <= 0.60 + 0.10:
-            return 'bad', f'parked {reach:.2f} m from G1: G1 mislocalized'
-        return 'ok', 'parked, returned'
+            return 'bad', (f'false completion: G1 mislocalized'
+                           f'{"" if error is None else f" {error:.2f} m"}, parked {reach:.2f} m from G1')
+        attempts = m.get('attempts') or 0
+        return 'ok', 'parked, returned' if attempts <= 1 else f'parked on attempt {attempts}, returned'
+    vetoes = sum('lidar' in f for f in m.get('attempt_failures') or [])
+    if vetoes or 'lidar_clearance' in reason:
+        vetoes = max(vetoes, m.get('attempts') or 1)
+        then = '; observation return timed out' if 'observation pose' in reason else ''
+        return 'warn', f'LiDAR safety monitor cancelled {vetoes} attempt{"s" if vetoes > 1 else ""}{then}{back}'
+    if 'target_position_unverified' in reason or 'unverified' in reason:
+        return 'bad', 'perception: G1 position not verified' + back
     if 'no_valid_candidate' in reason or 'no feasible' in reason or 'bounded_search_exhausted' in reason:
         return 'safe', 'refused to park: no safe pose or route' + back
     if m['outcome'] == 'timeout' and not m.get('attempts'):
@@ -169,11 +180,16 @@ def main():
         clearance = (f"{fmt(m.get('min_truth_clearance_m'), ' m')} ({m.get('min_truth_clearance_pair', '')})"
                      if truth else f"LiDAR {fmt(m.get('lidar_min_m'), ' m', 'not recorded')}")
         failure = '' if m['outcome'] == 'MISSION_COMPLETE' else (m.get('final_reason') or m['outcome'])
+        g1_error = fmt(m.get('localization_error_m'), ' m',
+                       'no truth (Isaac)' if not truth else 'not localized')
+        heading_error = fmt(m.get('heading_error_deg'), ' deg',
+                            'no truth (Isaac)' if not truth else 'no heading')
         cells = [f'<a href="#{tag}">{pages.esc(m["scenario"])}</a>' if latest else pages.esc(m['scenario']),
                  'Gazebo' if truth else 'Isaac', pages.esc(campaign), f'<code>{pages.esc(os.path.basename(run))}</code>',
                  when, pages.esc(m['outcome']), f'<span class="badge {kind}">{pages.esc(label)}</span>',
                  pages.esc(', '.join(m.get('selected_sides') or []) or '-'), fmt(m.get('attempts')),
-                 fmt(m.get('exploration_s'), ' s'), fmt(m.get('mission_s'), ' s'), reach, error,
+                 fmt(m.get('exploration_s'), ' s'), fmt(m.get('mission_s'), ' s'), g1_error, heading_error,
+                 reach, error,
                  pages.esc(clearance), fmt(m.get('returned_to_start')), pages.esc(failure[:140])]
         rows.append(f'<tr{"" if latest else " class=\"historical\""}>'
                     + ''.join(f'<td>{c}</td>' for c in cells) + '</tr>')
@@ -185,6 +201,12 @@ def main():
                  ('Sides tried (estimated)', ', '.join(m.get('selected_sides') or []) or '-'),
                  ('Attempts', fmt(m.get('attempts'))),
                  ('Exploration / mission', f"{fmt(m.get('exploration_s'), ' s')} / {fmt(m.get('mission_s'), ' s')}"),
+                 ('G1 position used', ', '.join(f'({x:.2f}, {y:.2f})' for x, y in m.get('g1_estimates') or [])
+                  or 'none'),
+                 ('G1 localization error, ground truth', g1_error),
+                 ('G1 heading estimate / error', f"{fmt(m.get('g1_heading_log'), ' deg', 'none')} / {heading_error}"),
+                 ('Positions re-seeded on the head / refused unverified',
+                  f"{m.get('reseeded_on_head', 0)} / {m.get('unverified_localizations', 0)}"),
                  ('Reach, ground truth', reach), ('Bearing from G1 heading, ground truth',
                                                   fmt(m.get('bearing_from_g1_heading_deg'), ' deg', 'not available')),
                  ('Parked pose error to the goal', error), ('Minimum clearance', clearance),
@@ -200,13 +222,14 @@ def main():
                      f'</header><p class="note">{pages.esc(m["description"])}. Expected: {pages.esc(m["expected"])}.</p>'
                      f'<div class="facts">{fact_html}</div><div class="stages">{figs}</div></section>')
     head = ['Scenario', 'Simulator', 'Campaign', 'Run', 'Date', 'Final state', 'Outcome', 'Sides tried',
-            'Attempts', 'Exploration', 'Mission', 'Reach', 'Pose error', 'Min clearance', 'Returned',
+            'Attempts', 'Exploration', 'Mission', 'G1 error', 'Heading error', 'Reach', 'Pose error',
+            'Min clearance', 'Returned',
             'Failure reason']
     intro = (
         '<p>What happened when the mission ran each scenario. Rows list every recorded run by the code '
         'that ran; the newest campaign comes first, earlier campaigns stay as historical evidence. '
-        'Reach, pose error and clearance are Gazebo ground truth, sampled every 1-2.5 s and never given '
-        'to the mission; Isaac runs record no ground truth, so those cells say so. The scene layouts are '
+        'G1 error, heading error, reach, pose error and clearance are Gazebo ground truth, sampled every '
+        '1-2.5 s and never given to the mission; Isaac runs record no ground truth, so those cells say so. The scene layouts are '
         f'on the <a href="{pages.SCENARIOS_PAGE}">scenarios page</a>.</p>'
         '<p class="note">Screenshots appear only for runs whose captures were verified: each image is a '
         'non-blank capture of that run, and its caption names the mission state active when it was '
@@ -215,16 +238,20 @@ def main():
         'in the dated records and run folders.</p>')
     legend = ('<p><span class="badge ok">parked, returned</span> parking completed &nbsp; '
               '<span class="badge safe">refused to park</span> the planner found no safe pose and said why &nbsp; '
-              '<span class="badge bad">perception</span> G1 not (re)localized in time, or localized '
-              'in the wrong place (ground truth) &nbsp; '
-              '<span class="badge warn">stopped by a check</span> another safety or precision check</p>')
+              '<span class="badge bad">perception</span> G1 not (re)localized in time, its position not '
+              'verified in depth, or localized in the wrong place (ground truth); a <em>false completion</em> '
+              'is a run the mission reported complete although it parked beside a wrong G1 position &nbsp; '
+              '<span class="badge warn">LiDAR safety monitor</span> the live LiDAR check cancelled parking '
+              'attempts &nbsp; <span class="badge warn">stopped by a check</span> another safety, planning or '
+              'precision check</p>')
     body = (f'<main class="shell"><h2>All runs</h2>{legend}<div class="wrap"><table><tr>'
             + ''.join(f'<th>{h}</th>' for h in head) + f'</tr>{"".join(rows)}</table></div>'
             f'<h2>Runs with verified screenshots</h2>{"".join(cards)}'
             '<p class="note">Records: <a href="../../archive/engineering/2026-11-05-parking-scenarios.md">P7 '
             'scenarios</a>, <a href="../../archive/engineering/2026-11-05-parking-detection-gaps.md">detection '
             'gaps</a>, <a href="../../archive/engineering/2026-11-05-parking-workstation-scenes.md">workstation '
-            'scenes</a>.</p></main>')
+            'scenes</a>, <a href="../../archive/engineering/2026-11-09-parking-g1-position-check.md">G1 '
+            'position check</a>.</p></main>')
     with open(OUT, 'w') as stream:
         stream.write(pages.page('Autonomous parking: experiments and results', pages.RESULTS_PAGE, intro, body))
     print('wrote', OUT, len(data), 'runs', len(cards), 'with screenshots')

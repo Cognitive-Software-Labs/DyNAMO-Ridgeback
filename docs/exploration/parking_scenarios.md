@@ -133,8 +133,11 @@ python3 tools/parking_scenarios/make_results_page.py --runs artifacts/exploratio
 
 `preview_scenario.sh gz|isaac SCENARIO OUT_DIR` starts a scene with
 `--plan-only` (the robot stays at its start) and saves the documentation views:
-top-down views of the whole task and of the workstation, a close-up of G1 and its
-table, an oblique view, and one frame of the robot's own camera.
+top-down views of the whole task, of the start and G1 framed together, and of the
+workstation, a close-up of G1 and its table, an oblique view, an angled view from
+above of the robot and G1, and one frame of the robot's own camera. The scenarios
+page leads each scenario with Isaac Sim's top-down, close-up and angled views and
+keeps the Gazebo views of the same layout in a collapsed section.
 `capture_scene_views.py` renders them in the simulator itself, so a locked or
 disconnected desktop cannot blank them: Gazebo through temporary camera sensors
 that are removed afterwards, Isaac through the runner's opt-in view cameras
@@ -189,3 +192,4 @@ robot is moved, so that session's map is not usable afterwards.
 - [Parking scenarios](../../archive/engineering/2026-11-05-parking-scenarios.md) — every run by scenario and simulator, the provisional basket, and the layouts stopped by G1 detection.
 - [Parking detection gaps](../../archive/engineering/2026-11-05-parking-detection-gaps.md) — why G1 detection stopped `heading_90` and `no_feasible`, the detector floor and relocalization hysteresis, the observation-fallback race, and the reruns.
 - [Parking workstation scenes](../../archive/engineering/2026-11-05-parking-workstation-scenes.md) — the workstation layouts tried in Gazebo, every run on them, why routes near the spawn were rejected, and the perception limits that stopped most runs.
+- [G1 position check](../../archive/engineering/2026-11-09-parking-g1-position-check.md) — why `no_feasible` parked beside a worktable edge and reported success, the head and torso check, the first-localization changes, and the workstation reruns.
