@@ -59,3 +59,11 @@ def test_leader_velocity_is_smoothed_and_resets_on_track_change_or_gap():
     assert estimate.update(4, .1, (.05, 0.)) == pytest.approx((.5, 0.))
     assert estimate.update(5, .2, (1., 0.)) == (0., 0.)
     assert estimate.update(5, 1., (2., 0.)) == (0., 0.)
+
+
+def test_gazebo_world_real_time_factor_is_rewritten_once():
+    from ridgeback_leader_follow.crowd_gazebo import apply_real_time_factor
+    world = '<physics><real_time_factor>1</real_time_factor></physics>'
+    assert apply_real_time_factor(world, .5) == '<physics><real_time_factor>0.5</real_time_factor></physics>'
+    with pytest.raises(ValueError):
+        apply_real_time_factor('<physics/>', .5)

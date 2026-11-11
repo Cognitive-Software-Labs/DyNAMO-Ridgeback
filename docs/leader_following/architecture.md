@@ -130,10 +130,14 @@ servers from `config/follow_nav2_params.yaml` and `follow_controller`. That
 file is the exploration Nav2 configuration with `odom` as the global frame (no
 map or SLAM), a 20 m rolling global costmap without a static layer, a 0.9 m/s
 MPPI forward limit and a 0.3 rad goal heading tolerance. Exploration
-configuration is unchanged. In Isaac, `--drive` lets the crowd runner consume
-`cmd_vel`, paces it to `--real-time-factor` (default 0.5, so perception keeps
-up) and holds people at their start poses until the follow stack publishes.
-It also writes `robot_truth.csv`. Run the two in one private ROS domain:
+configuration is unchanged. In both simulators `--drive` lets the crowd
+runner move the robot from `cmd_vel`, paces simulation to
+`--real-time-factor` (default 0.5, so perception keeps up) and holds people at
+their start poses until the follow stack publishes. It also writes
+`robot_truth.csv` from simulator truth: the Isaac rig pose, or the Gazebo
+`r100_0001/robot` model pose. Gazebo's odometry topic is
+`platform/odom/filtered`; pass `odom_topic:=platform/odom/filtered` to the
+launch. Run the two in one private ROS domain:
 
 ```bash
 export ROS_DOMAIN_ID=171 RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
@@ -142,9 +146,10 @@ OMNI_KIT_ACCEPT_EULA=YES isaac_venv/bin/python -m ridgeback_leader_follow.crowd_
 ros2 launch ridgeback_leader_follow follow_leader.launch.py
 ```
 
-Run both from the workspace root so the tracker finds `perception_venv`.
-Gazebo driving, the remaining scenarios and the plan's metrics are not yet
-implemented.
+For Gazebo, run `ros2 run ridgeback_leader_follow crowd_scene --backend gz ...`
+with the same scene options. Run both from the workspace root so the tracker
+finds `perception_venv`. The remaining scenarios and the plan's metrics are
+not yet implemented.
 
 ## Crowd simulation
 
@@ -172,3 +177,4 @@ wrapper on 24,000 scripted frames with no differences.
 ## Archived evidence
 
 - [First closed-loop following in Isaac](../../archive/engineering/2026-11-11-f4-first-follow.md) — leader-alone tuning runs and distance-keeping results.
+- [Closed-loop following in Gazebo](../../archive/engineering/2026-11-11-f4-gazebo-follow.md) — first Gazebo leader-alone run.

@@ -45,9 +45,9 @@ def interrupt_run(_signum, _frame):
     raise KeyboardInterrupt('Scene interrupted')
 
 
-def run_gazebo(scenario, duration, output, writer, gui, record=False, scene_profile='baseline', environment=None, render_quality='reference', tuning=None):
+def run_gazebo(scenario, duration, output, writer, gui, record=False, scene_profile='baseline', environment=None, render_quality='reference', tuning=None, drive=None):
     from ridgeback_leader_follow.crowd_gazebo import run
-    return run(scenario, duration, output, writer, gui, record, scene_profile, environment, render_quality, tuning)
+    return run(scenario, duration, output, writer, gui, record, scene_profile, environment, render_quality, tuning, drive)
 
 
 def run_isaac(scenario, duration, output, writer, gui, finish, record=False, scene_profile="baseline", environment=None, render_quality="reference", tuning=None, drive=None):
@@ -77,7 +77,7 @@ def main(argv=None):
                         help='Isaac updates per simulated second (default: recorded timing); '
                              '60 doubles viewport updates while sensors keep their tick rates')
     parser.add_argument('--drive', action='store_true',
-                        help='Isaac only: move the robot from cmd_vel (closed-loop following); '
+                        help='Let cmd_vel move the robot (closed-loop following); '
                              'people wait at their start poses until a follow stack publishes')
     parser.add_argument('--real-time-factor', type=float, default=.5,
                         help='With --drive: simulated seconds per wall second (perception must keep up)')
@@ -87,8 +87,6 @@ def main(argv=None):
     parser.add_argument('--ros-domain', type=int, help='Override the private ROS domain (0..232)')
     args = parser.parse_args(argv)
     from ridgeback_leader_follow.simulation_performance import resolve_tuning
-    if args.drive and args.backend != 'isaac':
-        parser.error('--drive currently requires --backend isaac')
     drive = None
     if args.drive:
         from ridgeback_leader_follow.simulation_performance import DriveOptions
@@ -193,7 +191,7 @@ def main(argv=None):
             if args.backend == 'gz':
                 # Keep this fixture separate from every other Gazebo session.
                 os.environ['GZ_PARTITION'] = f'leader_follow_{uuid.uuid4().hex}'
-                run_gazebo(scenario, duration, output, writer, args.gui, args.record, args.scene_profile, args.environment, args.render_quality, tuning)
+                run_gazebo(scenario, duration, output, writer, args.gui, args.record, args.scene_profile, args.environment, args.render_quality, tuning, drive)
             else:
                 # Kit has its own argument parser; it must not parse this CLI.
                 sys.argv = [sys.argv[0]]

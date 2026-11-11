@@ -9,7 +9,32 @@ from ridgeback_leader_follow.crowd_geometry import gazebo_world
 from ridgeback_leader_follow.crowd_sensors import SensorEvidence
 
 
-def run(scenario, duration, output, writer, gui, record=False, scene_profile='baseline', environment=None, render_quality='reference', tuning=None):
+def wait_for_follower(drive, monitor):
+    """Keep the crowd at its start until the follow stack publishes, then settle."""
+    node = monitor.node
+    deadline = time.monotonic() + drive.startup_timeout
+    while not (node.count_publishers('cmd_vel') > 0 and node.count_publishers('leader_follow/leader') > 0):
+        if time.monotonic() > deadline:
+            raise TimeoutError('Follow stack (cmd_vel and leader_follow/leader publishers) did not start')
+        monitor.spin(.05)
+    settle = time.monotonic() + drive.settle_seconds / drive.real_time_factor
+    while time.monotonic() < settle:
+        monitor.spin(.05)
+
+
+ROBOT_MODEL = 'r100_0001/robot'
+
+
+def apply_real_time_factor(world: str, factor: float) -> str:
+    """Pace a generated world; closed-loop runs slow it so perception keeps up."""
+    old = '<real_time_factor>1</real_time_factor>'
+    if world.count(old) != 1:
+        raise ValueError('generated world must declare exactly one real_time_factor of 1')
+    return world.replace(old, f'<real_time_factor>{factor:g}</real_time_factor>')
+
+
+def run(scenario, duration, output, writer, gui, record=False, scene_profile='baseline', environment=None, render_quality='reference', tuning=None, drive=None):
+    """``drive`` (DriveOptions) holds the crowd until a follow stack publishes and records robot truth."""
     from ridgeback_leader_follow.simulation_performance import RuntimeTuning
     tuning=tuning or RuntimeTuning()
     from gz.transport13 import Node
@@ -28,11 +53,26 @@ def run(scenario, duration, output, writer, gui, record=False, scene_profile='ba
         world = gazebo_world(scenario)
     else:
         raise ValueError(f'Gazebo does not implement scene profile {scene_profile!r}')
+    if drive is not None:
+        world = apply_real_time_factor(world, drive.real_time_factor)
     (output / 'scene.sdf').write_text(world)
     monitor = SensorEvidence(output, record=record, odom_topic='platform/odom/filtered')
     transport = Node()
     messages = queue.Queue()
     transport.subscribe(Pose_V, '/leader_follow/ground_truth', messages.put)
+    robot_pose = {}
+    last_command = [(0., 0., 0.)]
+    if drive is not None:
+        def on_poses(message):
+            for pose in message.pose:
+                if pose.name == ROBOT_MODEL:
+                    q = pose.orientation
+                    robot_pose['latest'] = (pose.position.x, pose.position.y,
+                                            math.atan2(2 * (q.w*q.z+q.x*q.y), 1-2*(q.y*q.y+q.z*q.z)))
+        transport.subscribe(Pose_V, '/world/leader_follow_scene/pose/info', on_poses)
+        from geometry_msgs.msg import TwistStamped
+        monitor.node.create_subscription(TwistStamped, 'cmd_vel', lambda m: last_command.__setitem__(
+            0, (m.twist.linear.x, m.twist.linear.y, m.twist.angular.z)), 10)
     processes = []
     env = dict(os.environ)
     if not gui:
@@ -62,12 +102,17 @@ def run(scenario, duration, output, writer, gui, record=False, scene_profile='ba
                 if time.monotonic() > deadline:
                     raise TimeoutError('Crowd plugin start service unavailable')
                 monitor.spin(.02)
+            robot_truth = None
+            if drive is not None:
+                wait_for_follower(drive, monitor)
+                robot_truth = (output / 'robot_truth.csv').open('w')
+                robot_truth.write('stamp,scenario_time,x,y,yaw,cmd_vx,cmd_vy,cmd_wz\n')
             ok, response = transport.request('/leader_follow/start', Empty(), Empty, Boolean, 10000)
             if not ok or not response.data:
                 raise RuntimeError('Crowd start failed')
             by_name = {p.name: p for p in scenario.people}
             last = -1.
-            wall_deadline = time.monotonic() + max(120., duration * 10)
+            wall_deadline = time.monotonic() + max(120., duration * 10 / (drive.real_time_factor if drive else 1.))
             while last < duration - .001:
                 if gui and processes[-1].poll() is not None:
                     raise RuntimeError('Gazebo GUI exited during playback; see simulator.log')
@@ -89,7 +134,15 @@ def run(scenario, duration, output, writer, gui, record=False, scene_profile='ba
                         yaw = math.atan2(2 * (q.w*q.z+q.x*q.y), 1-2*(q.y*q.y+q.z*q.z))
                         write_sample(writer, by_name[p.name], stamp, elapsed, min(elapsed,scenario.duration),
                                      (p.position.x,p.position.y,p.position.z,yaw))
+                    if robot_truth is not None:
+                        if 'latest' not in robot_pose:
+                            raise RuntimeError(f'No {ROBOT_MODEL} pose on the world pose stream')
+                        x, y, robot_yaw = robot_pose['latest']
+                        robot_truth.write(f'{stamp:.6f},{elapsed:.6f},{x:.6f},{y:.6f},{robot_yaw:.6f},'
+                                          + ','.join(f'{v:.6f}' for v in last_command[0]) + '\n')
                     last = elapsed
+            if robot_truth is not None:
+                robot_truth.close()
             # Dispatch final sensor samples before writing health evidence.
             for _ in range(20):
                 monitor.spin(.005)

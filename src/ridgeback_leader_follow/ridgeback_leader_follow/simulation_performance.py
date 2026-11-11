@@ -42,7 +42,7 @@ class RuntimeTuning:
 
 @dataclass(frozen=True)
 class DriveOptions:
-    """Closed-loop Isaac runs: consume cmd_vel, pace to ``real_time_factor``."""
+    """Closed-loop runs: consume cmd_vel, pace simulation to ``real_time_factor``."""
     real_time_factor: float = .5
     startup_timeout: float = 300.
     settle_seconds: float = 3.

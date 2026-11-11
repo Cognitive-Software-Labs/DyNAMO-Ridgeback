@@ -12,9 +12,10 @@ Both camera-exit cases held every sampled outside-camera observation; visible
 lock coverage is 87–100% with the profile's continuity confidence floor
 ([reference](../leader_following/recognition.md)).
 Robot/Thor performance is deferred until hardware access. F4 has started:
-`follow_controller` drove the Isaac robot through Nav2 behind the leader in the
-leader-alone scene ([reference](../leader_following/architecture.md#follow_controller-node)).
-Gazebo driving, the other scenarios and the metrics remain. F5–F6 remain open;
+`follow_controller` drove the robot through Nav2 behind the leader in the
+leader-alone scene in both Isaac and Gazebo
+([reference](../leader_following/architecture.md#follow_controller-node)).
+The other scenarios and the metrics remain. F5–F6 remain open;
 no leader-following controller has driven the physical robot.
 
 ## Goal

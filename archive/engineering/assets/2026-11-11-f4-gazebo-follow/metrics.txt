@@ -1,0 +1,2 @@
+leader distance after 3 s: median 1.58 min 1.21 max 1.92
+robot end (6.72, 0.57) yaw 0.99
