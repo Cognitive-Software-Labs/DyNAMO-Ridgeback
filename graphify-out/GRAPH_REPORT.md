@@ -1,7 +1,7 @@
 # Graph Report - /home/pratham/Documents/ChatGPT/DyNAMO-Ridgeback  (2026-11-11)
 
 ## Corpus Check
-- Large corpus: 1240 files · ~7,362,280 words. Semantic extraction will be expensive (many Claude tokens). Consider running on a subfolder.
+- Large corpus: 1240 files · ~7,362,296 words. Semantic extraction will be expensive (many Claude tokens). Consider running on a subfolder.
 
 ## Summary
 - 10296 nodes · 18606 edges · 802 communities (727 shown, 75 thin omitted)
