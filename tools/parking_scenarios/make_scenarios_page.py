@@ -45,7 +45,8 @@ CAPTION = {
 }
 SIM = {'gz': 'Gazebo (warehouse)', 'isaac': 'Isaac Sim (hospital floor)'}
 # Recorded HEAD -> the code that ran (previews then carried no other code change).
-CODE = {'bb8aa94': 'bb8aa94 plus the changes committed as b4f855b', 'b4f855b': 'b4f855b'}
+CODE = {'bb8aa94': 'bb8aa94 plus the changes committed as b4f855b', 'b4f855b': 'b4f855b',
+        '16bf79c': '16bf79c plus the view framing committed with these images'}
 ASSET_NAMES = {'table': 'table 1.20 x 0.70 m, top 0.75 m', 'privacy_curtain': 'panel 1.70 m long, 1.60 m high',
                'hospital_bed': 'bed 1.80 x 0.90 m, 0.50 m high'}
 

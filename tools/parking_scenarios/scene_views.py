@@ -34,7 +34,7 @@ CAPTIONS = {
 # Room walls stand about 3 m high in Isaac's hospital floor; the angled view looks
 # down steeply enough to see over them.
 ISOMETRIC = {'gz': (5.0, 7.0), 'isaac': (5.5, 11.0)}   # horizontal offset, height (m)
-TASK_MARGIN_M = 1.6
+TASK_MARGIN_M = 1.2
 
 
 def _snap(angle):
@@ -60,11 +60,13 @@ def views(backend, scenario, data=None):
         return [round(gx + forward * fx + left * lx, 3), round(gy + forward * fy + left * ly, 3), z]
 
     table = at(0.4, 0.0, 0.6)
-    # The start and G1 framed together: the larger of their spread across and along
-    # the image sets the height, with a margin, under the overall view's ceiling.
-    hfov, aspect = math.radians(70.0), 1600 / 1000
-    span = math.hypot(gx - START[0], gy - START[1]) + 2 * TASK_MARGIN_M
-    task_top = min(top, max(4.0, span / 2 / math.tan(hfov / 2), (2 * TASK_MARGIN_M) * aspect / 2 / math.tan(hfov / 2)))
+    # The start, G1 and its worktable framed together, with a margin. The height uses a
+    # 60 deg field: Isaac rendered a 70 deg view camera about that narrow (2026-11-11).
+    far = at(1.2, 0.0, 0.0)
+    xs, ys = (START[0], gx, far[0]), (START[1], gy, far[1])
+    tx, ty = (min(xs) + max(xs)) / 2, (min(ys) + max(ys)) / 2
+    span = max(max(xs) - min(xs), max(ys) - min(ys)) + 2 * TASK_MARGIN_M
+    task_top = min(top, max(4.0, span / 2 / math.tan(math.radians(30.0))))
     # Seen from behind G1 (the side the robot approaches), turned toward the start.
     behind = math.atan2(-fy, -fx)
     to_start = math.atan2(START[1] - gy, START[0] - gx)
@@ -72,7 +74,7 @@ def views(backend, scenario, data=None):
     offset, height = ISOMETRIC[backend]
     mx, my = (START[0] + 2 * gx) / 3, (START[1] + 2 * gy) / 3
     return [
-        {'name': 'task', 'eye': [cx, cy, round(task_top, 2)], 'target': [cx, cy, 0.0], 'up': list(up),
+        {'name': 'task', 'eye': [tx, ty, round(task_top, 2)], 'target': [tx, ty, 0.0], 'up': list(up),
          'hfov_deg': 70, 'width': 1600, 'height': 1000},
         {'name': 'isometric', 'eye': [round(mx + offset * math.cos(side), 3),
                                       round(my + offset * math.sin(side), 3), height],
