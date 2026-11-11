@@ -1,0 +1,405 @@
+{
+  "simulation_step_seconds": 0.025,
+  "frames": [
+    {
+      "animation": 0.0035119899548590183,
+      "render_and_sensors": 0.04147753189317882,
+      "ros_monitor": 0.08932456211186945
+    },
+    {
+      "animation": 0.0029322998598217964,
+      "render_and_sensors": 0.03516722097992897,
+      "ros_monitor": 0.008902014000341296
+    },
+    {
+      "animation": 0.0026259678415954113,
+      "render_and_sensors": 0.03640572214499116,
+      "ros_monitor": 0.008931407937780023
+    },
+    {
+      "animation": 0.0027202439960092306,
+      "render_and_sensors": 0.03465940407477319,
+      "ros_monitor": 0.009184890892356634
+    },
+    {
+      "animation": 0.0031932860147207975,
+      "render_and_sensors": 0.037418599938973784,
+      "ros_monitor": 0.008784194011241198
+    },
+    {
+      "animation": 0.0034673570189625025,
+      "render_and_sensors": 0.03093463694676757,
+      "ros_monitor": 0.008309968980029225
+    },
+    {
+      "animation": 0.0030469128396362066,
+      "render_and_sensors": 0.03356177709065378,
+      "ros_monitor": 0.009044850012287498
+    },
+    {
+      "animation": 0.0027331169694662094,
+      "render_and_sensors": 0.033792067086324096,
+      "ros_monitor": 0.00929307285696268
+    },
+    {
+      "animation": 0.0028260909020900726,
+      "render_and_sensors": 0.03195785591378808,
+      "ros_monitor": 0.008825430180877447
+    },
+    {
+      "animation": 0.002764725824818015,
+      "render_and_sensors": 0.03169506601989269,
+      "ros_monitor": 0.009243811015039682
+    },
+    {
+      "animation": 0.0028613568283617496,
+      "render_and_sensors": 0.03476325795054436,
+      "ros_monitor": 0.008792369160801172
+    },
+    {
+      "animation": 0.002813988132402301,
+      "render_and_sensors": 0.03241118090227246,
+      "ros_monitor": 0.009070578031241894
+    },
+    {
+      "animation": 0.003584115067496896,
+      "render_and_sensors": 0.03263900591991842,
+      "ros_monitor": 0.008358590072020888
+    },
+    {
+      "animation": 0.002785466145724058,
+      "render_and_sensors": 0.031518345000222325,
+      "ros_monitor": 0.008747986983507872
+    },
+    {
+      "animation": 0.0028664558194577694,
+      "render_and_sensors": 0.03649818408302963,
+      "ros_monitor": 0.009856333956122398
+    },
+    {
+      "animation": 0.0027819590177387,
+      "render_and_sensors": 0.03415646590292454,
+      "ros_monitor": 0.008335165912285447
+    },
+    {
+      "animation": 0.0038829331751912832,
+      "render_and_sensors": 0.03232757491059601,
+      "ros_monitor": 0.009134335909038782
+    },
+    {
+      "animation": 0.0035204561427235603,
+      "render_and_sensors": 0.03033592994324863,
+      "ros_monitor": 0.008866437012329698
+    },
+    {
+      "animation": 0.0027887308970093727,
+      "render_and_sensors": 0.03317950409837067,
+      "ros_monitor": 0.009590737987309694
+    },
+    {
+      "animation": 0.002958959201350808,
+      "render_and_sensors": 0.029555404791608453,
+      "ros_monitor": 0.009479982079938054
+    },
+    {
+      "animation": 0.002979487180709839,
+      "render_and_sensors": 0.026860518846660852,
+      "ros_monitor": 0.008915889076888561
+    },
+    {
+      "animation": 0.0030608989764004946,
+      "render_and_sensors": 0.03142046416178346,
+      "ros_monitor": 0.008746763924136758
+    },
+    {
+      "animation": 0.0036321240477263927,
+      "render_and_sensors": 0.03315399680286646,
+      "ros_monitor": 0.008780417032539845
+    },
+    {
+      "animation": 0.002936737146228552,
+      "render_and_sensors": 0.03004283388145268,
+      "ros_monitor": 0.008623233065009117
+    },
+    {
+      "animation": 0.0035742968320846558,
+      "render_and_sensors": 0.029339362168684602,
+      "ros_monitor": 0.008665060857310891
+    },
+    {
+      "animation": 0.004134872928261757,
+      "render_and_sensors": 0.03375668008811772,
+      "ros_monitor": 0.008550697937607765
+    },
+    {
+      "animation": 0.002859042026102543,
+      "render_and_sensors": 0.04456639289855957,
+      "ros_monitor": 0.010244988137856126
+    },
+    {
+      "animation": 0.00303926900960505,
+      "render_and_sensors": 0.035955491941422224,
+      "ros_monitor": 0.008860466070473194
+    },
+    {
+      "animation": 0.002855896018445492,
+      "render_and_sensors": 0.029932928970083594,
+      "ros_monitor": 0.00832176092080772
+    },
+    {
+      "animation": 0.0037551240529865026,
+      "render_and_sensors": 0.030968060018494725,
+      "ros_monitor": 0.009013650938868523
+    },
+    {
+      "animation": 0.003534702118486166,
+      "render_and_sensors": 0.03426244389265776,
+      "ros_monitor": 0.008720424957573414
+    },
+    {
+      "animation": 0.00299847312271595,
+      "render_and_sensors": 0.031324394047260284,
+      "ros_monitor": 0.009024260798469186
+    },
+    {
+      "animation": 0.003002240089699626,
+      "render_and_sensors": 0.03402362787164748,
+      "ros_monitor": 0.009423226118087769
+    },
+    {
+      "animation": 0.003286991035565734,
+      "render_and_sensors": 0.032010843977332115,
+      "ros_monitor": 0.009020233992487192
+    },
+    {
+      "animation": 0.003898901864886284,
+      "render_and_sensors": 0.034698185976594687,
+      "ros_monitor": 0.008804301964119077
+    },
+    {
+      "animation": 0.00289996899664402,
+      "render_and_sensors": 0.03464545798487961,
+      "ros_monitor": 0.008904056856408715
+    },
+    {
+      "animation": 0.004003716865554452,
+      "render_and_sensors": 0.032217700965702534,
+      "ros_monitor": 0.008245569188147783
+    },
+    {
+      "animation": 0.002903614891692996,
+      "render_and_sensors": 0.03176091914065182,
+      "ros_monitor": 0.009558707941323519
+    },
+    {
+      "animation": 0.0029324288479983807,
+      "render_and_sensors": 0.04069380019791424,
+      "ros_monitor": 0.009093229891732335
+    },
+    {
+      "animation": 0.0029837859328836203,
+      "render_and_sensors": 0.02955429209396243,
+      "ros_monitor": 0.008678948041051626
+    },
+    {
+      "animation": 0.002864452078938484,
+      "render_and_sensors": 0.028783604968339205,
+      "ros_monitor": 0.009109931997954845
+    },
+    {
+      "animation": 0.00303622311912477,
+      "render_and_sensors": 0.03149942005984485,
+      "ros_monitor": 0.008667085785418749
+    },
+    {
+      "animation": 0.0027349810115993023,
+      "render_and_sensors": 0.03217407898046076,
+      "ros_monitor": 0.008523597149178386
+    },
+    {
+      "animation": 0.002924283966422081,
+      "render_and_sensors": 0.030240914085879922,
+      "ros_monitor": 0.008648509858176112
+    },
+    {
+      "animation": 0.0031483019702136517,
+      "render_and_sensors": 0.030969012062996626,
+      "ros_monitor": 0.008629996096715331
+    },
+    {
+      "animation": 0.0028056229930371046,
+      "render_and_sensors": 0.031021889997646213,
+      "ros_monitor": 0.008186429040506482
+    },
+    {
+      "animation": 0.002780345967039466,
+      "render_and_sensors": 0.03327210689894855,
+      "ros_monitor": 0.00876723206602037
+    },
+    {
+      "animation": 0.0029758901800960302,
+      "render_and_sensors": 0.029883055947721004,
+      "ros_monitor": 0.008525019977241755
+    },
+    {
+      "animation": 0.002814189065247774,
+      "render_and_sensors": 0.033267257967963815,
+      "ros_monitor": 0.010649753035977483
+    },
+    {
+      "animation": 0.004646487068384886,
+      "render_and_sensors": 0.0405334800016135,
+      "ros_monitor": 0.0095747378654778
+    },
+    {
+      "animation": 0.002647707937285304,
+      "render_and_sensors": 0.03423074493184686,
+      "ros_monitor": 0.010693665128201246
+    },
+    {
+      "animation": 0.002510983031243086,
+      "render_and_sensors": 0.035559392999857664,
+      "ros_monitor": 0.009486753959208727
+    },
+    {
+      "animation": 0.003235515207052231,
+      "render_and_sensors": 0.031325276009738445,
+      "ros_monitor": 0.009425398893654346
+    },
+    {
+      "animation": 0.0036180978640913963,
+      "render_and_sensors": 0.03100735298357904,
+      "ros_monitor": 0.008288599085062742
+    },
+    {
+      "animation": 0.0028397860005497932,
+      "render_and_sensors": 0.03375227306969464,
+      "ros_monitor": 0.009365447098389268
+    },
+    {
+      "animation": 0.0032877319026738405,
+      "render_and_sensors": 0.033366363029927015,
+      "ros_monitor": 0.00863244105130434
+    },
+    {
+      "animation": 0.0027407221496105194,
+      "render_and_sensors": 0.030537015991285443,
+      "ros_monitor": 0.008971533039584756
+    },
+    {
+      "animation": 0.0028195190243422985,
+      "render_and_sensors": 0.030404648976400495,
+      "ros_monitor": 0.008278639987111092
+    },
+    {
+      "animation": 0.0032409350387752056,
+      "render_and_sensors": 0.034498032880946994,
+      "ros_monitor": 0.008658730192109942
+    },
+    {
+      "animation": 0.003059406066313386,
+      "render_and_sensors": 0.0336967590264976,
+      "ros_monitor": 0.00912290601991117
+    },
+    {
+      "animation": 0.003064714837819338,
+      "render_and_sensors": 0.03516738209873438,
+      "ros_monitor": 0.008461222052574158
+    },
+    {
+      "animation": 0.0028852911200374365,
+      "render_and_sensors": 0.03328474098816514,
+      "ros_monitor": 0.008385048946365714
+    },
+    {
+      "animation": 0.0028759839478880167,
+      "render_and_sensors": 0.03599501610733569,
+      "ros_monitor": 0.009127764031291008
+    },
+    {
+      "animation": 0.003203846048563719,
+      "render_and_sensors": 0.028969302074983716,
+      "ros_monitor": 0.008583127986639738
+    },
+    {
+      "animation": 0.0029940952081233263,
+      "render_and_sensors": 0.03154374286532402,
+      "ros_monitor": 0.008705015992745757
+    },
+    {
+      "animation": 0.0029444920364767313,
+      "render_and_sensors": 0.03308139112778008,
+      "ros_monitor": 0.008574062027037144
+    },
+    {
+      "animation": 0.0036265840753912926,
+      "render_and_sensors": 0.03458167891949415,
+      "ros_monitor": 0.008812136016786098
+    },
+    {
+      "animation": 0.0029878627974539995,
+      "render_and_sensors": 0.03380983020178974,
+      "ros_monitor": 0.009532678872346878
+    },
+    {
+      "animation": 0.0031310899648815393,
+      "render_and_sensors": 0.030720867915078998,
+      "ros_monitor": 0.010599139146506786
+    },
+    {
+      "animation": 0.0028012751135975122,
+      "render_and_sensors": 0.03129296493716538,
+      "ros_monitor": 0.008140664082020521
+    },
+    {
+      "animation": 0.0032276699785143137,
+      "render_and_sensors": 0.034488865872845054,
+      "ros_monitor": 0.010620638960972428
+    },
+    {
+      "animation": 0.0028379030991345644,
+      "render_and_sensors": 0.02898842701688409,
+      "ros_monitor": 0.009105673991143703
+    },
+    {
+      "animation": 0.0026153679937124252,
+      "render_and_sensors": 0.02752306405454874,
+      "ros_monitor": 0.008958148071542382
+    },
+    {
+      "animation": 0.00302342907525599,
+      "render_and_sensors": 0.029532612999901175,
+      "ros_monitor": 0.008451873902231455
+    },
+    {
+      "animation": 0.0034987961407750845,
+      "render_and_sensors": 0.03199385292828083,
+      "ros_monitor": 0.008696018951013684
+    },
+    {
+      "animation": 0.003900194074958563,
+      "render_and_sensors": 0.033270974876359105,
+      "ros_monitor": 0.009412536164745688
+    },
+    {
+      "animation": 0.0047379969619214535,
+      "render_and_sensors": 0.03211563010700047,
+      "ros_monitor": 0.008962044958025217
+    },
+    {
+      "animation": 0.0029199360869824886,
+      "render_and_sensors": 0.03160528792068362,
+      "ros_monitor": 0.009053044952452183
+    },
+    {
+      "animation": 0.003102417103946209,
+      "render_and_sensors": 0.03426760295405984,
+      "ros_monitor": 0.009317168034613132
+    },
+    {
+      "animation": 0.002952385926619172,
+      "render_and_sensors": 0.033224388025701046,
+      "ros_monitor": 0.009427182842046022
+    }
+  ]
+}

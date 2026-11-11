@@ -10,7 +10,9 @@ from ridgeback_leader_follow.crowd_geometry import create_isaac_scene, animate_i
 from ridgeback_leader_follow.crowd_sensors import SensorEvidence
 
 
-def run(scenario, duration, output, writer, gui, finish, record=False, scene_profile="baseline", environment=None):
+def run(scenario, duration, output, writer, gui, finish, record=False, scene_profile="baseline", environment=None, render_quality="reference", tuning=None):
+    from ridgeback_leader_follow.simulation_performance import RuntimeTuning
+    tuning=tuning or RuntimeTuning()
     from ament_index_python.packages import get_package_share_directory
     from pathlib import Path
     from ridgeback_leader_follow.crowd_runner import stop_process, write_sample
@@ -41,14 +43,25 @@ def run(scenario, duration, output, writer, gui, finish, record=False, scene_pro
     try:
         os.environ.setdefault('OMNI_KIT_ACCEPT_EULA', 'YES')
         from isaacsim import SimulationApp
-        app = SimulationApp({'headless': not gui})
+        # Over a remote desktop, the window's size dominates GUI frame cost
+        # (measured 17 FPS at 1920x1080, 67 FPS at 640x480 for the same scene).
+        width, height = (int(v) for v in os.environ.get('ISAAC_WINDOW', '1280x720').split('x'))
+        app = SimulationApp({'headless': not gui, 'width': width, 'height': height,
+                             'window_width': width, 'window_height': height})
+        if render_quality == 'performance':
+            import carb
+            settings = carb.settings.get_settings()
+            # Retain RTX materials/textures; remove expensive secondary rays.
+            for key in ('/rtx/shadows/enabled', '/rtx/reflections/enabled',
+                        '/rtx/indirectDiffuse/enabled'):
+                settings.set_bool(key, False)
         import omni.timeline
         import omni.usd
         from isaacsim.core.utils.extensions import enable_extension
         from omni.kit.loop import _loop as omni_loop
         from pxr import Gf, PhysxSchema, Usd, UsdGeom, UsdPhysics
         from robot_rig import RidgebackRig
-        from ros_io import RosIO
+        from ros_io import RosIO, drain_callbacks
         from sensors import attach_camera, attach_lidars
         from worlds import BASE_LINK_FLOOR_CLEARANCE
 
@@ -57,7 +70,7 @@ def run(scenario, duration, output, writer, gui, finish, record=False, scene_pro
         stage = context.get_stage()
         if scene_profile == 'realistic':
             from ridgeback_leader_follow.realistic_scene import create_scene
-            people = create_scene(stage, scenario, environment or 'modern_office')
+            people = create_scene(stage, scenario, environment or 'modern_office', render_quality, tuning)
         elif scene_profile == 'lab':
             from ridgeback_leader_follow.lab_scene import create_scene
             people = create_scene(stage, scenario)
@@ -66,8 +79,9 @@ def run(scenario, duration, output, writer, gui, finish, record=False, scene_pro
             people = create_f3_scene(stage, scenario)
         else:
             people = create_isaac_scene(stage, scenario)
+        animation_cache={}
         for person in scenario.people:
-            animate_isaac_person(people[person.name], person, 0.)
+            animate_isaac_person(people[person.name], person, 0.,animation_cache)
         robot = stage.DefinePrim('/ridgeback', 'Xform')
         robot.GetReferences().AddReference((adapter / 'usd/robots/ridgeback_r100/ridgeback_r100.usda').as_uri())
         height = BASE_LINK_FLOOR_CLEARANCE
@@ -76,19 +90,28 @@ def run(scenario, duration, output, writer, gui, finish, record=False, scene_pro
         root = next(p.GetPath().pathString for p in Usd.PrimRange(robot)
                     if p.HasAPI(UsdPhysics.ArticulationRootAPI) and '/drive_rig/' in str(p.GetPath()))
         physics = UsdPhysics.Scene.Define(stage, '/physicsScene')
-        PhysxSchema.PhysxSceneAPI.Apply(physics.GetPrim()).CreateTimeStepsPerSecondAttr(120.)
+        physx = PhysxSchema.PhysxSceneAPI.Apply(physics.GetPrim())
+        physx.CreateTimeStepsPerSecondAttr(120.)
+        # One stationary articulation and static colliders: GPU dynamics made
+        # every substep wait on the GPU (about 13 ms of a 20 ms update in the
+        # modern office). CPU PhysX leaves sensor rates and paths unchanged.
+        physx.CreateEnableGPUDynamicsAttr(False)
+        physx.CreateBroadphaseTypeAttr('MBP')
         enable_extension('isaacsim.ros2.bridge')
         ros = RosIO('r100_0001', odom_tf=True)
         monitor = SensorEvidence(output, record=record)
         attach_lidars(stage, '/ridgeback', 'r100_0001')
         _, depth_handle = attach_camera(stage, '/ridgeback', 'r100_0001',
-                                         '640x480', 'ideal', depth_sink=ros.publish_d455_depth)
+                                         '640x480', 'ideal', depth_sink=ros.publish_d455_depth,
+                                         profile_override=tuning.camera_profile(),publish_points=not tuning.reduced_sensors)
         rig = RidgebackRig(root, odom_noise=0., seed=0)
         # One render per step. The realistic profile's RTX office makes each
         # render costly, so it steps at the camera's 30 Hz instead of 40 Hz:
         # about a third more scene time per second of wall time. Baseline and
         # F3 runs keep their recorded 40 Hz timing.
         dt = 1 / 30 if scene_profile == 'realistic' else .025
+        if tuning.isaac_step_hz:
+            dt = 1 / tuning.isaac_step_hz
         loop = omni_loop.acquire_loop_interface()
         loop.set_manual_step_size(dt)
         loop.set_manual_mode(True, name='main')
@@ -118,8 +141,7 @@ def run(scenario, duration, output, writer, gui, finish, record=False, scene_pro
             ros.publish_imu(stamp, 0., 0., 0.)
             ros.publish_ground_truth(stamp, *rig.ground_truth())
             ros.spin_once()
-            for _ in range(12):
-                monitor.spin(0.)
+            drain_callbacks(monitor, monitor.node, 12)
 
         deadline = time.monotonic() + 120.
         while not monitor.ready:
@@ -136,7 +158,7 @@ def run(scenario, duration, output, writer, gui, finish, record=False, scene_pro
                 raise RuntimeError('Isaac window closed before scene completion')
             elapsed = (index + 1) * dt
             for person in scenario.people:
-                animate_isaac_person(people[person.name], person, elapsed)
+                animate_isaac_person(people[person.name], person, elapsed,animation_cache)
             # No command is consumed. The F1 observation robot stays stationary.
             rig.step(dt, now=timeline.get_current_time())
             app.update()

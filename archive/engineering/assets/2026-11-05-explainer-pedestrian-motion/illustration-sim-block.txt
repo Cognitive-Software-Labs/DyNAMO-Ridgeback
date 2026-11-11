@@ -1,0 +1,56 @@
+ (tools/explainer_gifs/leader_following.py renders the README GIF from this block)
+  const PX = 40, DT = 1 / 30, T = 24, N = Math.round(T / DT);
+  const path = keys => t => {
+    if (t <= keys[0][0]) return [keys[0][1], keys[0][2]];
+    for (let i = 1; i < keys.length; i++) { const a = keys[i - 1], b = keys[i]; if (t <= b[0]) { const u = (t - a[0]) / (b[0] - a[0]); return [a[1] + u * (b[1] - a[1]), a[2] + u * (b[2] - a[2])]; } }
+    const l = keys[keys.length - 1]; return [l[1], l[2]];
+  };
+  const leaderAt = path([[0, 3.6, 4.6], [5, 8.6, 4.6], [9, 12.2, 3.4], [14, 16.4, 3.0], [18, 19.6, 3.8], [24, 21.6, 4.8]]);
+  const others = [
+    { at: path([[0, 9.3, 9.6], [3.5, 9.3, 9.0], [9.5, 9.3, 0.0], [24, 9.3, -12]]) },          // fast crosser
+    { at: path([[0, 14.9, 9.1], [24, 14.9, -1.7]]) },                                          // slow pair walking
+    { at: path([[0, 14.9, 9.7], [24, 14.9, -1.1]]) },                                          //   across the view
+    { at: () => [17.6, 1.4] }, { at: () => [18.2, 1.1] }, { at: () => [18.15, 1.85] },         // standing group
+    { at: path([[0, 26, 7.3], [24, 15.5, 3.7]]), alike: true },                                // look-alike
+    { at: path([[0, 0.8, 7.8], [24, 19, 8.3]]) },
+    { at: path([[0, 21, 7.6], [24, 3, 6.9]]) },
+    { at: path([[0, 19, 0.4], [24, 1.5, 0.6]]) },
+  ];
+  const ALIKE = others.findIndex(o => o.alike);
+  const sub = (a, b) => [a[0] - b[0], a[1] - b[1]], len = v => Math.hypot(v[0], v[1]);
+  const segDist = (p, a, b) => { const ab = sub(b, a), ap = sub(p, a); const s = Math.max(0, Math.min(1, (ap[0] * ab[0] + ap[1] * ab[1]) / (ab[0] ** 2 + ab[1] ** 2))); return [len(sub(p, [a[0] + s * ab[0], a[1] + s * ab[1]])), s]; };
+
+  const frames = [];
+  let R = [2.2, 4.6], state = 'LOCKED', hidden = 0, seen = 0, sinceLock = 99, heading = 0, lastSeen = leaderAt(0);
+  for (let i = 0; i <= N; i++) {
+    const t = i * DT, L = leaderAt(t), P = others.map(o => o.at(t));
+    const blocked = P.some(p => { const [d, s] = segDist(p, R, L); return d < 0.32 && s > 0.05 && s < 0.95; });
+    let why;
+    if (blocked) {
+      seen = 0; hidden += DT;
+      if (state === 'LOCKED') state = 'UNCERTAIN';
+      if (state === 'UNCERTAIN' && hidden > 1.5) state = 'LOST';
+      why = state === 'LOST' ? 'lost' : 'hidden';
+    } else {
+      hidden = 0;
+      if (state !== 'LOCKED') { seen += DT; why = 'confirming'; if (seen >= 0.6) { state = 'LOCKED'; sinceLock = 0; seen = 0; } }
+    }
+    if (state === 'LOCKED') { lastSeen = L; sinceLock += DT; why = sinceLock < 1.6 ? 'recovered' : 'locked'; }
+    // motion: follow when locked, keep clear of everyone always
+    let v = [0, 0];
+    if (state === 'LOCKED') {
+      const d = sub(L, R), dist = len(d), tgt = [L[0] - 1.4 * d[0] / dist, L[1] - 1.4 * d[1] / dist];
+      const e = sub(tgt, R), el2 = len(e), sp = Math.min(1.35, el2 * 1.6);
+      if (el2 > 1e-6) v = [e[0] / el2 * sp, e[1] / el2 * sp];
+    }
+    P.forEach(p => { const d = sub(R, p), r = len(d); if (r < 1.3 && r > 1e-6) { const k = (1.3 - r) * 3.2; v[0] += d[0] / r * k; v[1] += d[1] / r * k; } });
+    const speed = len(v);
+    R = [R[0] + v[0] * DT, R[1] + v[1] * DT];
+    const want = Math.atan2(lastSeen[1] - R[1], lastSeen[0] - R[0]) + (state === 'LOST' ? 0.55 * Math.sin(t * 2.2) : 0);
+    let dh = want - heading; dh = Math.atan2(Math.sin(dh), Math.cos(dh)); heading += Math.max(-2.5 * DT, Math.min(2.5 * DT, dh));
+    const gap = Math.min(...P.map(p => len(sub(R, p)))) - 0.25 - 0.45;
+    const alikeNear = len(sub(P[ALIKE], L)) < 3.2;
+    frames.push({ t, L, P, R: [...R], heading, state, why, speed, lead: len(sub(L, R)), gap, alikeNear });
+  }
+
+  

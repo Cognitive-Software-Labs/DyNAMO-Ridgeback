@@ -285,7 +285,8 @@ def attach_camera(stage, robot_root: str = "/ridgeback",
                   namespace: str = "r100_0001",
                   camera_profile: str = DEFAULT_CAMERA_PROFILE,
                   depth_fidelity: str = DEFAULT_DEPTH_FIDELITY,
-                  depth_sink=None) -> tuple[str, object | None]:
+                  depth_sink=None, *, profile_override=None,
+                  publish_points=True) -> tuple[str, object | None]:
     """Bind one render product + color/depth/points/camera_info publishers
     to the baked D455 camera prim (depth aligned to color, like the gz
     setup and the real driver's align mode)."""
@@ -293,7 +294,7 @@ def attach_camera(stage, robot_root: str = "/ridgeback",
     from pxr import UsdGeom
 
     cam = _find_prim_by_name(stage, robot_root, "d455_color")
-    profile = resolve_camera_profile(camera_profile)
+    profile = profile_override or resolve_camera_profile(camera_profile)
     width, height = profile.width, profile.height
     tick_rate = profile.fps
     width_attr = cam.GetAttribute("dynamo:resolutionWidth")
@@ -339,8 +340,9 @@ def attach_camera(stage, robot_root: str = "/ridgeback",
     if depth_fidelity == "ideal":
         camera_products += [
             ("cam_depth", "depth", f"{base}/depth/image"),
-            ("cam_points", "depth_pcl", f"{base}/points"),
         ]
+        if publish_points:
+            camera_products.append(("cam_points", "depth_pcl", f"{base}/points"))
     elif depth_fidelity == "d455":
         pass
     else:

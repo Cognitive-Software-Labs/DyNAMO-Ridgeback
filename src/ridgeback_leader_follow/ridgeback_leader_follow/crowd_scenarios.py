@@ -20,8 +20,11 @@ class PersonPath:
     role: str
     color: tuple[float, float, float]
     waypoints: tuple[Waypoint, ...]
+    initial_heading: float = 0.
 
     def __post_init__(self):
+        if not math.isfinite(self.initial_heading):
+            raise ValueError('Initial heading must be finite')
         if not self.name.isidentifier() or self.role not in ('leader', 'bystander'):
             raise ValueError('Person needs an identifier and a leader/bystander role')
         if len(self.color) != 3 or any(not 0 <= c <= 1 for c in self.color):
@@ -39,7 +42,7 @@ class PersonPath:
         if not math.isfinite(time):
             raise ValueError('Time must be finite')
         time = max(0., min(time, self.waypoints[-1].time))
-        heading = 0.
+        heading = self.initial_heading
         for a, b in zip(self.waypoints, self.waypoints[1:]):
             dx, dy = b.x - a.x, b.y - a.y
             if dx or dy:

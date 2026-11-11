@@ -11,7 +11,7 @@ import numpy as np
 from numba import njit
 from ridgeback_leader_follow.benchmarking.dataset import SensorBag
 from ridgeback_leader_follow.fusion import rigid_matrix
-from ridgeback_leader_follow.crowd_geometry import motion_frame
+from ridgeback_leader_follow.crowd_geometry import motion_frame,motion_values
 from .scene_geometry import recorded_scenario,projection_meshes
 
 
@@ -67,9 +67,10 @@ def annotate(bag, output, world_from_odom, stationary_base=False):
                 # Unwrap yaw before interpolation across the -pi/pi boundary.
                 angle=float(np.interp(rt,times,np.unwrap([float(r['yaw']) for r in samples])))
                 command=float(np.interp(rt,times,[float(r['command_time']) for r in samples]))
-                clip,frame=motion_frame(dict(data,gait_speed_mps=(float(data['gait_speed_mps']) if 'gait_speed_mps' in data else .5)*scale),person,command)
+                clip,frame=motion_frame(dict(data,gait_speed_mps=(float(data['gait_speed_mps']) if 'gait_speed_mps' in data else .5)*scale),person,command,fractional=manifest['backend']=='isaac' and 'idle' in data)
                 world_person=rigid_matrix(pose,(0,0,math.sin(angle/2),math.cos(angle/2)))
-                xyz=np.column_stack((clip['points'][frame]*scale,np.ones(len(clip['points'][frame]))))
+                points=motion_values(clip,frame)
+                xyz=np.column_stack((points*scale,np.ones(len(points))))
                 vertices=(color_world@world_person@xyz.T).T[:,:3]
                 mesh_depth=rasterize(vertices,data['faces'],k,rgb.shape[0],rgb.shape[1])
                 mask=np.isfinite(mesh_depth); masks.append(mesh_depth)

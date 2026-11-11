@@ -45,6 +45,12 @@ distance, so stance feet stay planted at any path speed; while a person stands
 (including before their first step and after their route ends) the idle loop
 plays. Deterministic per-person phase offsets keep pairs, including
 look-alikes, from walking or breathing in step. Isaac selects cached frames;
+Modern-office walkers waiting for a delayed start face their first travel
+heading, so crossing pedestrians do not snap sideways when they start.
+The recorded route includes this initial heading; older recordings default
+to zero. Isaac interpolates the 10 Hz idle vertex cache across the loop seam, uses
+the 30 Hz walk samples and nearest cached normals, and skips repeated USD
+attribute writes when the sampled pose has not changed.
 Gazebo's `CrowdMotion` plugin switches each actor between its `walk` and
 `idle` animations using the same rule and offsets.
 
@@ -60,6 +66,47 @@ robot on both sides and a standing trio. Everyone stays at least 0.8 m apart at
 crowd sizes 2, 4 and 8. The earlier
 realistic worlds keep their recorded routes, which walk at 0.2-0.5 m/s.
 All routes are scripted rather than reactive pedestrian navigation.
+
+## Exact explainer pedestrian playback
+
+`--scenario explainer` with the realistic profile and `modern_office` replays
+all pedestrian routes in `explainer.html`'s animation: 24 seconds, one leader,
+ten bystanders, including the fast crosser, slow pair, three stationary people,
+matching look-alike and three other walkers. This mode has a fixed population;
+`--crowd-size` does not change it. It is separate from the six benchmark
+families. The existing `crowd` command does not reproduce this illustration.
+
+The HTML's coordinates map to world metres as `x = svg_x - 2.2` and
+`y = 4.6 - svg_y`, preserving distances and timing while putting the observer
+at the origin and converting screen-down to world-up. The original furnished modern-office layout is used without expanding the
+floor or moving furniture. Routes are not rounded, shortened or slowed to fit
+the room. The fast crosser continues beyond the original room boundary and
+can pass through partitions on that exact illustrated path; these kinematic
+pedestrians do not stop at furniture or walls.
+A regression test compares every person's position to the HTML at all 721
+30 Hz display times; another checks that the original office layout is retained without changing
+any person’s waypoints.
+These are scripted paths: interpersonal avoidance is not added to the drawing's
+choreography.
+
+The three group members remain stationary and play idle motion. The look-alike
+uses the leader's model and scale with its own animation phase. Walk motion
+continues to follow travelled distance. The illustration's robot controller,
+lock-state display and avoidance are **not** reproduced: the observation robot
+remains stationary, and this is not a recognition or following test.
+
+```bash
+# Gazebo (after building and sourcing the workspace)
+python3 -m ridgeback_leader_follow.crowd_runner \
+  --backend gz --scene-profile realistic --environment modern_office \
+  --scenario explainer --ros-domain 215 --gui
+
+# Isaac Sim
+OMNI_KIT_ACCEPT_EULA=YES isaac_venv/bin/python \
+  -m ridgeback_leader_follow.crowd_runner \
+  --backend isaac --scene-profile realistic --environment modern_office \
+  --scenario explainer --ros-domain 216 --gui
+```
 
 ## Rendering differences
 
@@ -84,6 +131,151 @@ unique texture names. The static converter removes loose wire edges (Collada
 Trees use a 180,000-triangle visual mesh and cylindrical trunk collisions in
 both backends; foliage has no collision. The Gazebo launch bridges
 `/world/leader_follow_scene/clock` to ROS `/clock`.
+
+## Interactive rendering performance
+
+`--render-quality reference` (the default) retains the original lighting and
+renderer settings. `--render-quality performance` is available with the
+realistic profile. Gazebo disables scene shadows and keeps the sun plus two
+fill lights. Isaac disables RTX shadows, reflections and indirect diffuse;
+the modern office uses HDR daylight and sun instead of the window-fill and
+ceiling-light emitters. Fixture meshes, textures, glass, humans, paths,
+collisions and sensor configuration remain present. Lighting appearance changes;
+this mode is not interchangeable with reference images for recognition scoring.
+
+Isaac keeps its 120 Hz physics configuration and the step rate described under
+[Smooth Isaac window](#smooth-isaac-window). The selected lighting mode does not
+guarantee any frame rate. Ground truth remains sampled on the 0.05-second grid.
+
+```bash
+./tools/run_leader_gazebo_gpu --render-quality performance
+# In a separate run, after sourcing ROS and the workspace:
+isaac_venv/bin/python3 -m ridgeback_leader_follow.crowd_runner \
+  --backend isaac --scene-profile realistic --environment modern_office \
+  --scenario explainer --render-quality performance --gui
+```
+
+Reduced lighting has not demonstrated a useful frame-rate improvement on this
+host. It remains an optional comparison mode rather than the recommended default.
+
+The selected render quality is recorded in each run's manifest. Omit the option
+or select `reference` to restore the original lighting and timing.
+
+Experimental preview dispatch and timing instrumentation were removed.
+Earlier frame-cost measurements were host loop costs, not remote-desktop FPS. Concurrent simulators and GPU workloads
+can affect results; compare one scene with the same window size and machine
+load. A visual-only mode without sensor computation is not implemented.
+
+### Humans, sensors and collisions
+
+`--performance-profile balanced` enables the following options together for
+`--scene-profile realistic`. The reference profile remains the default.
+Each option can also be selected independently for a controlled comparison.
+
+| Option | Reference | Reduced-cost setting |
+|---|---|---|
+| `--human-detail` | `full` | `distant`: about half the triangles for people whose entire route stays at least 7 m from both the robot and the initial Isaac observer position |
+| `--sensor-quality` | `reference`: 640×480 RGB/aligned depth at 30 simulation Hz | `reduced`: 320×240 at 15 simulation Hz, with unused depth point-cloud publication disabled |
+| `--collision-quality` | `reference`: existing colliders | `simple`: primitive boxes for furniture and props; cylindrical tree-trunk colliders remain |
+
+The leader and look-alike always retain their full meshes. Distance selection
+checks the complete line segments between waypoints and is fixed for the run;
+it does not switch detail dynamically when an operator orbits the GUI camera.
+Reduced assets retain the publisher outfits, textures, UVs, skeleton and clips.
+Identical Gazebo cast members reuse skin/animation files; Isaac reuses material
+graphs for identical texture/material inputs. Cached animation writes preserve
+the selected pose and idle interpolation.
+
+Simple prop collision boxes enclose each visual mesh's local bounds and retain
+its position, rotation and scale. They can close gaps under chairs or shelving;
+they are approximations for interactive scenes, not equivalent collision geometry
+for navigation evaluation. Visual meshes remain unchanged. The hardware robot
+configuration is never edited: reduced camera settings are written only to the
+run-local declaration. The smaller image keeps the same field of view and uses
+`fx=fy=192, cx=160, cy=120`; LiDAR configuration is unchanged.
+
+Reduced sensors ran through the real tracker and offline detector/association
+checks, but those checks showed lower camera-only recall. This setting therefore
+remains opt-in and is not qualified as a replacement for F2/F3 recordings. The
+run manifest records the tuning, camera contract and per-person mesh detail.
+Changing these settings requires a new recognition/tracking qualification.
+
+```bash
+# Run one simulator at a time, from a built and sourced workspace.
+./tools/run_leader_gazebo_gpu --performance-profile balanced
+isaac_venv/bin/python3 -m ridgeback_leader_follow.crowd_runner \
+  --backend isaac --scene-profile realistic --environment modern_office \
+  --scenario explainer --performance-profile balanced --gui
+# Example: reduce only furniture collision cost, retaining full camera quality.
+./tools/run_leader_gazebo_gpu --collision-quality simple
+```
+
+The balanced profile retains reference lighting because reducing lights alone
+showed no useful gain, and it is not needed for a smooth Isaac window (below).
+Remote browser delivery is measured separately using the
+[streaming probe](remote_streaming.md).
+
+### Smooth Isaac window
+
+The Isaac crowd runner uses CPU PhysX for its physics scene. With GPU dynamics,
+each of the four 120 Hz physics substeps waited on the GPU, which was most of a
+modern-office update. ROS callbacks are drained through persistent executors
+instead of per-call `rclpy.spin_once`. Neither change alters paths, sensor tick
+rates or the sensor contract.
+
+The realistic loop still renders 30 updates per simulated second by default,
+which caps the window at 30 FPS. `--isaac-step-hz 60` renders 60 updates per
+simulated second for viewing. The camera stays at 30 Hz and the LiDARs at
+40 Hz because they follow their own sensor tick rates. Clock, odometry and TF
+publish once per update, so they double. Use the default timing for
+recordings that are compared with earlier evidence.
+
+```bash
+OMNI_KIT_ACCEPT_EULA=YES isaac_venv/bin/python -m ridgeback_leader_follow.crowd_runner \
+  --backend isaac --scene-profile realistic --environment modern_office \
+  --scenario explainer --isaac-step-hz 60 --gui
+```
+
+On the shared workstation, the modern-office explainer with all sensors
+reached about 56 Isaac updates per second in an xrdp window at 1280x720,
+up from about 15–20. That count is the viewport rate, not the frame rate a
+remote browser receives. The window size in `ISAAC_WINDOW` (default
+`1280x720`) still sets the remote-desktop copy cost.
+
+LOD assets are reproducible with `sim/prepare_distance_lods.py` under the leader
+package, the pinned Rocketbox source cache and Blender 4.2.9:
+
+```bash
+python3 src/ridgeback_leader_follow/sim/prepare_distance_lods.py \
+  --blender artifacts/leader-following/tools/blender-4.2.9-linux-x64/blender \
+  --cache artifacts/leader-following/rocketbox-source
+```
+
+The derivative `lod1/conversion.json` receipts record the triangle ratio, source
+receipt hash, gait/floor checks and generated hashes. Textures are shared with
+the original character directory; the existing Microsoft Rocketbox MIT license
+and source provenance apply to the derivatives.
+
+### GPU-backed OpenGL for remote Gazebo
+
+Use the existing repository `tools/gpu-run` (also installed on this host as
+`/usr/local/bin/gpu-run`). It is the established NVIDIA GLX/PRIME path described
+in [troubleshooting](../troubleshooting.md#camera-rate-collapses-under-software-rendering).
+A separate VirtualGL installation is not required for this launcher.
+
+```bash
+# Compare the default and NVIDIA OpenGL renderers without opening a scene.
+tools/gpu-run
+# Compatibility helper: verify NVIDIA, then run the normal 24-second scene.
+tools/run_leader_gazebo_gpu
+```
+
+The helper delegates to `tools/gpu-run`, retains the office, people, sensors and
+renderer configuration, and changes only its own process environment. Its
+OpenGL check is saved under `artifacts/leader-following/gpu-launch/`. Extra
+arguments such as `--duration 8` are forwarded to the crowd runner. GPU selection
+is verified; a particular GUI/display FPS is not guaranteed. This OpenGL route
+is not a measured improvement to Isaac's Vulkan renderer or desktop streaming.
 
 ## Run a scenario
 
@@ -191,7 +383,7 @@ OMNI_KIT_ACCEPT_EULA=YES isaac_venv/bin/python \
   --environments modern_office --scenario crowd --times 4 9
 ```
 
-Tests cover static obstacle clearance for every route in every layout,
+Tests cover static obstacle clearance for the six benchmark families in every layout,
 modern-office pace and person-to-person separation, cast diversity and
 statures, look-alike assignment, Rocketbox receipt hashes and cache/skin
 consistency, idle selection, Gazebo walk/idle animations and emissive
@@ -264,3 +456,15 @@ The earlier worlds, rendered with the earlier four-character cast:
 - [Gazebo material isolation and full playback review](../../archive/engineering/2026-11-05-gazebo-material-isolation.md) — texture collision diagnosis and scenario coverage.
 
 - [Modern office and Rocketbox pedestrians](../../archive/engineering/2026-11-05-modern-office-rocketbox.md) — selection, retargeting findings and twelve-case playback.
+
+- [Exact explainer pedestrian choreography](../../archive/engineering/2026-11-05-explainer-pedestrian-motion.md) — reference paths, population and playback verification.
+
+- [Simulation performance investigation](../../archive/engineering/2026-11-05-simulation-performance.md) — measured costs, rejected preview preset and limits.
+
+- [Full scene using the existing gpu-run path](../../archive/engineering/2026-11-05-existing-gpu-run.md) — GPU verification, playback speed and sensor rates; GUI FPS was not instrumented.
+
+- [Direct viewport FPS and reduced-lighting comparison](../../archive/engineering/2026-11-11-lighting-performance.md) — lighting-only results, rejected 60 Hz/DLSS changes and measurement limits.
+
+- [Human LOD, sensor and collider checks](../../archive/engineering/2026-11-11-runtime-performance.md) — direct viewport measurements, tracking trade-offs and pending browser delivery measurement.
+
+- [Isaac update-cost breakdown](../../archive/engineering/2026-11-11-isaac-update-cost.md) — GPU-dynamics and ROS-spin costs, the CPU-physics and 60 Hz step results.

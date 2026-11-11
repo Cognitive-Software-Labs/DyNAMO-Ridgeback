@@ -54,6 +54,10 @@ def load_scenario(name,crowd_size=4,environment='office'):
     the earlier realistic worlds keep their recorded routes (alone adds turns)."""
     from dataclasses import replace
     from .crowd_scenarios import load_scenario as baseline,Waypoint
+    if name=='explainer':
+        if environment!='modern_office':raise ValueError('explainer requires modern_office')
+        from .explainer_motion import load_scenario as illustration
+        return illustration()
     scenario=baseline(name,crowd_size)
     if environment=='modern_office':
         return natural_scenario(name,crowd_size,scenario)
@@ -92,7 +96,10 @@ def natural_scenario(name,crowd_size,baseline):
     """Modern-office routes: same families and roles, natural walking speed."""
     from .crowd_scenarios import CrowdScenario,PersonPath
     colour=baseline.people[0].color
-    def person(key,role,points,start=0.,pace=PACE):return PersonPath(key,role,colour if role=='leader' or key=='lf_lookalike' else (.5,.5,.5),route(points,start,pace))
+    def person(key,role,points,start=0.,pace=PACE):
+        direction=np.asarray(points[1])-np.asarray(points[0])
+        return PersonPath(key,role,colour if role=='leader' or key=='lf_lookalike' else (.5,.5,.5),
+                          route(points,start,pace),initial_heading=float(np.arctan2(direction[1],direction[0])))
     # Routes keep people 2-9 m in front of the stationary robot, where its camera
     # sees them large, and include oncoming faces and close crossings.
     if name=='leader_alone':
@@ -128,6 +135,11 @@ def natural_scenario(name,crowd_size,baseline):
     else:
         raise ValueError('Unknown scenario '+name)
     return CrowdScenario(name,20.,people)
+
+
+def scene_layout(environment,scenario):
+    """Use the furnished office unchanged, including for illustration playback."""
+    return layout(environment)
 
 
 def manifest_entry(scenario,environment):
@@ -227,12 +239,17 @@ def clothing_color(name,color):
     return (.055,.065,.09) if 'original bottom' in name.lower().replace('_',' ') else color
 
 
-def create_scene(stage,scenario,environment='office'):
+def create_scene(stage,scenario,environment='office',render_quality='reference',tuning=None):
+    from .simulation_performance import RuntimeTuning,prop_bounds
+    tuning=tuning or RuntimeTuning()
     from pxr import Gf,Sdf,UsdGeom,UsdLux,UsdPhysics,UsdShade
     UsdGeom.SetStageUpAxis(stage,UsdGeom.Tokens.z);UsdGeom.SetStageMetersPerUnit(stage,1.)
     root=asset_directory();materials={};meshes={}
     def material(name,color=(.7,.7,.7),rough=.65,metal=0.,image=None,normal=None,masked=False,tint=None,orm=None,normal_scale=1.,specular=1.,rough_map=None,opacity_image=None):
-        key=(name,tuple(color),rough,metal,image,normal,masked,tint,orm,normal_scale,specular,rough_map,opacity_image)
+        # Resolve shared LOD/full texture paths to reuse identical material graphs.
+        image,normal,orm,rough_map,opacity_image=(p.resolve() if p is not None else None for p in (image,normal,orm,rough_map,opacity_image))
+        identity=name if image is None else 'textured'
+        key=(identity,tuple(color),rough,metal,image,normal,masked,tint,orm,normal_scale,specular,rough_map,opacity_image)
         if key in materials:return materials[key]
         path='/Realistic/Materials/m'+str(len(materials));mat=UsdShade.Material.Define(stage,path)
         shader=UsdShade.Shader.Define(stage,path+'/Surface');shader.CreateIdAttr('UsdPreviewSurface')
@@ -308,7 +325,7 @@ def create_scene(stage,scenario,environment='office'):
             subset=UsdGeom.Subset.CreateGeomSubset(obj,'m'+str(i),'face',faces,'materialBind')
             UsdShade.MaterialBindingAPI.Apply(subset.GetPrim()).Bind(mat)
         UsdGeom.Subset.SetFamilyType(obj,'materialBind','partition')
-    boxes,props=layout(environment)
+    boxes,props=scene_layout(environment,scenario)
     for box in boxes:
         # Explicit UVs in metres on every face; built-in cubes have no UV map.
         data,points=box_mesh_data(box.size,repeat=not box.material.startswith('sign_'))
@@ -322,7 +339,12 @@ def create_scene(stage,scenario,environment='office'):
             mat=material('emissive_'+box.material,PALETTE[box.material][0],PALETTE[box.material][1])
             UsdShade.Shader.Get(stage,str(mat.GetPath())+'/Surface').CreateInput('emissiveColor',Sdf.ValueTypeNames.Color3f).Set(Gf.Vec3f(*EMISSIVE[box.material]))
         UsdShade.MaterialBindingAPI.Apply(obj.GetPrim()).Bind(mat)
-        if box.collision:UsdPhysics.CollisionAPI.Apply(obj.GetPrim())
+        if box.collision:
+            if tuning.simple_collisions:
+                collider=UsdGeom.Cube.Define(stage,str(obj.GetPath())+'/CollisionBox')
+                collider.CreateSizeAttr(1.);collider.AddScaleOp().Set(Gf.Vec3f(*box.size))
+                collider.MakeInvisible();UsdPhysics.CollisionAPI.Apply(collider.GetPrim())
+            else:UsdPhysics.CollisionAPI.Apply(obj.GetPrim())
     for prop in props:
         directory=root/'props'/prop.asset
         if prop.asset not in meshes:
@@ -337,9 +359,14 @@ def create_scene(stage,scenario,environment='office'):
             collider.CreateRadiusAttr(.12);collider.CreateHeightAttr(2.)
             collider.AddTranslateOp().Set(Gf.Vec3d(-center[0],-center[1],1.))
             collider.MakeInvisible();UsdPhysics.CollisionAPI.Apply(collider.GetPrim())
+        elif tuning.simple_collisions:
+            center,size=prop_bounds(data)
+            collider=UsdGeom.Cube.Define(stage,str(obj.GetPath())+'/CollisionBox')
+            collider.CreateSizeAttr(1.);collider.AddTranslateOp().Set(Gf.Vec3d(*map(float,center)));collider.AddScaleOp().Set(Gf.Vec3f(*map(float,size)))
+            collider.MakeInvisible();UsdPhysics.CollisionAPI.Apply(collider.GetPrim())
         else:UsdPhysics.CollisionAPI.Apply(obj.GetPrim())
     if environment=='modern_office':
-        _modern_office_lights(stage);return _people(stage,scenario,meshes,mesh,bind_asset)
+        _modern_office_lights(stage,render_quality);return _people(stage,scenario,meshes,mesh,bind_asset,tuning)
     dome=UsdLux.DomeLight.Define(stage,'/Realistic/Lighting/Daylight');dome.CreateIntensityAttr(750. if environment!='courtyard' else 900.)
     dome.CreateTextureFileAttr(Sdf.AssetPath(str(root/'daylight.hdr')))
     dome.CreateTextureFormatAttr('latlong')
@@ -362,24 +389,28 @@ def create_scene(stage,scenario,environment='office'):
                 light.AddTranslateOp().Set(Gf.Vec3d(x,side*5.5,4.02));light.AddRotateXOp().Set(180.)
                 light.CreateWidthAttr(4.8);light.CreateHeightAttr(.08);light.CreateIntensityAttr(1800.)
                 light.CreateColorAttr(Gf.Vec3f(1.,.93,.82))
-    return _people(stage,scenario,meshes,mesh,bind_asset)
+    return _people(stage,scenario,meshes,mesh,bind_asset,tuning)
 
 
-def _people(stage,scenario,meshes,mesh,bind_asset):
+def _people(stage,scenario,meshes,mesh,bind_asset,tuning):
+    from .simulation_performance import use_distance_lod
     from pxr import UsdGeom
     roots={}
     for person in scenario.people:
         spec=assign_people(scenario)[person.name];directory=human_directory(spec.model)
-        if spec.model not in meshes:
-            meshes[spec.model]=load_motion(directory)
-        data=scaled_motion(meshes[spec.model],spec.scale)
+        if use_distance_lod(person,tuning):
+            directory=directory/'lod1'
+            if not (directory/'walk.npz').exists():raise FileNotFoundError('Bake distance LOD assets: '+str(directory))
+        key=str(directory)
+        if key not in meshes:meshes[key]=load_motion(directory)
+        data=scaled_motion(meshes[key],spec.scale)
         node=UsdGeom.Xform.Define(stage,'/People/'+person.name);translate=node.AddTranslateOp();rotate=node.AddRotateZOp()
         obj=mesh(str(node.GetPath())+'/human',data,data['points'][0]);bind_asset(obj,data,directory,spec.clothing if spec.model!="maya" else None)
         roots[person.name]=(node,translate,rotate,obj,data)
     return roots
 
 
-def _modern_office_lights(stage):
+def _modern_office_lights(stage,render_quality='reference'):
     """Daylight through the south glazing plus soft linear ceiling light."""
     from pxr import Gf,Sdf,UsdLux
     from .realistic_layout import CEILING,layout
@@ -390,6 +421,11 @@ def _modern_office_lights(stage):
     # Low sun from the south-west casting window light across the floor.
     sun=UsdLux.DistantLight.Define(stage,'/Realistic/Lighting/Sun');sun.AddRotateXYZOp().Set(Gf.Vec3f(52,0,-25))
     sun.CreateIntensityAttr(4500.);sun.CreateAngleAttr(.6);sun.CreateColorAttr(Gf.Vec3f(1.,.95,.88))
+    if render_quality == 'performance':
+        # HDR sky and sun retain daylight; emissive fixture meshes stay visible.
+        UsdLux.ShadowAPI.Apply(dome.GetPrim()).CreateShadowEnableAttr(False)
+        UsdLux.ShadowAPI.Apply(sun.GetPrim()).CreateShadowEnableAttr(False)
+        return
     # Sky fill just inside the glazing, angled into the room.
     for i,x in enumerate(range(-1,24,5)):
         fill=UsdLux.RectLight.Define(stage,f'/Realistic/Lighting/WindowFill{i}')
@@ -405,12 +441,20 @@ def _modern_office_lights(stage):
         light.CreateColorAttr(Gf.Vec3f(1.,.97,.92))
         light.GetPrim().CreateAttribute('visibleInPrimaryRay',Sdf.ValueTypeNames.Bool).Set(False)
 
-def gazebo_world(scenario,output,environment):
+def gazebo_world(scenario,output,environment,render_quality='reference',tuning=None):
     """Same layout and cast, native Gazebo actor animation and textured meshes."""
+    from .simulation_performance import RuntimeTuning,use_distance_lod,prop_bounds
+    tuning=tuning or RuntimeTuning()
     from .crowd_geometry import gazebo_world as baseline
-    root=asset_directory();skins={};cast=assign_people(scenario)
+    root=asset_directory();skins={};skin_cache={};cast=assign_people(scenario)
     for person in scenario.people:
         spec=cast[person.name];directory=human_directory(spec.model)
+        if use_distance_lod(person,tuning):
+            directory=directory/'lod1'
+            if not (directory/'walk.dae').exists():raise FileNotFoundError('Bake distance LOD assets: '+str(directory))
+        cache_key=str(directory)
+        if cache_key in skin_cache:
+            skins[person.name]=skin_cache[cache_key];continue
         if spec.model=='maya':
             # Existing Maya skin/texture export; this branch uses its original outfit.
             original=root.parent/'maya_f3/walk.dae'
@@ -423,10 +467,13 @@ def gazebo_world(scenario,output,environment):
             # Rocketbox: publisher outfit, unique texture names, separate idle clip.
             for clip in ('walk','idle'):
                 text=(directory/(clip+'.dae')).read_text()
-                for file in [*directory.glob('*.jpg'),*directory.glob('*.png')]:
-                    text=text.replace(f'<init_from>{file.name}</init_from>',f'<init_from>{file.as_uri()}</init_from>')
-                target=output/(person.name+('' if clip=='walk' else '_idle')+'.dae');target.parent.mkdir(parents=True,exist_ok=True);target.write_text(text)
-            skins[person.name]=output/(person.name+'.dae');continue
+                textures=directory.parent if directory.name=='lod1' else directory
+                for file in [*textures.glob('*.jpg'),*textures.glob('*.png')]:
+                    for prefix in ('','../'):
+                        text=text.replace(f'<init_from>{prefix}{file.name}</init_from>',f'<init_from>{file.as_uri()}</init_from>')
+                target=output/(spec.model+('_lod1' if directory.name=='lod1' else '')+('' if clip=='walk' else '_idle')+'.dae');target.parent.mkdir(parents=True,exist_ok=True);target.write_text(text)
+            skins[person.name]=output/(spec.model+('_lod1' if directory.name=='lod1' else '')+'.dae')
+            skin_cache[cache_key]=skins[person.name];continue
         else:
             text=(directory/'walk.dae').read_text()
             for file in directory.glob('image_*.png'):text=text.replace(f'<init_from>{file.name}</init_from>',f'<init_from>{file.as_uri()}</init_from>')
@@ -469,13 +516,15 @@ def gazebo_world(scenario,output,environment):
             for key,value in [('range',16),('constant',.6),('linear',.03),('quadratic',.02)]:
                 ET.SubElement(attenuation,key).text=str(value)
     for actor in world.findall('actor'):
-        spec=cast[actor.get('name')];idle=output/(actor.get('name')+'_idle.dae')
+        spec=cast[actor.get('name')];skin=skins[actor.get('name')];idle=skin.with_name(skin.stem+'_idle.dae')
         if idle.exists():
             animation=ET.SubElement(actor,'animation',name='idle');ET.SubElement(animation,'filename').text=str(idle)
             ET.SubElement(animation,'interpolate_x').text='false'
         for element in (actor.find('skin'),*actor.findall('animation')):ET.SubElement(element,'scale').text=str(spec.scale)
     controller=next(p for p in world.findall('plugin') if p.get('name')=='leader_follow::CrowdMotion')
     for config in controller.findall('person'):
+        person=next(p for p in scenario.people if p.name==config.findtext('name'))
+        ET.SubElement(config,'initial_heading').text=str(person.initial_heading)
         spec=cast[config.findtext('name')]
         directory=human_directory(spec.model)
         with np.load(directory/'walk.npz') as data:
@@ -491,7 +540,7 @@ def gazebo_world(scenario,output,environment):
         obj=ET.SubElement(world,'model',name=name);ET.SubElement(obj,'static').text='true'
         ET.SubElement(obj,'pose').text=' '.join(map(str,(*position,0,0,np.deg2rad(yaw))))
         return ET.SubElement(obj,'link',name='body')
-    boxes,props=layout(environment)
+    boxes,props=scene_layout(environment,scenario)
     for box in boxes:
         link=model(box.name,box.position,box.yaw)
         for tag in ('visual','collision') if box.collision else ('visual',):
@@ -524,6 +573,16 @@ def gazebo_world(scenario,output,environment):
                 center=json.loads((root/'props'/prop.asset/'conversion.json').read_text())['floor_center_translation']
                 ET.SubElement(item,'pose').text=f'{-center[0]*prop.scale} {-center[1]*prop.scale} {prop.scale} 0 0 0'
                 cylinder=ET.SubElement(geometry,'cylinder');ET.SubElement(cylinder,'radius').text=str(.12*prop.scale);ET.SubElement(cylinder,'length').text=str(2*prop.scale)
+            elif tag=='collision' and tuning.simple_collisions:
+                with np.load(root/'props'/prop.asset/'mesh.npz') as data:center,size=prop_bounds(data,prop.scale)
+                ET.SubElement(item,'pose').text=' '.join(map(str,(*center,0,0,0)))
+                ET.SubElement(ET.SubElement(geometry,'box'),'size').text=' '.join(map(str,size))
             else:
                 mesh=ET.SubElement(geometry,'mesh');ET.SubElement(mesh,'uri').text=(root/'props'/prop.asset/'model.dae').as_uri();ET.SubElement(mesh,'scale').text=' '.join([str(prop.scale)]*3)
+    if render_quality == 'performance':
+        scene.find('shadows').text='false'
+        ET.SubElement(sun,'cast_shadows').text='false'
+        # Keep two non-shadow fill lights plus sun; retain emissive fixtures.
+        for light in world.findall('light')[3:]:
+            world.remove(light)
     ET.indent(tree);return ET.tostring(tree,encoding='unicode')

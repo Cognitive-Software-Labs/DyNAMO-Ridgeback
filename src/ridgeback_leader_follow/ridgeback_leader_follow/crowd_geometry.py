@@ -148,7 +148,7 @@ def idle_offset(name, cycle):
     return (zlib.crc32(name.encode()) % 1000) / 1000. * cycle
 
 
-def motion_frame(data, person, scenario_time):
+def motion_frame(data, person, scenario_time, fractional=False):
     """Clip and frame for a person: idle loop while standing (when baked), else gait.
 
     Gait phase follows travelled distance, so foot motion matches path speed.
@@ -159,23 +159,40 @@ def motion_frame(data, person, scenario_time):
     if idle is not None and not person.moving(scenario_time):
         cycle = float(idle['cycle_seconds'])
         phase = (scenario_time + idle_offset(person.name, cycle)) % cycle
-        return idle, int(phase * float(idle['fps'])) % len(idle['points'])
+        frame=(phase * float(idle['fps'])) % len(idle['points'])
+        return idle, frame if fractional else int(frame)
     speed = float(data['gait_speed_mps']) if 'gait_speed_mps' in data else .5
     cycle = float(data['cycle_seconds'])
     # Profiles with an idle loop also desynchronize gaits, so pairs do not march in step.
     offset = idle_offset(person.name + ':gait', cycle) if idle is not None else 0.
     phase = (person.distance(scenario_time) / speed + offset) % cycle
-    return data, int(phase * float(data['fps'])) % len(data['points'])
+    frame=(phase * float(data['fps'])) % len(data['points'])
+    return data, frame if fractional else int(frame)
 
 
-def animate_isaac_person(handle, person, scenario_time):
+def motion_values(clip,frame,field='points'):
+    """Interpolate cached poses instead of holding 10 Hz idle frames on screen."""
+    values=clip[field];index=int(frame);fraction=frame-index
+    return values[index]*(1-fraction)+values[(index+1)%len(values)]*fraction
+
+
+def animate_isaac_person(handle, person, scenario_time, cache=None):
     import math
     from pxr import Gf
     root, translate, rotate, mesh, data = handle
     x, y, yaw = person.sample(scenario_time)
-    translate.Set(Gf.Vec3d(x, y, 0.))
-    rotate.Set(math.degrees(yaw))
-    clip, frame = motion_frame(data, person, scenario_time)
-    mesh.GetPointsAttr().Set(clip['points'][frame])
-    if 'normals' in clip:
-        mesh.GetNormalsAttr().Set(clip['normals'][frame])
+    previous=cache.get(person.name,{}) if cache is not None else {}
+    if previous.get('position')!=(x,y):translate.Set(Gf.Vec3d(x, y, 0.))
+    if previous.get('yaw')!=yaw:rotate.Set(math.degrees(yaw))
+    # Only the 10 Hz idle cache needs blending; the 30 Hz walk cache is already
+    # finer than the GUI step, and blended normals add cost without visible gain.
+    clip, frame = motion_frame(data, person, scenario_time,fractional='idle' in data)
+    idle = 'idle' in data and clip is data['idle']
+    pose=(id(clip),float(frame) if idle else int(frame))
+    if previous.get('pose')!=pose:
+        mesh.GetPointsAttr().Set(motion_values(clip,frame) if idle else clip['points'][int(frame)])
+    normal_pose=(id(clip),int(frame))
+    if 'normals' in clip and previous.get('normal_pose')!=normal_pose:
+        mesh.GetNormalsAttr().Set(clip['normals'][int(frame)])
+    if cache is not None:
+        cache[person.name]={'position':(x,y),'yaw':yaw,'pose':pose,'normal_pose':normal_pose}

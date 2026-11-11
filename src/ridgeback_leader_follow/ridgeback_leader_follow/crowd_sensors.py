@@ -131,4 +131,6 @@ class SensorEvidence:
         if self.writer:
             self.writer.close()
         (self.output / 'sensor_health.json').write_text(json.dumps(self.stats, indent=2) + '\n')
+        if getattr(self, '_executor', None) is not None:
+            self._executor.shutdown()
         self.node.destroy_node()

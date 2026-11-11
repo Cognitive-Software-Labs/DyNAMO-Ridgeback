@@ -1,0 +1,70 @@
+{
+  "tf_static": {
+    "count": 4,
+    "first_stamp": 0.0,
+    "last_stamp": 0.0,
+    "valid_count": 4,
+    "run_count": 0
+  },
+  "camera_info": {
+    "count": 735,
+    "first_stamp": 0.001,
+    "last_stamp": 24.222,
+    "valid_count": 735,
+    "run_count": 727
+  },
+  "depth": {
+    "count": 735,
+    "first_stamp": 0.001,
+    "last_stamp": 24.222,
+    "valid_count": 735,
+    "run_count": 727,
+    "width": 640,
+    "height": 480,
+    "encoding": "32FC1",
+    "frame": "camera_0_color_optical_frame"
+  },
+  "rgb": {
+    "count": 735,
+    "first_stamp": 0.001,
+    "last_stamp": 24.222,
+    "valid_count": 735,
+    "run_count": 727,
+    "width": 640,
+    "height": 480,
+    "encoding": "rgb8",
+    "frame": "camera_0_color_optical_frame"
+  },
+  "front_scan": {
+    "count": 970,
+    "first_stamp": 0.001,
+    "last_stamp": 24.225,
+    "valid_count": 970,
+    "run_count": 960,
+    "bins": 1081,
+    "frame": "lidar2d_0_laser"
+  },
+  "rear_scan": {
+    "count": 970,
+    "first_stamp": 0.001,
+    "last_stamp": 24.225,
+    "valid_count": 970,
+    "run_count": 960,
+    "bins": 1081,
+    "frame": "lidar2d_1_laser"
+  },
+  "tf": {
+    "count": 1101,
+    "first_stamp": 0.16,
+    "last_stamp": 24.24,
+    "valid_count": 1101,
+    "run_count": 1096
+  },
+  "odom": {
+    "count": 1101,
+    "first_stamp": 0.16,
+    "last_stamp": 24.24,
+    "valid_count": 1101,
+    "run_count": 1096
+  }
+}

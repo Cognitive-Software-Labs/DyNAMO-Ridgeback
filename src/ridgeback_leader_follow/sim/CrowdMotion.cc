@@ -22,13 +22,13 @@ namespace leader_follow {
 struct Waypoint { double t, x, y; };
 struct Person {
   std::string name;
-  double gaitSpeed{.5}, cycle{2.}, idleCycle{0.}, idleOffset{0.}, walkOffset{0.};
+  double gaitSpeed{.5}, cycle{2.}, idleCycle{0.}, idleOffset{0.}, walkOffset{0.}, initialHeading{0.};
   std::string clip;
   std::vector<Waypoint> path;
   gz::sim::Entity entity{gz::sim::kNullEntity};
   gz::math::Pose3d Sample(double t, double &distance) const {
     distance = 0.;
-    double yaw = 0.;
+    double yaw = initialHeading;
     auto end = path.back();
     for (size_t i = 1; i < path.size(); ++i) {
       auto a = path[i-1], b = path[i];
@@ -84,6 +84,7 @@ class CrowdMotion : public gz::sim::System,
       if (p->HasElement("idle_cycle")) person.idleCycle = p->Get<double>("idle_cycle");
       if (p->HasElement("idle_offset")) person.idleOffset = p->Get<double>("idle_offset");
       if (p->HasElement("walk_offset")) person.walkOffset = p->Get<double>("walk_offset");
+      if (p->HasElement("initial_heading")) person.initialHeading = p->Get<double>("initial_heading");
       for (auto w = p->GetElement("waypoint"); w;
            w = w->GetNextElement("waypoint")) {
         auto v = w->Get<gz::math::Vector3d>();

@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+set -euo pipefail
+repo_root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+tool_dir="$repo_root/artifacts/leader-following/tools/virtualgl"
+mkdir -p "$tool_dir"
+python3 - "$tool_dir" <<'PY'
+import hashlib,json,sys,urllib.request
+from pathlib import Path
+root=Path(sys.argv[1]);path=root/'virtualgl.deb'
+url='https://github.com/VirtualGL/virtualgl/releases/download/3.1.5/virtualgl_3.1.5_amd64.deb'
+expected='df3f7788ce41b182a47c0d298e5cd6d2d63579522cb41825970b7726e825485e'
+if not path.exists():
+    with urllib.request.urlopen(url,timeout=90) as response:path.write_bytes(response.read())
+actual=hashlib.sha256(path.read_bytes()).hexdigest()
+if actual!=expected:raise SystemExit('VirtualGL package checksum mismatch; no files extracted')
+(root/'receipt.json').write_text(json.dumps({'url':url,'sha256':actual},indent=2)+'\n')
+PY
+dpkg-deb -x "$tool_dir/virtualgl.deb" "$tool_dir/root"
+printf '%s\n' "VirtualGL 3.1.5 extracted locally; no system packages or desktop settings changed."

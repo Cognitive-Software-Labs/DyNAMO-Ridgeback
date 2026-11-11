@@ -16,8 +16,10 @@ def generate_launch_description():
     profile = resolve_camera_profile('640x480')
     return LaunchDescription([
         DeclareLaunchArgument('world_file'), DeclareLaunchArgument('setup_path'),
-        SetLaunchConfiguration('sim_camera_width', str(profile.width)),
-        SetLaunchConfiguration('sim_camera_height', str(profile.height)),
+        DeclareLaunchArgument('camera_width',default_value=str(profile.width)),
+        DeclareLaunchArgument('camera_height',default_value=str(profile.height)),
+        SetLaunchConfiguration('sim_camera_width', LaunchConfiguration('camera_width')),
+        SetLaunchConfiguration('sim_camera_height', LaunchConfiguration('camera_height')),
         SetLaunchConfiguration('sim_camera_horizontal_fov', str(profile.horizontal_fov_rad)),
         SetEnvironmentVariable('GZ_SIM_RESOURCE_PATH', os.pathsep.join(resources + [os.path.join(vendor, 'meshes')])),
         GzServer(world_sdf_file=LaunchConfiguration('world_file'), verbosity_level='2'),

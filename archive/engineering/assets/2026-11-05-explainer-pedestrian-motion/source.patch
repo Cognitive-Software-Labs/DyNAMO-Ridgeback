@@ -1,0 +1,344 @@
+diff --git a/src/ridgeback_leader_follow/ridgeback_leader_follow/benchmarking/annotations.py b/src/ridgeback_leader_follow/ridgeback_leader_follow/benchmarking/annotations.py
+index 6f5a6b2..a89b2c8 100644
+--- a/src/ridgeback_leader_follow/ridgeback_leader_follow/benchmarking/annotations.py
++++ b/src/ridgeback_leader_follow/ridgeback_leader_follow/benchmarking/annotations.py
+@@ -11,7 +11,7 @@ import numpy as np
+ from numba import njit
+ from ridgeback_leader_follow.benchmarking.dataset import SensorBag
+ from ridgeback_leader_follow.fusion import rigid_matrix
+-from ridgeback_leader_follow.crowd_geometry import motion_frame
++from ridgeback_leader_follow.crowd_geometry import motion_frame,motion_values
+ from .scene_geometry import recorded_scenario,projection_meshes
+ 
+ 
+@@ -67,9 +67,10 @@ def annotate(bag, output, world_from_odom, stationary_base=False):
+                 # Unwrap yaw before interpolation across the -pi/pi boundary.
+                 angle=float(np.interp(rt,times,np.unwrap([float(r['yaw']) for r in samples])))
+                 command=float(np.interp(rt,times,[float(r['command_time']) for r in samples]))
+-                clip,frame=motion_frame(dict(data,gait_speed_mps=(float(data['gait_speed_mps']) if 'gait_speed_mps' in data else .5)*scale),person,command)
++                clip,frame=motion_frame(dict(data,gait_speed_mps=(float(data['gait_speed_mps']) if 'gait_speed_mps' in data else .5)*scale),person,command,fractional=manifest['backend']=='isaac' and 'idle' in data)
+                 world_person=rigid_matrix(pose,(0,0,math.sin(angle/2),math.cos(angle/2)))
+-                xyz=np.column_stack((clip['points'][frame]*scale,np.ones(len(clip['points'][frame]))))
++                points=motion_values(clip,frame)
++                xyz=np.column_stack((points*scale,np.ones(len(points))))
+                 vertices=(color_world@world_person@xyz.T).T[:,:3]
+                 mesh_depth=rasterize(vertices,data['faces'],k,rgb.shape[0],rgb.shape[1])
+                 mask=np.isfinite(mesh_depth); masks.append(mesh_depth)
+diff --git a/src/ridgeback_leader_follow/ridgeback_leader_follow/benchmarking/scene_geometry.py b/src/ridgeback_leader_follow/ridgeback_leader_follow/benchmarking/scene_geometry.py
+index 1a54d5f..67675ee 100644
+--- a/src/ridgeback_leader_follow/ridgeback_leader_follow/benchmarking/scene_geometry.py
++++ b/src/ridgeback_leader_follow/ridgeback_leader_follow/benchmarking/scene_geometry.py
+@@ -10,7 +10,7 @@ def recorded_scenario(manifest):
+     spec=manifest['scenario']
+     if 'people' in spec:
+         return CrowdScenario(spec['name'],spec['duration'],tuple(
+-            PersonPath(p['name'],p['role'],tuple(p['color']),tuple(Waypoint(**w) for w in p['waypoints']))
++            PersonPath(p['name'],p['role'],tuple(p['color']),tuple(Waypoint(**w) for w in p['waypoints']),p.get('initial_heading',0.))
+             for p in spec['people']))
+     if spec['name']=='leader_out_of_view' and manifest.get('scene_profile')=='f3':
+         from ridgeback_leader_follow.recognition_scenarios import load_recognition_scenario
+diff --git a/src/ridgeback_leader_follow/ridgeback_leader_follow/crowd_geometry.py b/src/ridgeback_leader_follow/ridgeback_leader_follow/crowd_geometry.py
+index 899d1c3..b2e9153 100644
+--- a/src/ridgeback_leader_follow/ridgeback_leader_follow/crowd_geometry.py
++++ b/src/ridgeback_leader_follow/ridgeback_leader_follow/crowd_geometry.py
+@@ -148,7 +148,7 @@ def idle_offset(name, cycle):
+     return (zlib.crc32(name.encode()) % 1000) / 1000. * cycle
+ 
+ 
+-def motion_frame(data, person, scenario_time):
++def motion_frame(data, person, scenario_time, fractional=False):
+     """Clip and frame for a person: idle loop while standing (when baked), else gait.
+ 
+     Gait phase follows travelled distance, so foot motion matches path speed.
+@@ -159,13 +159,21 @@ def motion_frame(data, person, scenario_time):
+     if idle is not None and not person.moving(scenario_time):
+         cycle = float(idle['cycle_seconds'])
+         phase = (scenario_time + idle_offset(person.name, cycle)) % cycle
+-        return idle, int(phase * float(idle['fps'])) % len(idle['points'])
++        frame=(phase * float(idle['fps'])) % len(idle['points'])
++        return idle, frame if fractional else int(frame)
+     speed = float(data['gait_speed_mps']) if 'gait_speed_mps' in data else .5
+     cycle = float(data['cycle_seconds'])
+     # Profiles with an idle loop also desynchronize gaits, so pairs do not march in step.
+     offset = idle_offset(person.name + ':gait', cycle) if idle is not None else 0.
+     phase = (person.distance(scenario_time) / speed + offset) % cycle
+-    return data, int(phase * float(data['fps'])) % len(data['points'])
++    frame=(phase * float(data['fps'])) % len(data['points'])
++    return data, frame if fractional else int(frame)
++
++
++def motion_values(clip,frame,field='points'):
++    """Interpolate cached poses instead of holding 10 Hz idle frames on screen."""
++    values=clip[field];index=int(frame);fraction=frame-index
++    return values[index]*(1-fraction)+values[(index+1)%len(values)]*fraction
+ 
+ 
+ def animate_isaac_person(handle, person, scenario_time):
+@@ -175,7 +183,7 @@ def animate_isaac_person(handle, person, scenario_time):
+     x, y, yaw = person.sample(scenario_time)
+     translate.Set(Gf.Vec3d(x, y, 0.))
+     rotate.Set(math.degrees(yaw))
+-    clip, frame = motion_frame(data, person, scenario_time)
+-    mesh.GetPointsAttr().Set(clip['points'][frame])
++    clip, frame = motion_frame(data, person, scenario_time,fractional='idle' in data)
++    mesh.GetPointsAttr().Set(motion_values(clip,frame))
+     if 'normals' in clip:
+-        mesh.GetNormalsAttr().Set(clip['normals'][frame])
++        mesh.GetNormalsAttr().Set(motion_values(clip,frame,'normals'))
+diff --git a/src/ridgeback_leader_follow/ridgeback_leader_follow/crowd_qualify.py b/src/ridgeback_leader_follow/ridgeback_leader_follow/crowd_qualify.py
+index 828e217..5de8ac3 100644
+--- a/src/ridgeback_leader_follow/ridgeback_leader_follow/crowd_qualify.py
++++ b/src/ridgeback_leader_follow/ridgeback_leader_follow/crowd_qualify.py
+@@ -108,7 +108,7 @@ def main():
+     parser.add_argument('--scene-profile', choices=('baseline', 'f3', 'realistic'), default='baseline',
+                         help='Scene/sensor gates only; recognition needs separate evaluation')
+     parser.add_argument('--environments',nargs='+',choices=('modern_office','office','warehouse','courtyard'))
+-    parser.add_argument('--scenarios',nargs='+',choices=SCENARIOS,default=SCENARIOS)
++    parser.add_argument('--scenarios',nargs='+',choices=(*SCENARIOS,'explainer'),default=SCENARIOS)
+     parser.add_argument('--crowd-sizes',nargs='+',type=int,choices=CROWD_SIZES,default=CROWD_SIZES)
+     args = parser.parse_args()
+     if args.environments and args.scene_profile!='realistic':parser.error('--environments requires --scene-profile realistic')
+diff --git a/src/ridgeback_leader_follow/ridgeback_leader_follow/crowd_runner.py b/src/ridgeback_leader_follow/ridgeback_leader_follow/crowd_runner.py
+index e883aaf..e8f4edd 100644
+--- a/src/ridgeback_leader_follow/ridgeback_leader_follow/crowd_runner.py
++++ b/src/ridgeback_leader_follow/ridgeback_leader_follow/crowd_runner.py
+@@ -58,8 +58,8 @@ def run_isaac(scenario, duration, output, writer, gui, finish, record=False, sce
+ def main(argv=None):
+     parser = argparse.ArgumentParser(description=__doc__)
+     parser.add_argument('--backend', required=True, choices=('gz', 'isaac'))
+-    parser.add_argument('--scenario', default='crossing', choices=(*SCENARIOS,'leader_out_of_view'))
+-    parser.add_argument('--duration', type=float, help='Shorten the 20-second fixture')
++    parser.add_argument('--scenario', default='crossing', choices=(*SCENARIOS,'leader_out_of_view','explainer'))
++    parser.add_argument('--duration', type=float, help='Shorten the selected scenario')
+     parser.add_argument('--output-dir', type=Path)
+     parser.add_argument('--demo-cycles', type=int, default=0,
+                         help='Repeat a continuous 30-second lab walk (1..120 cycles)')
+@@ -81,7 +81,12 @@ def main(argv=None):
+         args.ros_domain = 100 + int(uuid.uuid4().hex[:8], 16) % 100
+     if not 0 <= args.ros_domain <= 232:
+         parser.error('ros-domain must be between 0 and 232')
+-    if args.scenario == 'leader_out_of_view':
++    if args.scenario == 'explainer':
++        if args.scene_profile!='realistic' or args.environment!='modern_office':
++            parser.error('explainer requires realistic profile and modern_office')
++        from ridgeback_leader_follow.explainer_motion import load_scenario as explainer_scenario
++        scenario=explainer_scenario()
++    elif args.scenario == 'leader_out_of_view':
+         if args.scene_profile != 'f3':
+             parser.error('leader_out_of_view requires --scene-profile f3')
+         from ridgeback_leader_follow.recognition_scenarios import load_recognition_scenario
+@@ -112,7 +117,7 @@ def main(argv=None):
+                 'scene_profile': args.scene_profile,
+                 'geometry': ('CC0 Innerscene Maya, furnished lab corridor' if args.scene_profile == 'lab'
+                              else 'Cesium Man CC-BY-4.0 skinned animation; baseline corridor'),
+-                'crowd_size': args.crowd_size, 'ros_domain': args.ros_domain,
++                'crowd_size': (10 if scenario.name=='explainer' else args.crowd_size), 'ros_domain': args.ros_domain,
+                 'frame': 'world', 'floor_z': 0., 'output_dir': str(output)}
+     if args.scene_profile == 'f3':
+         from ridgeback_leader_follow.f3_scene import GEOMETRY, manifest_entry
+diff --git a/src/ridgeback_leader_follow/ridgeback_leader_follow/crowd_scenarios.py b/src/ridgeback_leader_follow/ridgeback_leader_follow/crowd_scenarios.py
+index 11b66ce..df60cf9 100644
+--- a/src/ridgeback_leader_follow/ridgeback_leader_follow/crowd_scenarios.py
++++ b/src/ridgeback_leader_follow/ridgeback_leader_follow/crowd_scenarios.py
+@@ -20,8 +20,11 @@ class PersonPath:
+     role: str
+     color: tuple[float, float, float]
+     waypoints: tuple[Waypoint, ...]
++    initial_heading: float = 0.
+ 
+     def __post_init__(self):
++        if not math.isfinite(self.initial_heading):
++            raise ValueError('Initial heading must be finite')
+         if not self.name.isidentifier() or self.role not in ('leader', 'bystander'):
+             raise ValueError('Person needs an identifier and a leader/bystander role')
+         if len(self.color) != 3 or any(not 0 <= c <= 1 for c in self.color):
+@@ -39,7 +42,7 @@ class PersonPath:
+         if not math.isfinite(time):
+             raise ValueError('Time must be finite')
+         time = max(0., min(time, self.waypoints[-1].time))
+-        heading = 0.
++        heading = self.initial_heading
+         for a, b in zip(self.waypoints, self.waypoints[1:]):
+             dx, dy = b.x - a.x, b.y - a.y
+             if dx or dy:
+diff --git a/src/ridgeback_leader_follow/ridgeback_leader_follow/realistic_scene.py b/src/ridgeback_leader_follow/ridgeback_leader_follow/realistic_scene.py
+index 9d7a87a..a40499e 100644
+--- a/src/ridgeback_leader_follow/ridgeback_leader_follow/realistic_scene.py
++++ b/src/ridgeback_leader_follow/ridgeback_leader_follow/realistic_scene.py
+@@ -54,6 +54,10 @@ def load_scenario(name,crowd_size=4,environment='office'):
+     the earlier realistic worlds keep their recorded routes (alone adds turns)."""
+     from dataclasses import replace
+     from .crowd_scenarios import load_scenario as baseline,Waypoint
++    if name=='explainer':
++        if environment!='modern_office':raise ValueError('explainer requires modern_office')
++        from .explainer_motion import load_scenario as illustration
++        return illustration()
+     scenario=baseline(name,crowd_size)
+     if environment=='modern_office':
+         return natural_scenario(name,crowd_size,scenario)
+@@ -92,7 +96,10 @@ def natural_scenario(name,crowd_size,baseline):
+     """Modern-office routes: same families and roles, natural walking speed."""
+     from .crowd_scenarios import CrowdScenario,PersonPath
+     colour=baseline.people[0].color
+-    def person(key,role,points,start=0.,pace=PACE):return PersonPath(key,role,colour if role=='leader' or key=='lf_lookalike' else (.5,.5,.5),route(points,start,pace))
++    def person(key,role,points,start=0.,pace=PACE):
++        direction=np.asarray(points[1])-np.asarray(points[0])
++        return PersonPath(key,role,colour if role=='leader' or key=='lf_lookalike' else (.5,.5,.5),
++                          route(points,start,pace),initial_heading=float(np.arctan2(direction[1],direction[0])))
+     # Routes keep people 2-9 m in front of the stationary robot, where its camera
+     # sees them large, and include oncoming faces and close crossings.
+     if name=='leader_alone':
+@@ -130,6 +137,25 @@ def natural_scenario(name,crowd_size,baseline):
+     return CrowdScenario(name,20.,people)
+ 
+ 
++def scene_layout(environment,scenario):
++    if scenario.name!='explainer':return layout(environment)
++    from dataclasses import replace
++    boxes,props=layout(environment)
++    def moved(obj):
++        x,y,z=obj.position
++        if y>3.8:y+=16.
++        elif y < -4.4:y-=2.
++        if obj.name in ('Ground','Ceiling','WestWall','EastWall','SkirtWest','SkirtEast'):
++            y=7.5
++            if hasattr(obj,'size'):
++                size=list(obj.size);size[1]=33.
++                if obj.name in ('Ground','Ceiling'):size[0]+=4.
++                obj=replace(obj,size=tuple(size))
++        if obj.name in ('EastWall','SkirtEast'):x+=2.
++        return replace(obj,position=(x,y,z))
++    return [moved(o) for o in boxes],[moved(o) for o in props]
++
++
+ def manifest_entry(scenario,environment):
+     from dataclasses import asdict
+     return {'environment':environment,'geometry':'Textured architectural scene, CC0 Poly Haven props and MIT Microsoft Rocketbox pedestrians',
+@@ -308,7 +334,7 @@ def create_scene(stage,scenario,environment='office'):
+             subset=UsdGeom.Subset.CreateGeomSubset(obj,'m'+str(i),'face',faces,'materialBind')
+             UsdShade.MaterialBindingAPI.Apply(subset.GetPrim()).Bind(mat)
+         UsdGeom.Subset.SetFamilyType(obj,'materialBind','partition')
+-    boxes,props=layout(environment)
++    boxes,props=scene_layout(environment,scenario)
+     for box in boxes:
+         # Explicit UVs in metres on every face; built-in cubes have no UV map.
+         data,points=box_mesh_data(box.size,repeat=not box.material.startswith('sign_'))
+@@ -476,6 +502,8 @@ def gazebo_world(scenario,output,environment):
+         for element in (actor.find('skin'),*actor.findall('animation')):ET.SubElement(element,'scale').text=str(spec.scale)
+     controller=next(p for p in world.findall('plugin') if p.get('name')=='leader_follow::CrowdMotion')
+     for config in controller.findall('person'):
++        person=next(p for p in scenario.people if p.name==config.findtext('name'))
++        ET.SubElement(config,'initial_heading').text=str(person.initial_heading)
+         spec=cast[config.findtext('name')]
+         directory=human_directory(spec.model)
+         with np.load(directory/'walk.npz') as data:
+@@ -491,7 +519,7 @@ def gazebo_world(scenario,output,environment):
+         obj=ET.SubElement(world,'model',name=name);ET.SubElement(obj,'static').text='true'
+         ET.SubElement(obj,'pose').text=' '.join(map(str,(*position,0,0,np.deg2rad(yaw))))
+         return ET.SubElement(obj,'link',name='body')
+-    boxes,props=layout(environment)
++    boxes,props=scene_layout(environment,scenario)
+     for box in boxes:
+         link=model(box.name,box.position,box.yaw)
+         for tag in ('visual','collision') if box.collision else ('visual',):
+diff --git a/src/ridgeback_leader_follow/sim/CrowdMotion.cc b/src/ridgeback_leader_follow/sim/CrowdMotion.cc
+index e02bbe7..034f0bb 100644
+--- a/src/ridgeback_leader_follow/sim/CrowdMotion.cc
++++ b/src/ridgeback_leader_follow/sim/CrowdMotion.cc
+@@ -22,13 +22,13 @@ namespace leader_follow {
+ struct Waypoint { double t, x, y; };
+ struct Person {
+   std::string name;
+-  double gaitSpeed{.5}, cycle{2.}, idleCycle{0.}, idleOffset{0.}, walkOffset{0.};
++  double gaitSpeed{.5}, cycle{2.}, idleCycle{0.}, idleOffset{0.}, walkOffset{0.}, initialHeading{0.};
+   std::string clip;
+   std::vector<Waypoint> path;
+   gz::sim::Entity entity{gz::sim::kNullEntity};
+   gz::math::Pose3d Sample(double t, double &distance) const {
+     distance = 0.;
+-    double yaw = 0.;
++    double yaw = initialHeading;
+     auto end = path.back();
+     for (size_t i = 1; i < path.size(); ++i) {
+       auto a = path[i-1], b = path[i];
+@@ -84,6 +84,7 @@ class CrowdMotion : public gz::sim::System,
+       if (p->HasElement("idle_cycle")) person.idleCycle = p->Get<double>("idle_cycle");
+       if (p->HasElement("idle_offset")) person.idleOffset = p->Get<double>("idle_offset");
+       if (p->HasElement("walk_offset")) person.walkOffset = p->Get<double>("walk_offset");
++      if (p->HasElement("initial_heading")) person.initialHeading = p->Get<double>("initial_heading");
+       for (auto w = p->GetElement("waypoint"); w;
+            w = w->GetNextElement("waypoint")) {
+         auto v = w->Get<gz::math::Vector3d>();
+diff --git a/src/ridgeback_leader_follow/test/test_realistic_scene.py b/src/ridgeback_leader_follow/test/test_realistic_scene.py
+index cc3905b..0ce9a88 100644
+--- a/src/ridgeback_leader_follow/test/test_realistic_scene.py
++++ b/src/ridgeback_leader_follow/test/test_realistic_scene.py
+@@ -4,6 +4,22 @@ from pathlib import Path
+ from xml.etree import ElementTree as ET
+ import numpy as np
+ import pytest
++
++
++def test_waiting_modern_walkers_face_their_first_step():
++    from ridgeback_leader_follow.realistic_scene import load_scenario
++    for person in load_scenario('crowd',8,'modern_office').people:
++        for a,b in zip(person.waypoints,person.waypoints[1:]):
++            if (a.x,a.y)!=(b.x,b.y):
++                assert person.sample(0.)[2]==pytest.approx(np.arctan2(b.y-a.y,b.x-a.x))
++                break
++
++
++def test_cached_motion_interpolates_and_wraps_at_loop_boundary():
++    from ridgeback_leader_follow.crowd_geometry import motion_values
++    clip={'points':np.array([[[0.,0.,0.]],[[2.,0.,0.]]])}
++    assert motion_values(clip,.5)[0,0]==pytest.approx(1.)
++    assert motion_values(clip,1.5)[0,0]==pytest.approx(1.)
+ from ridgeback_leader_follow.crowd_scenarios import SCENARIOS
+ from ridgeback_leader_follow.realistic_layout import ENVIRONMENTS,layout
+ from ridgeback_leader_follow.realistic_scene import CAST,assign_people,asset_directory,human_directory,load_scenario,gazebo_world
+@@ -204,3 +220,45 @@ def test_modern_office_people_pass_close_to_but_clear_of_the_robot():
+         distances=[np.hypot(*p.sample(t)[:2]) for p in scenario.people for t in times]
+         assert min(distances)>1.4 and min(distances)<2.5,name
+         assert max(np.hypot(*p.sample(t)[:2]) for p in scenario.people for t in times)<15.,name
++
++
++def test_explainer_motion_matches_html_at_every_display_frame():
++    import re
++    from ridgeback_leader_follow.explainer_motion import load_scenario as illustration
++    html=(Path(__file__).resolve().parents[3]/'docs/leader_following/assets/explainer.html').read_text()
++    block=html.split('// sim:start',1)[1].split('// sim:end',1)[0]
++    leader=json.loads(re.search(r'const leaderAt = path\((\[\[.*?\]\])\)',block).group(1))
++    entries=re.findall(r'at:\s*(?:path\((\[\[.*?\]\])\)|\(\)\s*=>\s*(\[[^\]]+\]))',block)
++    expected=[leader]+[json.loads(path) if path else [[0,*json.loads(point)],[24,*json.loads(point)]] for path,point in entries]
++    scenario=illustration()
++    assert len(expected)==len(scenario.people)==11
++    assert scenario.duration==24.
++    for person,keys in zip(scenario.people,expected,strict=True):
++        keys=np.array(keys)
++        for t in np.linspace(0,24,721):
++            x,y,_=person.sample(t)
++            assert x==pytest.approx(np.interp(t,keys[:,0],keys[:,1])-2.2)
++            assert y==pytest.approx(4.6-np.interp(t,keys[:,0],keys[:,2]))
++    cast=assign_people(scenario)
++    assert cast['lf_leader']==cast['lf_lookalike']
++    assert sum(not p.moving(12.) for p in scenario.people)==3
++
++
++def test_explainer_paths_clear_office_obstacles():
++    from ridgeback_leader_follow.explainer_motion import load_scenario as illustration
++    from ridgeback_leader_follow.realistic_scene import scene_layout
++    scenario=illustration();boxes,props=scene_layout('modern_office',scenario)
++    obstacles=[]
++    for box in boxes:
++        if box.collision and box.position[2]+box.size[2]/2>.1 and box.position[2]-box.size[2]/2<1.9:
++            obstacles.append((box.name,np.array(box.position[:2]),np.array(box.size[:2])/2))
++    for prop in props:
++        if not prop.collision or prop.position[2]>1.9:continue
++        size=json.loads((asset_directory()/'props'/prop.asset/'conversion.json').read_text())['dimensions_m']
++        c,s=abs(np.cos(np.deg2rad(prop.yaw))),abs(np.sin(np.deg2rad(prop.yaw)))
++        obstacles.append((prop.name,np.array(prop.position[:2]),np.array([[c,s],[s,c]])@np.array(size[:2])*prop.scale/2))
++    for p in scenario.people:
++        for t in np.linspace(0,24,481):
++            xy=np.array(p.sample(t)[:2])
++            for name,center,half in obstacles:
++                assert np.linalg.norm(np.maximum(abs(xy-center)-half,0))>.28,(p.name,t,name)

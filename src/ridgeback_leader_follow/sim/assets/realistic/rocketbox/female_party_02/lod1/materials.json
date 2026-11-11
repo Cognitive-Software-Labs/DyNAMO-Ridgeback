@@ -1,0 +1,32 @@
+[
+  {
+    "name": "f022_body",
+    "doubleSided": true,
+    "pbrMetallicRoughness": {
+      "metallicFactor": 0.0,
+      "roughnessFactor": 0.72
+    },
+    "image": "../f022_body_color.jpg",
+    "normal_image": "../f022_body_normal.jpg"
+  },
+  {
+    "name": "f022_head",
+    "doubleSided": true,
+    "pbrMetallicRoughness": {
+      "metallicFactor": 0.0,
+      "roughnessFactor": 0.72
+    },
+    "image": "../f022_head_color.jpg",
+    "normal_image": "../f022_head_normal.jpg"
+  },
+  {
+    "name": "f022_opacity",
+    "doubleSided": true,
+    "pbrMetallicRoughness": {
+      "metallicFactor": 0.0,
+      "roughnessFactor": 0.72
+    },
+    "image": "../f022_opacity_color.png",
+    "alphaMode": "MASK"
+  }
+]

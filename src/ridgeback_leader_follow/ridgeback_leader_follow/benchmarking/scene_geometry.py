@@ -10,7 +10,7 @@ def recorded_scenario(manifest):
     spec=manifest['scenario']
     if 'people' in spec:
         return CrowdScenario(spec['name'],spec['duration'],tuple(
-            PersonPath(p['name'],p['role'],tuple(p['color']),tuple(Waypoint(**w) for w in p['waypoints']))
+            PersonPath(p['name'],p['role'],tuple(p['color']),tuple(Waypoint(**w) for w in p['waypoints']),p.get('initial_heading',0.))
             for p in spec['people']))
     if spec['name']=='leader_out_of_view' and manifest.get('scene_profile')=='f3':
         from ridgeback_leader_follow.recognition_scenarios import load_recognition_scenario

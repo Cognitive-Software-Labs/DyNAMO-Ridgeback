@@ -1,0 +1,36 @@
+{
+  "status": "passed",
+  "scene_profile": "realistic",
+  "scope": "Realistic scenes: playback, sensors and simulator truth; no recognition claims",
+  "environments": [
+    "modern_office"
+  ],
+  "results": [
+    {
+      "backend": "gz",
+      "scene_profile": "realistic",
+      "environment": "modern_office",
+      "scenario": "explainer",
+      "crowd_size": 10,
+      "people": 11,
+      "duration": 24.0,
+      "truth_rows": 5280,
+      "maximum_pose_error": 2.220446049250313e-16,
+      "status": "passed",
+      "run": "/home/pratham/Documents/ChatGPT/DyNAMO-Ridgeback/artifacts/leader-following/explainer-motion-review/gz-modern_office-explainer-4"
+    },
+    {
+      "backend": "isaac",
+      "scene_profile": "realistic",
+      "environment": "modern_office",
+      "scenario": "explainer",
+      "crowd_size": 10,
+      "people": 11,
+      "duration": 24.0,
+      "truth_rows": 5280,
+      "maximum_pose_error": 1.3221272077146295e-07,
+      "status": "passed",
+      "run": "/home/pratham/Documents/ChatGPT/DyNAMO-Ridgeback/artifacts/leader-following/explainer-motion-review/isaac-modern_office-explainer-4"
+    }
+  ]
+}

@@ -4,6 +4,22 @@ from pathlib import Path
 from xml.etree import ElementTree as ET
 import numpy as np
 import pytest
+
+
+def test_waiting_modern_walkers_face_their_first_step():
+    from ridgeback_leader_follow.realistic_scene import load_scenario
+    for person in load_scenario('crowd',8,'modern_office').people:
+        for a,b in zip(person.waypoints,person.waypoints[1:]):
+            if (a.x,a.y)!=(b.x,b.y):
+                assert person.sample(0.)[2]==pytest.approx(np.arctan2(b.y-a.y,b.x-a.x))
+                break
+
+
+def test_cached_motion_interpolates_and_wraps_at_loop_boundary():
+    from ridgeback_leader_follow.crowd_geometry import motion_values
+    clip={'points':np.array([[[0.,0.,0.]],[[2.,0.,0.]]])}
+    assert motion_values(clip,.5)[0,0]==pytest.approx(1.)
+    assert motion_values(clip,1.5)[0,0]==pytest.approx(1.)
 from ridgeback_leader_follow.crowd_scenarios import SCENARIOS
 from ridgeback_leader_follow.realistic_layout import ENVIRONMENTS,layout
 from ridgeback_leader_follow.realistic_scene import CAST,assign_people,asset_directory,human_directory,load_scenario,gazebo_world
@@ -204,3 +220,50 @@ def test_modern_office_people_pass_close_to_but_clear_of_the_robot():
         distances=[np.hypot(*p.sample(t)[:2]) for p in scenario.people for t in times]
         assert min(distances)>1.4 and min(distances)<2.5,name
         assert max(np.hypot(*p.sample(t)[:2]) for p in scenario.people for t in times)<15.,name
+
+
+def test_explainer_motion_matches_html_at_every_display_frame():
+    import re
+    from ridgeback_leader_follow.explainer_motion import load_scenario as illustration
+    html=(Path(__file__).resolve().parents[3]/'docs/leader_following/assets/explainer.html').read_text()
+    block=html.split('// sim:start',1)[1].split('// sim:end',1)[0]
+    leader=json.loads(re.search(r'const leaderAt = path\((\[\[.*?\]\])\)',block).group(1))
+    entries=re.findall(r'at:\s*(?:path\((\[\[.*?\]\])\)|\(\)\s*=>\s*(\[[^\]]+\]))',block)
+    expected=[leader]+[json.loads(path) if path else [[0,*json.loads(point)],[24,*json.loads(point)]] for path,point in entries]
+    scenario=illustration()
+    assert len(expected)==len(scenario.people)==11
+    assert scenario.duration==24.
+    for person,keys in zip(scenario.people,expected,strict=True):
+        keys=np.array(keys)
+        for t in np.linspace(0,24,721):
+            x,y,_=person.sample(t)
+            assert x==pytest.approx(np.interp(t,keys[:,0],keys[:,1])-2.2)
+            assert y==pytest.approx(4.6-np.interp(t,keys[:,0],keys[:,2]))
+    cast=assign_people(scenario)
+    assert cast['lf_leader']==cast['lf_lookalike']
+    assert sum(not p.moving(12.) for p in scenario.people)==3
+
+
+def test_explainer_restores_original_office_without_changing_paths():
+    from ridgeback_leader_follow.explainer_motion import load_scenario as illustration
+    from ridgeback_leader_follow.realistic_scene import scene_layout
+    scenario=illustration()
+    before=tuple(p.waypoints for p in scenario.people)
+    assert scene_layout('modern_office',scenario)==layout('modern_office')
+    assert tuple(p.waypoints for p in scenario.people)==before
+
+
+def test_performance_lighting_preserves_cast_paths_and_office(tmp_path):
+    scenario=load_scenario('explainer',8,'modern_office')
+    reference=ET.fromstring(gazebo_world(scenario,tmp_path/'reference','modern_office')).find('world')
+    fast=ET.fromstring(gazebo_world(scenario,tmp_path/'performance','modern_office','performance')).find('world')
+    for tag in ('actor','model','plugin','physics'):
+        def normalized(world):
+            result=[]
+            for element in world.findall(tag):
+                text=ET.tostring(element,encoding='unicode')
+                result.append(text.replace(str(tmp_path/'reference'),'RUN').replace(str(tmp_path/'performance'),'RUN'))
+            return result
+        assert normalized(reference)==normalized(fast),tag
+    assert fast.find('scene/shadows').text=='false'
+    assert len(fast.findall('light'))==3

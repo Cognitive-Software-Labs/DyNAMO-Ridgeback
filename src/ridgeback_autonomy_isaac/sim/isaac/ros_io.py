@@ -33,6 +33,30 @@ from ridgeback_common.lidar_contract import (
 )
 
 
+def drain_callbacks(owner, node, limit: int) -> int:
+    """Run up to ``limit`` ready callbacks of ``node`` without waiting.
+
+    ``rclpy.spin_once(node)`` adds and removes the node from the global
+    executor on every call; repeated per render frame that cost several
+    milliseconds. A persistent executor stopping at the first empty wait does
+    the same work. Returns the number of callbacks run.
+    """
+    from rclpy.executors import SingleThreadedExecutor, TimeoutException
+    executor = getattr(owner, '_executor', None)
+    if executor is None:
+        executor = owner._executor = SingleThreadedExecutor(context=node.context)
+        executor.add_node(node)
+    for count in range(limit):
+        try:
+            handler, _, _ = executor.wait_for_ready_callbacks(timeout_sec=0.0)
+        except TimeoutException:
+            return count
+        handler()
+        if handler.exception() is not None:
+            raise handler.exception()
+    return limit
+
+
 def _quat_from_yaw(yaw: float):
     return (0.0, 0.0, math.sin(yaw / 2.0), math.cos(yaw / 2.0))
 
@@ -362,9 +386,10 @@ class RosIO:
     def spin_once(self):
         # Drain ready callbacks: two 40 Hz cloud streams plus command/clock
         # traffic exceed a one-callback-per-render-frame budget.
-        for _ in range(32):
-            self._rclpy.spin_once(self.node, timeout_sec=0.0)
+        drain_callbacks(self, self.node, 32)
 
     def shutdown(self):
+        if getattr(self, '_executor', None) is not None:
+            self._executor.shutdown()
         self.node.destroy_node()
         self._rclpy.shutdown()

@@ -110,6 +110,14 @@ simulation profiles, not factory calibration for a physical camera.
 | `640x480` | 640 x 480 | `(384, 384, 320, 240)` | 75 deg | 0.32 m | 30 Hz |
 | `1280x720` | 1280 x 720 | `(640, 640, 640, 360)` | 87 deg | 0.52 m | 30 Hz |
 
+The crowd runner can pass an explicit `CameraProfile` through
+`attach_camera(profile_override=...)` for its opt-in interactive profile. That
+profile scales the camera aperture and published intrinsics together and sets
+the sensor tick rate. `publish_points=False` omits the ideal depth point-cloud
+helper while retaining RGB, aligned depth and both CameraInfo publishers. These
+arguments default to the existing production behavior. The interactive contract
+and qualification limits belong to [leader-following environments](../leader_following/environments.md#humans-sensors-and-collisions).
+
 The colour and depth imagers intentionally use different focal lengths in
 `d455` mode. Colour uses the shared profile's `focal_length_px`. The left depth
 imager derives its focal length from the profile's depth horizontal FoV:

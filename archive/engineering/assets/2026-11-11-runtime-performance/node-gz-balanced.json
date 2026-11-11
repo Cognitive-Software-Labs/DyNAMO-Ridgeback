@@ -1,0 +1,23 @@
+{
+  "status": "passed",
+  "messages": 114,
+  "nonempty_messages": 111,
+  "domain": 225,
+  "camera": "yolo11",
+  "lidar": "clustering",
+  "appearance": "none",
+  "appearance_observations": 0,
+  "track_maximum_age": 0.75,
+  "observation_timeout": 0.15,
+  "identity_parameters": {
+    "match_threshold": 0.72,
+    "recovery_margin": 0.05,
+    "acquire_interval": 8,
+    "acquire_distance_tolerance": 0.0,
+    "acquire_lateral_tolerance": 0.0
+  },
+  "appearance_dimensions": [],
+  "leader_messages": 0,
+  "locked_messages": 0,
+  "scope": "real ROS node, sensors/TF from bag, People publication; no motion command"
+}

@@ -1,0 +1,36 @@
+..................................................s..................... [ 29%]
+........................................................................ [ 58%]
+.....................s....ssssssssssssssssss.........F.................. [ 88%]
+.........................ssss                                            [100%]
+=================================== FAILURES ===================================
+______ test_catalog_g1_spawns_and_reads_back_with_the_robot_in_one_update ______
+
+provider = (<scene_provider.SceneControlService object at 0x7be4a1299970>, <test_scene_control_service.MainLoop object at 0x7be4a1299a60>)
+client = <ridgeback_autonomy.benchmarking.scene_control.SceneControlClient object at 0x7be4a091a540>
+native = <test_scene_provider.FakeNativeScene object at 0x7be5c1d55790>
+
+    def test_catalog_g1_spawns_and_reads_back_with_the_robot_in_one_update(
+            provider, client, native) -> None:
+        g1 = load_asset_catalog(str(CATALOG)).targets['g1']
+        target = SpawnSpec.for_resource(g1, 'bench_g1', 3.0, -1.0, 2.5)
+        spawned: list[str] = []
+    
+        client.spawn_entities([target], spawned)
+        snapshot = client.get_scene_snapshot([ROBOT, 'bench_g1'])
+    
+        assert spawned == ['bench_g1']
+        assert native.prims['/scene_entities/bench_g1'][0] == g1.uri
+        assert snapshot.frame_id == 'world'
+        robot, pose = snapshot.poses[ROBOT], snapshot.poses['bench_g1']
+        assert (robot['position']['x'], robot['position']['y']) == (1.5, -0.5)
+        assert yaw_of(robot) == pytest.approx(0.3)
+>       assert (pose['position']['x'], pose['position']['y'], pose['position']['z']) == (
+            3.0, -1.0, 0.0)
+E       assert (3.0, -1.0, 0.05) == (3.0, -1.0, 0.0)
+E         At index 2 diff: 0.05 != 0.0
+E         Use -v to get more diff
+
+src/ridgeback_autonomy_isaac/test/test_scene_control_service.py:183: AssertionError
+=========================== short test summary info ============================
+FAILED src/ridgeback_autonomy_isaac/test/test_scene_control_service.py::test_catalog_g1_spawns_and_reads_back_with_the_robot_in_one_update
+1 failed, 220 passed, 24 skipped in 11.92s

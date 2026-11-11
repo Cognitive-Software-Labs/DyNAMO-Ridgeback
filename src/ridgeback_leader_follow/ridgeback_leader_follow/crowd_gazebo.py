@@ -9,7 +9,9 @@ from ridgeback_leader_follow.crowd_geometry import gazebo_world
 from ridgeback_leader_follow.crowd_sensors import SensorEvidence
 
 
-def run(scenario, duration, output, writer, gui, record=False, scene_profile='baseline', environment=None):
+def run(scenario, duration, output, writer, gui, record=False, scene_profile='baseline', environment=None, render_quality='reference', tuning=None):
+    from ridgeback_leader_follow.simulation_performance import RuntimeTuning
+    tuning=tuning or RuntimeTuning()
     from gz.transport13 import Node
     from gz.msgs10.empty_pb2 import Empty
     from gz.msgs10.boolean_pb2 import Boolean
@@ -18,7 +20,7 @@ def run(scenario, duration, output, writer, gui, record=False, scene_profile='ba
 
     if scene_profile == 'realistic':
         from ridgeback_leader_follow.realistic_scene import gazebo_world as realistic_world
-        world = realistic_world(scenario, output / 'actors', environment or 'modern_office')
+        world = realistic_world(scenario, output / 'actors', environment or 'modern_office', render_quality, tuning)
     elif scene_profile == 'f3':
         from ridgeback_leader_follow.f3_scene import gait_speed, gazebo_actor_skins
         world = gazebo_world(scenario, gazebo_actor_skins(scenario, output / 'actors'), gait_speed())
@@ -40,13 +42,16 @@ def run(scenario, duration, output, writer, gui, record=False, scene_profile='ba
         try:
             processes.append(subprocess.Popen([
                 'ros2', 'launch', 'ridgeback_leader_follow', 'crowd_gazebo.launch.py',
-                f'world_file:={output / "scene.sdf"}', f'setup_path:={output / "setup"}/'],
+                f'world_file:={output / "scene.sdf"}', f'setup_path:={output / "setup"}/',
+                f'camera_width:={tuning.camera_profile().width}',f'camera_height:={tuning.camera_profile().height}'],
                 env=env, stdout=log, stderr=subprocess.STDOUT, start_new_session=True))
             if gui:
                 processes.append(subprocess.Popen(['gz', 'sim', '-g'], env=env,
                     stdout=log, stderr=subprocess.STDOUT, start_new_session=True))
             deadline = time.monotonic() + 120.
             while not monitor.ready:
+                if gui and processes[-1].poll() is not None:
+                    raise RuntimeError('Gazebo GUI exited during startup; see simulator.log')
                 monitor.spin(.02)
                 if processes[0].poll() is not None:
                     raise RuntimeError('Gazebo bringup exited; see simulator.log')
@@ -64,6 +69,8 @@ def run(scenario, duration, output, writer, gui, record=False, scene_profile='ba
             last = -1.
             wall_deadline = time.monotonic() + max(120., duration * 10)
             while last < duration - .001:
+                if gui and processes[-1].poll() is not None:
+                    raise RuntimeError('Gazebo GUI exited during playback; see simulator.log')
                 monitor.spin(.01)
                 if time.monotonic() > wall_deadline:
                     raise TimeoutError('Crowd scenario stalled')

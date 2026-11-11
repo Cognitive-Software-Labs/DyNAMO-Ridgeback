@@ -69,9 +69,14 @@ def validate_run(output, scene_profile='baseline'):
     if not health.get('tf_static',{}).get('valid_count'):
         raise ValueError('No robot/sensor static transforms')
     calibration = json.loads((output / 'camera_info.json').read_text())
-    if (calibration['width'],calibration['height']) != (640,480) or any(
-            abs(calibration['k'][i]-384.) > .01 for i in (0,4)):
-        raise ValueError('Camera does not match the shared 640x480 D455 profile')
+    from ridgeback_leader_follow.simulation_performance import RuntimeTuning
+    profile=RuntimeTuning(**manifest.get('runtime_tuning',{})).camera_profile()
+    if 'camera_contract' in manifest:
+        from ridgeback_common.camera_profiles import CameraProfile
+        profile=CameraProfile(**manifest['camera_contract'])
+    if (calibration['width'],calibration['height']) != (profile.width,profile.height) or any(
+            abs(calibration['k'][i]-profile.focal_length_px) > .01 for i in (0,4)):
+        raise ValueError('Camera does not match the recorded run profile')
     if not (output / 'frames/rgb_06s.png').exists() and manifest['duration'] > 6:
         raise ValueError('No representative camera frame')
     scan = json.loads((output / 'frames/front_scan_00s.json').read_text())
@@ -108,7 +113,7 @@ def main():
     parser.add_argument('--scene-profile', choices=('baseline', 'f3', 'realistic'), default='baseline',
                         help='Scene/sensor gates only; recognition needs separate evaluation')
     parser.add_argument('--environments',nargs='+',choices=('modern_office','office','warehouse','courtyard'))
-    parser.add_argument('--scenarios',nargs='+',choices=SCENARIOS,default=SCENARIOS)
+    parser.add_argument('--scenarios',nargs='+',choices=(*SCENARIOS,'explainer'),default=SCENARIOS)
     parser.add_argument('--crowd-sizes',nargs='+',type=int,choices=CROWD_SIZES,default=CROWD_SIZES)
     args = parser.parse_args()
     if args.environments and args.scene_profile!='realistic':parser.error('--environments requires --scene-profile realistic')

@@ -1,0 +1,325 @@
+{
+  "simulation_step_seconds": 0.025,
+  "frames": [
+    {
+      "animation": 0.0026004710234701633,
+      "render_and_sensors": 0.12142190104350448
+    },
+    {
+      "animation": 0.0028030378744006157,
+      "render_and_sensors": 0.040952082024887204
+    },
+    {
+      "animation": 0.0026917499490082264,
+      "render_and_sensors": 0.04112500511109829
+    },
+    {
+      "animation": 0.0024957850109785795,
+      "render_and_sensors": 0.03946112096309662
+    },
+    {
+      "animation": 0.002768523059785366,
+      "render_and_sensors": 0.03660059696994722
+    },
+    {
+      "animation": 0.002675820840522647,
+      "render_and_sensors": 0.03638772899284959
+    },
+    {
+      "animation": 0.002811674028635025,
+      "render_and_sensors": 0.040530936792492867
+    },
+    {
+      "animation": 0.003016846952959895,
+      "render_and_sensors": 0.037977233063429594
+    },
+    {
+      "animation": 0.0029691881500184536,
+      "render_and_sensors": 0.04223254998214543
+    },
+    {
+      "animation": 0.0030243510846048594,
+      "render_and_sensors": 0.0370084869209677
+    },
+    {
+      "animation": 0.0024693948216736317,
+      "render_and_sensors": 0.03957133716903627
+    },
+    {
+      "animation": 0.0026414261665195227,
+      "render_and_sensors": 0.03803504188545048
+    },
+    {
+      "animation": 0.002571165096014738,
+      "render_and_sensors": 0.035606250865384936
+    },
+    {
+      "animation": 0.0025922551285475492,
+      "render_and_sensors": 0.037630917970091105
+    },
+    {
+      "animation": 0.002510532969608903,
+      "render_and_sensors": 0.039990368066355586
+    },
+    {
+      "animation": 0.002607061993330717,
+      "render_and_sensors": 0.038966489024460316
+    },
+    {
+      "animation": 0.0030198420863598585,
+      "render_and_sensors": 0.03835054999217391
+    },
+    {
+      "animation": 0.0030328670982271433,
+      "render_and_sensors": 0.03980617504566908
+    },
+    {
+      "animation": 0.0028232350014150143,
+      "render_and_sensors": 0.04086902691051364
+    },
+    {
+      "animation": 0.0027685840614140034,
+      "render_and_sensors": 0.03841372695751488
+    },
+    {
+      "animation": 0.0028748519252985716,
+      "render_and_sensors": 0.04358504293486476
+    },
+    {
+      "animation": 0.002579821040853858,
+      "render_and_sensors": 0.03723684302531183
+    },
+    {
+      "animation": 0.002742445096373558,
+      "render_and_sensors": 0.042230455903336406
+    },
+    {
+      "animation": 0.002681450918316841,
+      "render_and_sensors": 0.038413797970861197
+    },
+    {
+      "animation": 0.0025264921132475138,
+      "render_and_sensors": 0.03787839901633561
+    },
+    {
+      "animation": 0.0027621618937700987,
+      "render_and_sensors": 0.03885336802341044
+    },
+    {
+      "animation": 0.0026561140548437834,
+      "render_and_sensors": 0.038641242077574134
+    },
+    {
+      "animation": 0.0027157249860465527,
+      "render_and_sensors": 0.036683120066300035
+    },
+    {
+      "animation": 0.0024753259494900703,
+      "render_and_sensors": 0.042429117020219564
+    },
+    {
+      "animation": 0.0026651208754628897,
+      "render_and_sensors": 0.03980256803333759
+    },
+    {
+      "animation": 0.0025075068697333336,
+      "render_and_sensors": 0.03936534305103123
+    },
+    {
+      "animation": 0.002707018982619047,
+      "render_and_sensors": 0.046016999054700136
+    },
+    {
+      "animation": 0.0026453440077602863,
+      "render_and_sensors": 0.03824185696430504
+    },
+    {
+      "animation": 0.002909245900809765,
+      "render_and_sensors": 0.038610714953392744
+    },
+    {
+      "animation": 0.0027778709772974253,
+      "render_and_sensors": 0.041591875022277236
+    },
+    {
+      "animation": 0.0028366409242153168,
+      "render_and_sensors": 0.04145952803082764
+    },
+    {
+      "animation": 0.002848793053999543,
+      "render_and_sensors": 0.03916075103916228
+    },
+    {
+      "animation": 0.002821102039888501,
+      "render_and_sensors": 0.03693803492933512
+    },
+    {
+      "animation": 0.002732355846092105,
+      "render_and_sensors": 0.0414036950096488
+    },
+    {
+      "animation": 0.002902965061366558,
+      "render_and_sensors": 0.03831783891655505
+    },
+    {
+      "animation": 0.0027300019282847643,
+      "render_and_sensors": 0.03791570896282792
+    },
+    {
+      "animation": 0.00260021910071373,
+      "render_and_sensors": 0.03831886104308069
+    },
+    {
+      "animation": 0.002883467823266983,
+      "render_and_sensors": 0.03853894118219614
+    },
+    {
+      "animation": 0.0029257270507514477,
+      "render_and_sensors": 0.038989131106063724
+    },
+    {
+      "animation": 0.002611451083794236,
+      "render_and_sensors": 0.03654092410579324
+    },
+    {
+      "animation": 0.0031251690816134214,
+      "render_and_sensors": 0.03599033807404339
+    },
+    {
+      "animation": 0.002638992853462696,
+      "render_and_sensors": 0.039297475945204496
+    },
+    {
+      "animation": 0.002608786104246974,
+      "render_and_sensors": 0.03672635997645557
+    },
+    {
+      "animation": 0.002515672007575631,
+      "render_and_sensors": 0.03789304685778916
+    },
+    {
+      "animation": 0.0026272600516676903,
+      "render_and_sensors": 0.0370046601165086
+    },
+    {
+      "animation": 0.0025378228165209293,
+      "render_and_sensors": 0.10004042112268507
+    },
+    {
+      "animation": 0.002974978880956769,
+      "render_and_sensors": 0.10008444311097264
+    },
+    {
+      "animation": 0.002614066004753113,
+      "render_and_sensors": 0.04303768207319081
+    },
+    {
+      "animation": 0.0030776800122112036,
+      "render_and_sensors": 0.0362946349196136
+    },
+    {
+      "animation": 0.0025538839399814606,
+      "render_and_sensors": 0.0392687120474875
+    },
+    {
+      "animation": 0.002999383956193924,
+      "render_and_sensors": 0.03742326004430652
+    },
+    {
+      "animation": 0.0026623958256095648,
+      "render_and_sensors": 0.03863268601708114
+    },
+    {
+      "animation": 0.003141819965094328,
+      "render_and_sensors": 0.0358330849558115
+    },
+    {
+      "animation": 0.0026405751705169678,
+      "render_and_sensors": 0.03977952501736581
+    },
+    {
+      "animation": 0.0026924621779471636,
+      "render_and_sensors": 0.039840618846938014
+    },
+    {
+      "animation": 0.0027649367693811655,
+      "render_and_sensors": 0.0378801932092756
+    },
+    {
+      "animation": 0.002848963951691985,
+      "render_and_sensors": 0.03634479898028076
+    },
+    {
+      "animation": 0.0027405209839344025,
+      "render_and_sensors": 0.041310731088742614
+    },
+    {
+      "animation": 0.003061750903725624,
+      "render_and_sensors": 0.03783464711159468
+    },
+    {
+      "animation": 0.0026664731558412313,
+      "render_and_sensors": 0.03667000588029623
+    },
+    {
+      "animation": 0.0032450018916279078,
+      "render_and_sensors": 0.04081930499523878
+    },
+    {
+      "animation": 0.002581884851679206,
+      "render_and_sensors": 0.038419248070567846
+    },
+    {
+      "animation": 0.002678575925529003,
+      "render_and_sensors": 0.036967159947380424
+    },
+    {
+      "animation": 0.0024765999987721443,
+      "render_and_sensors": 0.03765703598037362
+    },
+    {
+      "animation": 0.003310064086690545,
+      "render_and_sensors": 0.035831260960549116
+    },
+    {
+      "animation": 0.0024366038851439953,
+      "render_and_sensors": 0.039126086980104446
+    },
+    {
+      "animation": 0.003138914005830884,
+      "render_and_sensors": 0.037896062014624476
+    },
+    {
+      "animation": 0.002613974967971444,
+      "render_and_sensors": 0.03398749209009111
+    },
+    {
+      "animation": 0.0027893229853361845,
+      "render_and_sensors": 0.03957632603123784
+    },
+    {
+      "animation": 0.002587025985121727,
+      "render_and_sensors": 0.03532752091996372
+    },
+    {
+      "animation": 0.0028582720551639795,
+      "render_and_sensors": 0.03391753090545535
+    },
+    {
+      "animation": 0.002882957924157381,
+      "render_and_sensors": 0.035216334043070674
+    },
+    {
+      "animation": 0.0027250428684055805,
+      "render_and_sensors": 0.03786063613370061
+    },
+    {
+      "animation": 0.002551899990066886,
+      "render_and_sensors": 0.03670389810577035
+    },
+    {
+      "animation": 0.0026603220030665398,
+      "render_and_sensors": 0.03733699908480048
+    }
+  ]
+}

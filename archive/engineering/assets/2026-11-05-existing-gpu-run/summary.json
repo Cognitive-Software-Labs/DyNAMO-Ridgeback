@@ -1,0 +1,52 @@
+{
+  "playback": {
+    "gui_fps": "not instrumented; observe GUI separately",
+    "playback_wall_seconds": 41.52716936497018,
+    "playback_sim_seconds": 23.95,
+    "observed_realtime_factor": 0.5767308575624415,
+    "median_reported_realtime_factor": 0.4585658710660263
+  },
+  "sensor_rates": {
+    "rgb": {
+      "simulation_hz": 30.304281408694933,
+      "count": 735,
+      "run_count": 727,
+      "span_sim_seconds": 24.221,
+      "approx_wall_hz": 17.47741420465018
+    },
+    "depth": {
+      "simulation_hz": 30.304281408694933,
+      "count": 735,
+      "run_count": 727,
+      "span_sim_seconds": 24.221,
+      "approx_wall_hz": 17.47741420465018
+    },
+    "front_scan": {
+      "simulation_hz": 40.001651254953764,
+      "count": 970,
+      "run_count": 960,
+      "span_sim_seconds": 24.224,
+      "approx_wall_hz": 23.070186632183198
+    },
+    "rear_scan": {
+      "simulation_hz": 40.001651254953764,
+      "count": 970,
+      "run_count": 960,
+      "span_sim_seconds": 24.224,
+      "approx_wall_hz": 23.070186632183198
+    }
+  },
+  "qualification": {
+    "backend": "gz",
+    "scene_profile": "realistic",
+    "environment": "modern_office",
+    "scenario": "explainer",
+    "crowd_size": 10,
+    "people": 11,
+    "duration": 24.0,
+    "truth_rows": 5280,
+    "maximum_pose_error": 2.220446049250313e-16,
+    "status": "passed",
+    "run": "artifacts/leader-following/gpu-run-performance/full-gui"
+  }
+}

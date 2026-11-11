@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+set -euo pipefail
+repo_root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$repo_root"
+gpu_runner="$repo_root/tools/gpu-run"
+if [[ ! -x "$gpu_runner" ]]; then
+  printf '%s\n' "Existing GPU launcher is missing: $gpu_runner" >&2
+  exit 1
+fi
+check_dir="$repo_root/artifacts/leader-following/gpu-launch"
+mkdir -p "$check_dir"
+"$gpu_runner" glxinfo -B > "$check_dir/opengl.txt" 2>&1
+if ! grep -Eqi 'OpenGL renderer string:.*NVIDIA' "$check_dir/opengl.txt"; then
+  cat "$check_dir/opengl.txt" >&2
+  printf '%s\n' 'NVIDIA OpenGL was not verified; simulation was not started.' >&2
+  exit 1
+fi
+grep -E 'OpenGL (vendor|renderer) string:' "$check_dir/opengl.txt"
+if [[ "${1:-}" == '--check' ]]; then exit 0; fi
+if [[ ! -f "$repo_root/install/setup.bash" ]]; then
+  printf '%s\n' "Workspace setup is missing: $repo_root/install/setup.bash. Build the workspace first." >&2
+  exit 1
+fi
+# ROS environment scripts may reference unset optional variables.
+set +u
+source /opt/ros/jazzy/setup.bash
+source "$repo_root/install/setup.bash"
+set -u
+exec "$gpu_runner" python3 -m ridgeback_leader_follow.crowd_runner \
+  --backend gz --scene-profile realistic --environment modern_office \
+  --scenario explainer --gui "$@"

@@ -194,7 +194,13 @@ def export_collada(scene, rig, mesh_object, action, frames, path, opacity):
 
 
 def main():
-    cache, name, output = sys.argv[sys.argv.index('--') + 1:]
+    import argparse
+    parser=argparse.ArgumentParser()
+    parser.add_argument('cache');parser.add_argument('name');parser.add_argument('output')
+    parser.add_argument('--lod-ratio',type=float,default=1.)
+    args=parser.parse_args(sys.argv[sys.argv.index('--')+1:])
+    if not 0.2 <= args.lod_ratio <= 1.:parser.error('lod-ratio must be in [0.2, 1]')
+    cache,name,output=args.cache,args.name,args.output
     cache, output = Path(cache).resolve(), Path(output).resolve()
     avatar, sex, description = ROSTER[name]
     assets = cache / 'Assets'
@@ -245,6 +251,23 @@ def main():
     applied_shift = float(np.abs(evaluated(scene, mesh_object, 1) - rest_before).max())
     if applied_shift > 1e-4 or rig.matrix_world != Matrix.Identity(4):
         raise RuntimeError(f'Applying the rig transform moved the rest mesh by {applied_shift} m')
+    source_triangles=sum(len(p.vertices)-2 for p in mesh_object.data.polygons)
+    if args.lod_ratio < 1.:
+        # Collapse in bind pose before skinning; Blender interpolates weights/UVs.
+        # Material boundaries and facial detail are protected with a weight mask.
+        bpy.context.view_layer.objects.active=mesh_object
+        keep=mesh_object.vertex_groups.new(name='LOD_Detail')
+        zs=[v.co.z for v in mesh_object.data.vertices];bottom,top=min(zs),max(zs)
+        for v in mesh_object.data.vertices:
+            keep.add([v.index], 0.05 if v.co.z>bottom+.78*(top-bottom) else 1., 'REPLACE')
+        modifier=mesh_object.modifiers.new('DistanceLOD','DECIMATE')
+        modifier.decimate_type='COLLAPSE';modifier.ratio=args.lod_ratio
+        modifier.vertex_group=keep.name;modifier.vertex_group_factor=1.
+        modifier.use_collapse_triangulate=True
+        bpy.ops.object.modifier_move_up(modifier=modifier.name)
+        bpy.ops.object.modifier_apply(modifier=modifier.name)
+        keep=mesh_object.vertex_groups.get('LOD_Detail')
+        if keep is not None:mesh_object.vertex_groups.remove(keep)
     roots = [b.name for b in rig.data.bones if b.parent is None]
     if len(roots) != 1:
         raise RuntimeError(f'Expected one skeleton root, found {roots}')
@@ -376,6 +399,7 @@ def main():
     export_collada(scene, rig, mesh_object, idle_action, len(idle_samples) + 1, output / 'idle.dae', opacity)
     receipt = {'source_avatar': avatar, 'description': description, 'animation_set': sex,
                'walk_clip': WALK[sex], 'idle_clip': IDLE[sex], 'blender': bpy.app.version_string,
+               'lod_ratio':args.lod_ratio,'source_triangles':source_triangles,
                'fps': FPS, 'walk_frames': walk_frames, 'cycle_seconds': cycle,
                'stride_m': stride_m, 'gait_speed_mps': speed, 'height_m': height,
                'idle_seconds': IDLE_SECONDS, 'idle_blend_seconds': IDLE_BLEND_SECONDS,

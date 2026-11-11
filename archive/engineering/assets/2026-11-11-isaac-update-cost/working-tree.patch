@@ -1,0 +1,303 @@
+diff --git a/src/ridgeback_autonomy_isaac/sim/isaac/ros_io.py b/src/ridgeback_autonomy_isaac/sim/isaac/ros_io.py
+index 46e327b..c6d281f 100644
+--- a/src/ridgeback_autonomy_isaac/sim/isaac/ros_io.py
++++ b/src/ridgeback_autonomy_isaac/sim/isaac/ros_io.py
+@@ -33,6 +33,30 @@ from ridgeback_common.lidar_contract import (
+ )
+ 
+ 
++def drain_callbacks(owner, node, limit: int) -> int:
++    """Run up to ``limit`` ready callbacks of ``node`` without waiting.
++
++    ``rclpy.spin_once(node)`` adds and removes the node from the global
++    executor on every call; repeated per render frame that cost several
++    milliseconds. A persistent executor stopping at the first empty wait does
++    the same work. Returns the number of callbacks run.
++    """
++    from rclpy.executors import SingleThreadedExecutor, TimeoutException
++    executor = getattr(owner, '_executor', None)
++    if executor is None:
++        executor = owner._executor = SingleThreadedExecutor(context=node.context)
++        executor.add_node(node)
++    for count in range(limit):
++        try:
++            handler, _, _ = executor.wait_for_ready_callbacks(timeout_sec=0.0)
++        except TimeoutException:
++            return count
++        handler()
++        if handler.exception() is not None:
++            raise handler.exception()
++    return limit
++
++
+ def _quat_from_yaw(yaw: float):
+     return (0.0, 0.0, math.sin(yaw / 2.0), math.cos(yaw / 2.0))
+ 
+@@ -362,9 +386,10 @@ class RosIO:
+     def spin_once(self):
+         # Drain ready callbacks: two 40 Hz cloud streams plus command/clock
+         # traffic exceed a one-callback-per-render-frame budget.
+-        for _ in range(32):
+-            self._rclpy.spin_once(self.node, timeout_sec=0.0)
++        drain_callbacks(self, self.node, 32)
+ 
+     def shutdown(self):
++        if getattr(self, '_executor', None) is not None:
++            self._executor.shutdown()
+         self.node.destroy_node()
+         self._rclpy.shutdown()
+diff --git a/src/ridgeback_leader_follow/ridgeback_leader_follow/crowd_isaac.py b/src/ridgeback_leader_follow/ridgeback_leader_follow/crowd_isaac.py
+index 5131f77..1e27c65 100644
+--- a/src/ridgeback_leader_follow/ridgeback_leader_follow/crowd_isaac.py
++++ b/src/ridgeback_leader_follow/ridgeback_leader_follow/crowd_isaac.py
+@@ -10,7 +10,9 @@ from ridgeback_leader_follow.crowd_geometry import create_isaac_scene, animate_i
+ from ridgeback_leader_follow.crowd_sensors import SensorEvidence
+ 
+ 
+-def run(scenario, duration, output, writer, gui, finish, record=False, scene_profile="baseline", environment=None):
++def run(scenario, duration, output, writer, gui, finish, record=False, scene_profile="baseline", environment=None, render_quality="reference", tuning=None):
++    from ridgeback_leader_follow.simulation_performance import RuntimeTuning
++    tuning=tuning or RuntimeTuning()
+     from ament_index_python.packages import get_package_share_directory
+     from pathlib import Path
+     from ridgeback_leader_follow.crowd_runner import stop_process, write_sample
+@@ -41,14 +43,25 @@ def run(scenario, duration, output, writer, gui, finish, record=False, scene_pro
+     try:
+         os.environ.setdefault('OMNI_KIT_ACCEPT_EULA', 'YES')
+         from isaacsim import SimulationApp
+-        app = SimulationApp({'headless': not gui})
++        # Over a remote desktop, the window's size dominates GUI frame cost
++        # (measured 17 FPS at 1920x1080, 67 FPS at 640x480 for the same scene).
++        width, height = (int(v) for v in os.environ.get('ISAAC_WINDOW', '1280x720').split('x'))
++        app = SimulationApp({'headless': not gui, 'width': width, 'height': height,
++                             'window_width': width, 'window_height': height})
++        if render_quality == 'performance':
++            import carb
++            settings = carb.settings.get_settings()
++            # Retain RTX materials/textures; remove expensive secondary rays.
++            for key in ('/rtx/shadows/enabled', '/rtx/reflections/enabled',
++                        '/rtx/indirectDiffuse/enabled'):
++                settings.set_bool(key, False)
+         import omni.timeline
+         import omni.usd
+         from isaacsim.core.utils.extensions import enable_extension
+         from omni.kit.loop import _loop as omni_loop
+         from pxr import Gf, PhysxSchema, Usd, UsdGeom, UsdPhysics
+         from robot_rig import RidgebackRig
+-        from ros_io import RosIO
++        from ros_io import RosIO, drain_callbacks
+         from sensors import attach_camera, attach_lidars
+         from worlds import BASE_LINK_FLOOR_CLEARANCE
+ 
+@@ -57,7 +70,7 @@ def run(scenario, duration, output, writer, gui, finish, record=False, scene_pro
+         stage = context.get_stage()
+         if scene_profile == 'realistic':
+             from ridgeback_leader_follow.realistic_scene import create_scene
+-            people = create_scene(stage, scenario, environment or 'modern_office')
++            people = create_scene(stage, scenario, environment or 'modern_office', render_quality, tuning)
+         elif scene_profile == 'lab':
+             from ridgeback_leader_follow.lab_scene import create_scene
+             people = create_scene(stage, scenario)
+@@ -66,8 +79,9 @@ def run(scenario, duration, output, writer, gui, finish, record=False, scene_pro
+             people = create_f3_scene(stage, scenario)
+         else:
+             people = create_isaac_scene(stage, scenario)
++        animation_cache={}
+         for person in scenario.people:
+-            animate_isaac_person(people[person.name], person, 0.)
++            animate_isaac_person(people[person.name], person, 0.,animation_cache)
+         robot = stage.DefinePrim('/ridgeback', 'Xform')
+         robot.GetReferences().AddReference((adapter / 'usd/robots/ridgeback_r100/ridgeback_r100.usda').as_uri())
+         height = BASE_LINK_FLOOR_CLEARANCE
+@@ -76,19 +90,28 @@ def run(scenario, duration, output, writer, gui, finish, record=False, scene_pro
+         root = next(p.GetPath().pathString for p in Usd.PrimRange(robot)
+                     if p.HasAPI(UsdPhysics.ArticulationRootAPI) and '/drive_rig/' in str(p.GetPath()))
+         physics = UsdPhysics.Scene.Define(stage, '/physicsScene')
+-        PhysxSchema.PhysxSceneAPI.Apply(physics.GetPrim()).CreateTimeStepsPerSecondAttr(120.)
++        physx = PhysxSchema.PhysxSceneAPI.Apply(physics.GetPrim())
++        physx.CreateTimeStepsPerSecondAttr(120.)
++        # One stationary articulation and static colliders: GPU dynamics made
++        # every substep wait on the GPU (about 13 ms of a 20 ms update in the
++        # modern office). CPU PhysX leaves sensor rates and paths unchanged.
++        physx.CreateEnableGPUDynamicsAttr(False)
++        physx.CreateBroadphaseTypeAttr('MBP')
+         enable_extension('isaacsim.ros2.bridge')
+         ros = RosIO('r100_0001', odom_tf=True)
+         monitor = SensorEvidence(output, record=record)
+         attach_lidars(stage, '/ridgeback', 'r100_0001')
+         _, depth_handle = attach_camera(stage, '/ridgeback', 'r100_0001',
+-                                         '640x480', 'ideal', depth_sink=ros.publish_d455_depth)
++                                         '640x480', 'ideal', depth_sink=ros.publish_d455_depth,
++                                         profile_override=tuning.camera_profile(),publish_points=not tuning.reduced_sensors)
+         rig = RidgebackRig(root, odom_noise=0., seed=0)
+         # One render per step. The realistic profile's RTX office makes each
+         # render costly, so it steps at the camera's 30 Hz instead of 40 Hz:
+         # about a third more scene time per second of wall time. Baseline and
+         # F3 runs keep their recorded 40 Hz timing.
+         dt = 1 / 30 if scene_profile == 'realistic' else .025
++        if tuning.isaac_step_hz:
++            dt = 1 / tuning.isaac_step_hz
+         loop = omni_loop.acquire_loop_interface()
+         loop.set_manual_step_size(dt)
+         loop.set_manual_mode(True, name='main')
+@@ -118,8 +141,7 @@ def run(scenario, duration, output, writer, gui, finish, record=False, scene_pro
+             ros.publish_imu(stamp, 0., 0., 0.)
+             ros.publish_ground_truth(stamp, *rig.ground_truth())
+             ros.spin_once()
+-            for _ in range(12):
+-                monitor.spin(0.)
++            drain_callbacks(monitor, monitor.node, 12)
+ 
+         deadline = time.monotonic() + 120.
+         while not monitor.ready:
+@@ -136,7 +158,7 @@ def run(scenario, duration, output, writer, gui, finish, record=False, scene_pro
+                 raise RuntimeError('Isaac window closed before scene completion')
+             elapsed = (index + 1) * dt
+             for person in scenario.people:
+-                animate_isaac_person(people[person.name], person, elapsed)
++                animate_isaac_person(people[person.name], person, elapsed,animation_cache)
+             # No command is consumed. The F1 observation robot stays stationary.
+             rig.step(dt, now=timeline.get_current_time())
+             app.update()
+diff --git a/src/ridgeback_leader_follow/ridgeback_leader_follow/crowd_runner.py b/src/ridgeback_leader_follow/ridgeback_leader_follow/crowd_runner.py
+index e883aaf..bcc5160 100644
+--- a/src/ridgeback_leader_follow/ridgeback_leader_follow/crowd_runner.py
++++ b/src/ridgeback_leader_follow/ridgeback_leader_follow/crowd_runner.py
+@@ -45,21 +45,21 @@ def interrupt_run(_signum, _frame):
+     raise KeyboardInterrupt('Scene interrupted')
+ 
+ 
+-def run_gazebo(scenario, duration, output, writer, gui, record=False, scene_profile='baseline', environment=None):
++def run_gazebo(scenario, duration, output, writer, gui, record=False, scene_profile='baseline', environment=None, render_quality='reference', tuning=None):
+     from ridgeback_leader_follow.crowd_gazebo import run
+-    return run(scenario, duration, output, writer, gui, record, scene_profile, environment)
++    return run(scenario, duration, output, writer, gui, record, scene_profile, environment, render_quality, tuning)
+ 
+ 
+-def run_isaac(scenario, duration, output, writer, gui, finish, record=False, scene_profile="baseline", environment=None):
++def run_isaac(scenario, duration, output, writer, gui, finish, record=False, scene_profile="baseline", environment=None, render_quality="reference", tuning=None):
+     from ridgeback_leader_follow.crowd_isaac import run
+-    return run(scenario, duration, output, writer, gui, finish, record, scene_profile, environment)
++    return run(scenario, duration, output, writer, gui, finish, record, scene_profile, environment, render_quality, tuning)
+ 
+ 
+ def main(argv=None):
+     parser = argparse.ArgumentParser(description=__doc__)
+     parser.add_argument('--backend', required=True, choices=('gz', 'isaac'))
+-    parser.add_argument('--scenario', default='crossing', choices=(*SCENARIOS,'leader_out_of_view'))
+-    parser.add_argument('--duration', type=float, help='Shorten the 20-second fixture')
++    parser.add_argument('--scenario', default='crossing', choices=(*SCENARIOS,'leader_out_of_view','explainer'))
++    parser.add_argument('--duration', type=float, help='Shorten the selected scenario')
+     parser.add_argument('--output-dir', type=Path)
+     parser.add_argument('--demo-cycles', type=int, default=0,
+                         help='Repeat a continuous 30-second lab walk (1..120 cycles)')
+@@ -67,11 +67,28 @@ def main(argv=None):
+                         help='Lab uses a CC0 casual pedestrian and furnished corridor (Isaac only); '
+                              'f3 uses distinct outfits; realistic adds textured worlds and Rocketbox pedestrians')
+     parser.add_argument('--environment',choices=('modern_office','office','warehouse','courtyard'),help='Realistic-profile world; defaults to modern_office')
++    parser.add_argument('--performance-profile',choices=('reference','balanced'),default='reference')
++    parser.add_argument('--human-detail',choices=('full','distant'))
++    parser.add_argument('--sensor-quality',choices=('reference','reduced'))
++    parser.add_argument('--collision-quality',choices=('reference','simple'))
++    parser.add_argument('--render-quality', choices=('reference', 'performance'), default='reference',
++                        help='Performance simplifies lighting/reflections; preserves people, sensors and paths')
++    parser.add_argument('--isaac-step-hz', type=int, choices=(30, 60),
++                        help='Isaac updates per simulated second (default: recorded timing); '
++                             '60 doubles viewport updates while sensors keep their tick rates')
+     parser.add_argument('--gui', action='store_true', help='Open a simulator window')
+     parser.add_argument('--crowd-size', type=int, choices=CROWD_SIZES, default=4)
+     parser.add_argument('--record', action='store_true', help='Record sensor topics to a ROS bag')
+     parser.add_argument('--ros-domain', type=int, help='Override the private ROS domain (0..232)')
+     args = parser.parse_args(argv)
++    from ridgeback_leader_follow.simulation_performance import resolve_tuning
++    if args.isaac_step_hz is not None and args.backend != 'isaac':
++        parser.error('--isaac-step-hz requires --backend isaac')
++    tuning=resolve_tuning(args.performance_profile,args.human_detail,args.sensor_quality,args.collision_quality,args.isaac_step_hz)
++    if tuning != resolve_tuning() and args.scene_profile!='realistic':
++        parser.error('runtime performance options require --scene-profile realistic')
++    if args.render_quality != 'reference' and args.scene_profile != 'realistic':
++        parser.error('--render-quality performance requires --scene-profile realistic')
+     if args.environment is not None and args.scene_profile != "realistic":
+         parser.error("--environment requires --scene-profile realistic")
+     if args.scene_profile == "realistic":args.environment=args.environment or "modern_office"
+@@ -81,7 +98,12 @@ def main(argv=None):
+         args.ros_domain = 100 + int(uuid.uuid4().hex[:8], 16) % 100
+     if not 0 <= args.ros_domain <= 232:
+         parser.error('ros-domain must be between 0 and 232')
+-    if args.scenario == 'leader_out_of_view':
++    if args.scenario == 'explainer':
++        if args.scene_profile!='realistic' or args.environment!='modern_office':
++            parser.error('explainer requires realistic profile and modern_office')
++        from ridgeback_leader_follow.explainer_motion import load_scenario as explainer_scenario
++        scenario=explainer_scenario()
++    elif args.scenario == 'leader_out_of_view':
+         if args.scene_profile != 'f3':
+             parser.error('leader_out_of_view requires --scene-profile f3')
+         from ridgeback_leader_follow.recognition_scenarios import load_recognition_scenario
+@@ -112,8 +134,8 @@ def main(argv=None):
+                 'scene_profile': args.scene_profile,
+                 'geometry': ('CC0 Innerscene Maya, furnished lab corridor' if args.scene_profile == 'lab'
+                              else 'Cesium Man CC-BY-4.0 skinned animation; baseline corridor'),
+-                'crowd_size': args.crowd_size, 'ros_domain': args.ros_domain,
+-                'frame': 'world', 'floor_z': 0., 'output_dir': str(output)}
++                'crowd_size': (10 if scenario.name=='explainer' else args.crowd_size), 'ros_domain': args.ros_domain,
++                'runtime_tuning':asdict(tuning), 'camera_contract':asdict(tuning.camera_profile()), 'render_quality': args.render_quality, 'frame': 'world', 'floor_z': 0., 'output_dir': str(output)}
+     if args.scene_profile == 'f3':
+         from ridgeback_leader_follow.f3_scene import GEOMETRY, manifest_entry
+         # Evidence for scoring only; appearance identities are never published.
+@@ -121,8 +143,12 @@ def main(argv=None):
+     if args.scene_profile == 'realistic':
+         from ridgeback_leader_follow.realistic_scene import manifest_entry
+         manifest.update(manifest_entry(scenario,args.environment))
++        from ridgeback_leader_follow.simulation_performance import use_distance_lod
++        manifest['human_geometry']={person.name:('lod1' if use_distance_lod(person,tuning) else 'full') for person in scenario.people}
+     (output / 'setup').mkdir()
+-    shutil.copyfile(Path.cwd() / 'clearpath/robot.yaml', output / 'setup/robot.yaml')
++    import yaml
++    declaration=yaml.safe_load((Path.cwd()/'clearpath/robot.yaml').read_text())
++    (output/'setup/robot.yaml').write_text(yaml.safe_dump(tuning.setup_robot(declaration),sort_keys=False))
+     os.environ['ROS_DOMAIN_ID'] = str(args.ros_domain)
+     os.environ.setdefault('RMW_IMPLEMENTATION', 'rmw_cyclonedds_cpp')
+     from ament_index_python.packages import get_package_share_directory, get_package_prefix
+@@ -132,8 +158,11 @@ def main(argv=None):
+     library = Path(get_package_prefix('ridgeback_leader_follow')) / 'lib/ridgeback_leader_follow/libCrowdMotion.so'
+     if library.is_file():
+         shutil.copyfile(library, output / 'simulation_inputs/libCrowdMotion.so')
++    if args.backend=='isaac':
++        adapter=Path(get_package_share_directory('ridgeback_autonomy_isaac'))/'sim/isaac'
++        shutil.copytree(adapter,output/'backend_inputs',ignore=shutil.ignore_patterns('usd','__pycache__'))
+     manifest['input_sha256'] = {str(p.relative_to(output)): hashlib.sha256(p.read_bytes()).hexdigest()
+-        for directory in ('source','simulation_inputs','launch_inputs','setup')
++        for directory in ('source','simulation_inputs','launch_inputs','setup','backend_inputs')
+         for p in (output / directory).rglob('*') if p.is_file()}
+     manifest['base_revision'] = subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip()
+     (output / 'package.diff').write_bytes(subprocess.check_output(['git','diff','--binary','--','src/ridgeback_leader_follow']))
+@@ -150,7 +179,7 @@ def main(argv=None):
+             if args.backend == 'gz':
+                 # Keep this fixture separate from every other Gazebo session.
+                 os.environ['GZ_PARTITION'] = f'leader_follow_{uuid.uuid4().hex}'
+-                run_gazebo(scenario, duration, output, writer, args.gui, args.record, args.scene_profile, args.environment)
++                run_gazebo(scenario, duration, output, writer, args.gui, args.record, args.scene_profile, args.environment, args.render_quality, tuning)
+             else:
+                 # Kit has its own argument parser; it must not parse this CLI.
+                 sys.argv = [sys.argv[0]]
+@@ -161,7 +190,7 @@ def main(argv=None):
+                     if error is not None:
+                         manifest['error'] = f'{type(error).__name__}: {error}'
+                     manifest_path.write_text(json.dumps(manifest, indent=2) + '\n')
+-                run_isaac(scenario, duration, output, writer, args.gui, finish, args.record, args.scene_profile, args.environment)
++                run_isaac(scenario, duration, output, writer, args.gui, finish, args.record, args.scene_profile, args.environment, args.render_quality, tuning)
+         manifest['status'] = 'complete'
+     except BaseException as exc:
+         manifest.update(status='failed', error=f'{type(exc).__name__}: {exc}')
+diff --git a/src/ridgeback_leader_follow/ridgeback_leader_follow/crowd_sensors.py b/src/ridgeback_leader_follow/ridgeback_leader_follow/crowd_sensors.py
+index 43a0e1f..8a0963b 100644
+--- a/src/ridgeback_leader_follow/ridgeback_leader_follow/crowd_sensors.py
++++ b/src/ridgeback_leader_follow/ridgeback_leader_follow/crowd_sensors.py
+@@ -131,4 +131,6 @@ class SensorEvidence:
+         if self.writer:
+             self.writer.close()
+         (self.output / 'sensor_health.json').write_text(json.dumps(self.stats, indent=2) + '\n')
++        if getattr(self, '_executor', None) is not None:
++            self._executor.shutdown()
+         self.node.destroy_node()
