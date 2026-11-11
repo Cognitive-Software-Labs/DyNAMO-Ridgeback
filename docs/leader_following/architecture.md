@@ -114,7 +114,14 @@ leader's speed and trailed by a constant gap. Within
 It cancels navigation, which stops the robot, whenever the state is not
 `LOCKED`, is older than `stale_timeout`, is not in `global_frame`, or the robot
 pose is unavailable. Nav2 supplies planning, obstacle clearance, speed limits
-and the collision monitor. `leader_follow/follow_status` publishes
+and the collision monitor.
+
+The controller server publishes `cmd_vel_mppi`. While following or holding,
+`follow_controller` replaces its turn rate with `heading_gain` times the
+leader's bearing error, limited to `max_heading_rate`, and republishes it on
+`cmd_vel_nav`. The holonomic base then keeps the camera on the leader while
+MPPI steers translation around people. Otherwise the command passes through
+unchanged. `leader_follow/follow_status` publishes
 `following`, `holding` or `stopped` with its reason.
 
 | Parameter | Default | Meaning |
@@ -123,13 +130,18 @@ and the collision monitor. `leader_follow/follow_status` publishes
 | `hold_tolerance` | `0.15` | Extra metres within which the robot only turns |
 | `lead_time` | `1.5` | Seconds of predicted leader motion added to the goal |
 | `stale_timeout` | `0.5` | Seconds before a missing `LOCKED` state stops the robot |
+| `heading_gain`, `max_heading_rate` | `2.0`, `1.0` | Turn toward the leader: rad/s per rad of bearing error, and its limit |
 | `global_frame`, `base_frame` | `odom`, `base_link` | Goal frame and robot frame |
 
 `follow_leader.launch.py` starts the F3 recognition pipeline, the Nav2
 servers from `config/follow_nav2_params.yaml` and `follow_controller`. That
 file is the exploration Nav2 configuration with `odom` as the global frame (no
 map or SLAM), a 20 m rolling global costmap without a static layer, a 0.9 m/s
-MPPI forward limit and a 0.3 rad goal heading tolerance. Exploration
+MPPI forward limit with wider forward-speed sampling (`vx_std` 0.3) and a
+stronger `PathFollowCritic` (weight 10, offset 8), and a 0.3 rad goal heading
+tolerance. With the exploration weights MPPI itself stayed near 0.6 m/s. The
+collision monitor adds a stop zone about 0.25 m around the body and counts
+two lidar points, so a person's legs register. Exploration
 configuration is unchanged. In both simulators `--drive` lets the crowd
 runner move the robot from `cmd_vel`, paces simulation to
 `--real-time-factor` (default 0.5, so perception keeps up) and holds people at
@@ -148,8 +160,10 @@ ros2 launch ridgeback_leader_follow follow_leader.launch.py
 
 For Gazebo, run `ros2 run ridgeback_leader_follow crowd_scene --backend gz ...`
 with the same scene options. Run both from the workspace root so the tracker
-finds `perception_venv`. The remaining scenarios and the plan's metrics are
-not yet implemented.
+finds `perception_venv`. Add `--scene-profile realistic --environment
+modern_office --scenario explainer` for the explainer office with all eleven
+walkers. The plan's metrics are not yet implemented. Scripted walkers do not
+avoid the robot, so a stopped robot can still be walked into.
 
 ## Crowd simulation
 
@@ -178,3 +192,4 @@ wrapper on 24,000 scripted frames with no differences.
 
 - [First closed-loop following in Isaac](../../archive/engineering/2026-11-11-f4-first-follow.md) — leader-alone tuning runs and distance-keeping results.
 - [Closed-loop following in Gazebo](../../archive/engineering/2026-11-11-f4-gazebo-follow.md) — first Gazebo leader-alone run.
+- [Following speed and heading in the explainer office](../../archive/engineering/2026-11-11-f4-office-speed.md) — MPPI speed cap, stop zone, leader-facing turn control and the Gazebo lock losses.

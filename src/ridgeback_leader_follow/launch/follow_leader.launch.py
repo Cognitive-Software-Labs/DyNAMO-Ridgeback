@@ -54,7 +54,7 @@ def generate_launch_description():
         GroupAction([
             PushRosNamespace(namespace),
             SetParameter('use_sim_time', use_sim_time),
-            nav2('nav2_controller', 'controller_server', [('cmd_vel', 'cmd_vel_nav')]),
+            nav2('nav2_controller', 'controller_server', [('cmd_vel', 'cmd_vel_mppi')]),
             nav2('nav2_smoother', 'smoother_server'),
             nav2('nav2_planner', 'planner_server'),
             nav2('nav2_behaviors', 'behavior_server', [('cmd_vel', 'cmd_vel_nav')]),

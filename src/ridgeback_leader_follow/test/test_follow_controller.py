@@ -67,3 +67,12 @@ def test_gazebo_world_real_time_factor_is_rewritten_once():
     assert apply_real_time_factor(world, .5) == '<physics><real_time_factor>0.5</real_time_factor></physics>'
     with pytest.raises(ValueError):
         apply_real_time_factor('<physics/>', .5)
+
+
+def test_heading_rate_turns_toward_the_leader_and_saturates():
+    from ridgeback_leader_follow.follow_controller import heading_rate
+    assert heading_rate((0., 0., 0.), (2., 0.), 2., 1.) == pytest.approx(0.)
+    assert heading_rate((0., 0., 0.), (2., .4), 2., 1.) == pytest.approx(2. * math.atan2(.4, 2.))
+    assert heading_rate((0., 0., 0.), (0., 2.), 2., 1.) == pytest.approx(1.)
+    assert heading_rate((0., 0., 3.), (-2., -.1), 2., 1.) == pytest.approx(
+        max(-1., min(1., 2. * math.atan2(math.sin(math.atan2(-.1, -2.) - 3.), math.cos(math.atan2(-.1, -2.) - 3.)))))

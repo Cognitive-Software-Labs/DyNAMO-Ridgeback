@@ -101,6 +101,13 @@ class FollowPlanner:
         return FollowDecision((robot[0] + dx * scale, robot[1] + dy * scale, yaw), 'following', 'leader_locked')
 
 
+def heading_rate(robot: Pose2D, leader: Tuple[float, float], gain: float, max_rate: float) -> float:
+    """Turn rate that points the robot's front (and camera) at the leader."""
+    error = math.atan2(leader[1] - robot[1], leader[0] - robot[0]) - robot[2]
+    error = math.atan2(math.sin(error), math.cos(error))
+    return max(-max_rate, min(max_rate, gain * error))
+
+
 def yaw_to_quaternion(yaw: float):
     return 0., 0., math.sin(yaw / 2), math.cos(yaw / 2)
 
@@ -113,7 +120,7 @@ def main():
     import rclpy
     from action_msgs.msg import GoalStatus
     from ament_index_python.packages import get_package_share_directory
-    from geometry_msgs.msg import PoseStamped
+    from geometry_msgs.msg import PoseStamped, TwistStamped
     from nav2_msgs.action import NavigateToPose
     from rclpy.action import ActionClient
     from rclpy.node import Node
@@ -131,7 +138,9 @@ def main():
                             follow_distance=1.2, hold_tolerance=.15, stale_timeout=.5, lead_time=1.5,
                             update_rate=5.,
                             behavior_tree=f'{share}/config/behavior_trees/follow_leader.xml',
-                            navigate_action='navigate_to_pose', goal_update_topic='goal_update')
+                            navigate_action='navigate_to_pose', goal_update_topic='goal_update',
+                            heading_gain=2., max_heading_rate=1.,
+                            controller_cmd_topic='cmd_vel_mppi', output_cmd_topic='cmd_vel_nav')
             for name, value in defaults.items():
                 self.declare_parameter(name, value)
             p = lambda name: self.get_parameter(name).value
@@ -149,6 +158,12 @@ def main():
             self.goal_handle = None
             self.sending = False
             self.mode = None
+            self.heading_gain, self.max_heading_rate = p('heading_gain'), p('max_heading_rate')
+            self.stale_timeout = p('stale_timeout')
+            # Nav2 plans translation; this node owns the turn rate so the
+            # camera stays on the leader while the holonomic base sidesteps.
+            self.cmd_out = self.create_publisher(TwistStamped, p('output_cmd_topic'), 10)
+            self.create_subscription(TwistStamped, p('controller_cmd_topic'), self.on_controller_cmd, 10)
             self.create_subscription(LeaderState, p('leader_topic'), self.on_leader, 10)
             self.create_timer(1. / float(p('update_rate')), self.tick)
 
@@ -159,6 +174,17 @@ def main():
                                      (msg.position.x, msg.position.y))
             else:
                 self.velocity.reset()
+
+        def on_controller_cmd(self, cmd):
+            msg = self.leader
+            if (self.mode in ('following', 'holding') and msg is not None and msg.state == LeaderState.LOCKED
+                    and msg.has_leader and msg.header.frame_id == self.global_frame):
+                age = self.get_clock().now().nanoseconds * 1e-9 - (msg.header.stamp.sec + msg.header.stamp.nanosec * 1e-9)
+                robot = self.robot_pose()
+                if robot is not None and age <= self.stale_timeout:
+                    cmd.twist.angular.z = heading_rate(robot, (msg.position.x, msg.position.y),
+                                                       self.heading_gain, self.max_heading_rate)
+            self.cmd_out.publish(cmd)
 
         def robot_pose(self) -> Optional[Pose2D]:
             try:

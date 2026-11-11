@@ -1,0 +1,32 @@
+== explainer-isaac
+{"duration": 23.93, "correct_s": 19.77, "wrong_s": 0.0, "unmatched_s": 0.0, "not_locked_s": 3.83, "distance_median": 7.0, "distance_error_median": 5.8, "distance_min": 1.47, "final_distance": 8.68, "min_bystander_clearance": 2.55, "status_counts": {"following": 99, "stopped": 21, "holding": 16}}
+== explainer-gz
+{"duration": 23.95, "correct_s": 10.76, "wrong_s": 0.76, "unmatched_s": 6.63, "not_locked_s": 5.78, "distance_median": 6.9, "distance_error_median": 5.7, "distance_min": 1.45, "final_distance": 8.71, "min_bystander_clearance": 2.53, "status_counts": {"stopped": 29, "following": 92, "holding": 14}}
+== explainer-isaac-speed
+cmd_vel_nav  max=0.65 p90=0.63 median_moving=0.59
+cmd_vel      max=0.65 p90=0.63 median_moving=0.58
+{"duration": 23.93, "correct_s": 20.73, "wrong_s": 0.0, "unmatched_s": 0.0, "not_locked_s": 2.87, "distance_median": 6.97, "distance_error_median": 5.77, "distance_min": 1.47, "final_distance": 8.18, "min_bystander_clearance": 2.06, "status_counts": {"stopped": 16, "following": 104, "holding": 16}}
+== explainer-isaac-tuneA
+cmd_vel_nav  max=0.91 p90=0.88 median_moving=0.82
+cmd_vel      max=0.90 p90=0.88 median_moving=0.81
+{"duration": 23.93, "correct_s": 21.77, "wrong_s": 0.0, "unmatched_s": 0.0, "not_locked_s": 1.87, "distance_median": 3.95, "distance_error_median": 2.75, "distance_min": 1.5, "final_distance": 3.76, "min_bystander_clearance": 0.26, "status_counts": {"holding": 14, "stopped": 13, "following": 109}}
+== explainer-isaac-tuneB
+cmd_vel_nav  max=0.90 p90=0.88 median_moving=0.81
+cmd_vel      max=0.90 p90=0.88 median_moving=0.80
+{"duration": 23.93, "correct_s": 21.3, "wrong_s": 0.0, "unmatched_s": 0.0, "not_locked_s": 2.3, "distance_median": 4.1, "distance_error_median": 2.9, "distance_min": 1.47, "final_distance": 4.47, "min_bystander_clearance": 0.15, "status_counts": {"holding": 14, "following": 107, "stopped": 15}}
+== explainer-gz-tuneB
+cmd_vel_nav  max=0.90 p90=0.89 median_moving=0.83
+cmd_vel      max=0.90 p90=0.88 median_moving=0.79
+{"duration": 23.95, "correct_s": 7.97, "wrong_s": 0.53, "unmatched_s": 3.29, "not_locked_s": 12.11, "distance_median": 4.98, "distance_error_median": 3.78, "distance_min": 1.45, "final_distance": 13.17, "min_bystander_clearance": 2.19, "status_counts": {"stopped": 64, "holding": 14, "following": 57}}
+== explainer-gz-tuneC2
+cmd_vel_nav  max=0.90 p90=0.88 median_moving=0.85
+cmd_vel      max=0.90 p90=0.88 median_moving=0.85
+{"duration": 23.95, "correct_s": 7.32, "wrong_s": 1.29, "unmatched_s": 3.89, "not_locked_s": 11.43, "distance_median": 3.88, "distance_error_median": 2.68, "distance_min": 1.45, "final_distance": 9.95, "min_bystander_clearance": 2.2, "status_counts": {"following": 65, "stopped": 56, "holding": 14}}
+== explainer-gz-tuneD
+cmd_vel_nav  max=0.90 p90=0.88 median_moving=0.84
+cmd_vel      max=0.90 p90=0.88 median_moving=0.84
+{"duration": 23.95, "correct_s": 8.43, "wrong_s": 0.92, "unmatched_s": 2.41, "not_locked_s": 12.16, "distance_median": 4.35, "distance_error_median": 3.15, "distance_min": 1.45, "final_distance": 12.16, "min_bystander_clearance": 2.21, "status_counts": {"holding": 14, "stopped": 62, "following": 59}}
+== explainer-isaac-tuneD
+cmd_vel_nav  max=0.91 p90=0.88 median_moving=0.80
+cmd_vel      max=0.90 p90=0.87 median_moving=0.78
+{"duration": 23.93, "correct_s": 20.57, "wrong_s": 0.0, "unmatched_s": 0.0, "not_locked_s": 3.03, "distance_median": 4.54, "distance_error_median": 3.34, "distance_min": 1.47, "final_distance": 4.63, "min_bystander_clearance": 0.15, "status_counts": {"holding": 16, "stopped": 15, "following": 105}}
