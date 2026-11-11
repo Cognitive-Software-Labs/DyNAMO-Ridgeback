@@ -114,6 +114,10 @@ def manager_factory():
     managers = []
 
     def create(*, tf_buffer=None, pause_client=None, clock=None, overrides=None, path_client=None):
+        # These tests model no depth image; the G1 depth check has its own tests.
+        overrides = list(overrides or [])
+        if not any(p.name == 'target_body_check' for p in overrides):
+            overrides.append(Parameter('target_body_check', value=False))
         manager = MissionManagerNode(
             tf_buffer=tf_buffer or FakeTfBuffer(),
             pause_client=pause_client or FakePauseClient(),

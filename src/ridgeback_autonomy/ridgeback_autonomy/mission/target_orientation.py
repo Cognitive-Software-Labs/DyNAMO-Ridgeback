@@ -12,6 +12,13 @@ estimate is None and parking keeps its undirected ranking.
 The body axis is a separate estimate from the same points: the middle of the legs,
 which the detector's surface centroid is not (the forearms pull it toward a camera
 G1 faces). It needs no forearms and does not feed the heading.
+
+The position is checked against G1's head before either is used: the detector's
+surface range comes from the nearest surface in the whole detection box, which is a
+worktable's edge or a panel's end when one stands in front of G1's legs or beside it.
+The head region of the box is G1 whatever stands there, so a surface well in front of
+or behind it re-seeds the position on the head, and a position is used only when depth
+shows G1's torso above it.
 """
 
 from __future__ import annotations
@@ -142,6 +149,121 @@ def estimate_body_axis(points_map, seed_xy, camera_xy, floor_z=0.0):
     x, y = seed_xy[0] + _middle(dx[legs]), seed_xy[1] + _middle(dy[legs])
     view = math.atan2(y - camera_xy[1], x - camera_xy[0])
     return (x + LEG_SURFACE_OFFSET_M * math.cos(view), y + LEG_SURFACE_OFFSET_M * math.sin(view))
+
+
+# The top quarter of G1's detection box, across its middle 40 %, is its head and upper
+# torso: above a worktable (0.76 m) or bed in front of its legs, and away from the box's
+# sides, where a panel beside G1 shows. The nearest fifth of those depths is G1's own
+# range. On 2026-11-09 Gazebo views from 2.3-6.9 m it was 0.01-0.12 m short of G1's
+# axis, where the detector's surface range was 1.25 m short behind a worktable and
+# 1.1 m short beside a panel.
+HEAD_ROWS_FRACTION = 0.25
+HEAD_COLUMNS_FRACTION = 0.40
+HEAD_RANGE_PERCENTILE = 20.0
+HEAD_SURFACE_BAND_M = (0.05, 0.15)   # around that range: the head and torso surface
+MIN_HEAD_POINTS = 12
+HEAD_DEPTH_M = 0.07                  # head surface to G1's vertical axis
+MAX_HEAD_SPREAD_M = 0.10             # between the frames of one stationary view
+# G1's nearest surface can be its forearm tips, 0.44 m from its axis toward the camera,
+# while its head is 0.07 m from it; a surface farther ahead or behind is another object.
+MAX_SURFACE_AHEAD_OF_HEAD_M = 0.50
+MAX_SURFACE_BEHIND_HEAD_M = 0.30
+# G1 itself above its axis: torso and head, higher than a worktable, within its shoulders.
+TORSO_HEIGHT_M = (0.85, 1.40)
+TORSO_RADIUS_M = 0.25
+MIN_TORSO_POINTS = 20
+
+
+@dataclass(frozen=True)
+class HeadObservation:
+    x: float
+    y: float
+    range_m: float           # horizontal, from the camera
+    points: int
+
+
+def box_pixels(box_xyxy, image_size, depth_shape):
+    """The detection box in depth pixels (x0, y0, x1, y1), scaled when the sizes differ."""
+    sx = depth_shape[1] / float(image_size[0]) if image_size[0] else 1.0
+    sy = depth_shape[0] / float(image_size[1]) if image_size[1] else 1.0
+    x0, y0, x1, y1 = (float(v) for v in box_xyxy[:4])
+    return (max(0, int(math.floor(x0 * sx))), max(0, int(math.floor(y0 * sy))),
+            min(depth_shape[1], int(math.ceil(x1 * sx)) + 1),
+            min(depth_shape[0], int(math.ceil(y1 * sy)) + 1))
+
+
+def head_observation(depth_m, box, intrinsics, rotation, translation):
+    """G1's head-region surface in the map from one depth frame, or None without enough of it.
+
+    ``box`` is (x0, y0, x1, y1) in depth pixels."""
+    x0, y0, x1, y1 = box
+    width, height = x1 - x0, y1 - y0
+    if width < 3 or height < 3:
+        return None
+    rows = (y0, y0 + max(2, int(round(HEAD_ROWS_FRACTION * height))))
+    margin = (1.0 - HEAD_COLUMNS_FRACTION) / 2.0
+    cols = (x0 + int(round(margin * width)), x1 - int(round(margin * width)))
+    if cols[1] - cols[0] < 1:
+        return None
+    patch = np.asarray(depth_m, dtype=float)[rows[0]:rows[1], cols[0]:cols[1]]
+    fx, fy, cx, cy = intrinsics
+    v, u = np.mgrid[rows[0]:rows[0] + patch.shape[0], cols[0]:cols[0] + patch.shape[1]]
+    valid = np.isfinite(patch) & (patch > 0.0)
+    if np.count_nonzero(valid) < MIN_HEAD_POINTS:
+        return None
+    z = patch[valid]
+    optical = np.stack(((u[valid] - cx) * z / fx, (v[valid] - cy) * z / fy, z), axis=1)
+    points = optical @ np.asarray(rotation).T + np.asarray(translation)
+    ranges = np.hypot(points[:, 0] - translation[0], points[:, 1] - translation[1])
+    near = float(np.percentile(ranges, HEAD_RANGE_PERCENTILE))
+    surface = (ranges >= near - HEAD_SURFACE_BAND_M[0]) & (ranges <= near + HEAD_SURFACE_BAND_M[1])
+    if np.count_nonzero(surface) < MIN_HEAD_POINTS:
+        return None
+    return HeadObservation(float(points[surface, 0].mean()), float(points[surface, 1].mean()),
+                           near, int(np.count_nonzero(surface)))
+
+
+def combined_head(heads):
+    """One head observation from a stationary view's frames, or None unless enough agree."""
+    seen = [h for h in heads if h is not None]
+    if len(seen) < MIN_AGREEING_FRAMES:
+        return None
+    x, y = float(np.median([h.x for h in seen])), float(np.median([h.y for h in seen]))
+    if max(math.hypot(h.x - x, h.y - y) for h in seen) > MAX_HEAD_SPREAD_M:
+        return None
+    return HeadObservation(x, y, float(np.median([h.range_m for h in seen])),
+                           min(h.points for h in seen))
+
+
+def head_axis(head, camera_xy):
+    """G1's vertical axis behind its head-region surface, seen from ``camera_xy``."""
+    view = math.atan2(head.y - camera_xy[1], head.x - camera_xy[0])
+    return head.x + HEAD_DEPTH_M * math.cos(view), head.y + HEAD_DEPTH_M * math.sin(view)
+
+
+def surface_offset_from_head(surface_xy, head, camera_xy):
+    """How far the measured surface lies in front of (+) or behind (-) G1's head, along the view."""
+    return head.range_m - math.hypot(surface_xy[0] - camera_xy[0], surface_xy[1] - camera_xy[1])
+
+
+def surface_is_g1(offset_m):
+    return -MAX_SURFACE_BEHIND_HEAD_M <= offset_m <= MAX_SURFACE_AHEAD_OF_HEAD_M
+
+
+def torso_points(points_map, axis_xy, floor_z=0.0):
+    """How many depth points stand above ``axis_xy`` at G1's torso and head height."""
+    points = np.asarray(points_map, dtype=float)
+    if points.size == 0:
+        return 0
+    radius = np.hypot(points[:, 0] - axis_xy[0], points[:, 1] - axis_xy[1])
+    height = points[:, 2] - floor_z
+    return int(np.count_nonzero((radius <= TORSO_RADIUS_M) & (height >= TORSO_HEIGHT_M[0])
+                                & (height <= TORSO_HEIGHT_M[1])))
+
+
+def torso_confirmed(counts):
+    """Whether enough frames of a stationary view show G1's torso above the axis."""
+    return sum(c >= MIN_TORSO_POINTS for c in counts) >= MIN_AGREEING_FRAMES
 
 
 def combined_axis(axes):

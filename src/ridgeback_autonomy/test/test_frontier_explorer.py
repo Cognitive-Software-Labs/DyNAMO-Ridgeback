@@ -3,6 +3,7 @@ from __future__ import annotations
 import numpy as np
 
 from ridgeback_autonomy.frontier_explorer.navigator import (
+    facing_quaternion,
     frontier_mask, get_frontier_clusters, is_frontier_point,
 )
 from ridgeback_autonomy.frontier_explorer.params import UNKNOWN, OBSTACLE, FREE
@@ -134,3 +135,11 @@ def test_cluster_grows_onto_edge_from_interior_seed() -> None:
     clusters = get_frontier_clusters(grid)
     assert len(clusters) == 1
     assert frozenset(clusters[0]) == frozenset({(1, 0), (1, 1), (1, 2)})
+
+
+def test_goal_faces_from_the_robot_towards_the_goal():
+    for (start, target), yaw in ((((0.0, 0.0), (1.0, 0.0)), 0.0), (((1.0, 1.0), (1.0, 3.0)), np.pi / 2),
+                                 (((0.0, 0.0), (-2.0, 0.0)), np.pi), (((0.0, 0.0), (1.0, -1.0)), -np.pi / 4)):
+        qz, qw = facing_quaternion(start, target)
+        assert np.isclose(2 * np.arctan2(qz, qw), yaw)
+        assert np.isclose(qz * qz + qw * qw, 1.0)

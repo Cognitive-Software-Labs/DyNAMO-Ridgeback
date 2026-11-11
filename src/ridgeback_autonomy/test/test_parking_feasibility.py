@@ -613,3 +613,37 @@ def test_start_footprint_occupancy_is_never_waived(case, cells, expected):
     p = path([start, (1.25, 0.), (2.5, 0., 0.)])
     assert path_rejection(p, c, start, g, target(5., 5.), CONFIG, .29,
                           occupied=(start,)) == expected, case
+
+
+def test_a_pose_closer_to_a_mapped_obstacle_than_the_lidar_margin_is_not_valid():
+    """The 2026-11-08 gz_standard run chose poses 0.017 and 0.079 m from G1's mapped legs;
+    the live LiDAR check (0.05 m margin) vetoed both approaches."""
+    from dataclasses import replace as _replace
+    from ridgeback_autonomy.mission.parking_planner import (
+        GridSnapshot, PlannerConfig, TargetReference, plan_parking, points_to_polygon_distance)
+    from ridgeback_autonomy.mission.parking_geometry import rotated_footprint_vertices
+    footprint = ((0.497, 0.264), (0.347, 0.414), (-0.347, 0.414), (-0.497, 0.264),
+                 (-0.497, -0.264), (-0.347, -0.414), (0.347, -0.414), (0.497, -0.264))
+    res, size = 0.05, 120
+    data = np.zeros((size, size), dtype=np.int16)
+    grid = GridSnapshot('map', 0, res, size, size, -3.0, -3.0, 0.0, data)
+    # G1's legs as a SLAM map can spread them: occupied cells up to 0.25 m from G1.
+    rows, cols = np.mgrid[0:size, 0:size]
+    x, y = grid.cell_centers(cols, rows)
+    data[np.hypot(x, y) <= 0.25] = 100
+    target = TargetReference(x=0.0, y=0.0, frame_id='map', stamp_ns=0,
+                             reference='generic_target_position', is_foot_midpoint=False,
+                             source='test')
+    loose = PlannerConfig(footprint=footprint, reach_allowance_m=0.06)
+    strict = _replace(loose, min_obstacle_clearance_m=0.08)
+    before = plan_parking(grid, target, loose, None, rays=False)
+    after = plan_parking(grid, target, strict, None, rays=False)
+    occupied = (x[data >= 50], y[data >= 50])
+
+    def clearance(c):
+        polygon = rotated_footprint_vertices(footprint, c.base_x, c.base_y, c.yaw)
+        return float(points_to_polygon_distance(occupied[0], occupied[1], polygon).min())
+    assert any(clearance(c) < 0.08 for c in before.candidates if c.status in ('valid', 'selected'))
+    valid = [c for c in after.candidates if c.status in ('valid', 'selected')]
+    assert valid and all(clearance(c) >= 0.08 for c in valid)
+    assert any(c.reason == 'obstacle_clearance' for c in after.candidates)

@@ -196,12 +196,16 @@ class TargetLocalizationAdapter:
         now_ns: int,
         known_target: tuple[float, float] | None = None,
         weak_minimum_score: float | None = None,
+        known_ray: tuple[tuple[float, float], tuple[float, float]] | None = None,
     ) -> TargetLocalizationResult:
         """Accept one associated measurement.
 
         When relocalizing an already localized target, ``known_target`` (map x, y)
         and ``weak_minimum_score`` admit a detection scoring below ``minimum_score``
         only if its position lies within ``max_sample_jump_m`` of the known target.
+        Before the first localization, ``known_ray`` ((x, y) origin and unit direction
+        in the map: the camera ray of the confirmed detection) does the same: a weak
+        detection is admitted only within ``max_sample_jump_m`` of that ray, ahead of it.
         """
         stamp_ns = stamp_to_nanoseconds(msg.header.stamp)
         if self._stabilized is not None:
@@ -222,7 +226,7 @@ class TargetLocalizationAdapter:
         ):
             return self._result(stamp_ns, reason='nonincreasing_timestamp')
 
-        weak = known_target is not None and weak_minimum_score is not None
+        weak = (known_target is not None or known_ray is not None) and weak_minimum_score is not None
         floor = min(self.minimum_score, float(weak_minimum_score)) if weak else self.minimum_score
         indices, invalid_reason = self._matching_indices(msg, association, floor)
         if invalid_reason is not None:
@@ -316,9 +320,8 @@ class TargetLocalizationAdapter:
         # even if the stabilization jump gate rejects its coordinates below.
         self._last_processed_stamp_ns = stamp_ns
 
-        if weak and float(msg.scores[index]) < self.minimum_score and math.hypot(
-            map_x_m - float(known_target[0]), map_y_m - float(known_target[1]),
-        ) > self.max_sample_jump_m:
+        if weak and float(msg.scores[index]) < self.minimum_score and _away_from_known(
+                map_x_m, map_y_m, known_target, known_ray, self.max_sample_jump_m):
             return self._result(
                 stamp_ns,
                 reason='weak_detection_away_from_known_target',
@@ -510,3 +513,14 @@ class TargetLocalizationAdapter:
     @staticmethod
     def _normalize_label(label: str) -> str:
         return str(label).strip().casefold()
+
+
+def _away_from_known(x, y, known_target, known_ray, limit_m):
+    """Whether (x, y) is farther than ``limit_m`` from the known target, or else from the
+    known ray (or behind its origin)."""
+    if known_target is not None:
+        return math.hypot(x - float(known_target[0]), y - float(known_target[1])) > limit_m
+    (ox, oy), (ux, uy) = known_ray
+    along = (x - ox) * ux + (y - oy) * uy
+    across = abs((x - ox) * uy - (y - oy) * ux)
+    return along <= 0.0 or across > limit_m

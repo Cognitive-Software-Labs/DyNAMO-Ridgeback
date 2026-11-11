@@ -227,8 +227,8 @@ them. Validate G1's reach into the opening before changing the 0.30-0.60 m band.
 
 **Gap.** OWLv2 scores a Gazebo G1 at about 0.42-0.60 depending on the view, and a
 static view scores the same on every frame. The parking detector now runs at
-0.40, with search and first localization at 0.50 and relocalization hysteresis
-near the known G1, which let `heading_90` and `no_feasible` reach planning. A
+0.40, with search confirmation at 0.50 and hysteresis from 0.40 near the known
+G1, which let `heading_90` and `no_feasible` reach planning. A
 side-on G1 in front of a matching background (a steel column) still scored below
 0.40 at one observation pose, and that relocalization timed out. Gazebo's
 walking person scored at most 0.19; Isaac's demo world has no person, and no
@@ -236,17 +236,40 @@ second humanoid robot was tested. The 2026-11-05 detection-gaps record under
 archived evidence holds the runs.
 
 With G1 at a workstation out of the robot's sight (2026-11-08), G1 was confirmed
-while the robot moved but the first static view scored 0.42-0.45, below the 0.50
-first-localization floor, so localization timed out (relocalization's 0.40
-hysteresis needs a known G1). In the pen scene G1 was localized 1.25 m behind
-itself, beyond its table, and the robot parked safely beside that wrong estimate;
-with a panel beside G1 the estimate moved 1.09 m toward the panel. Tall surfaces
-inside G1's detection box pull the depth estimate.
+while the robot moved, but the static view after the stop scored 0.42-0.45 and the
+first localization timed out under its 0.50 floor; a worktable edge and a panel end
+inside G1's detection box became G1's position (1.25 m and about 1 m off), and one
+run parked beside the wrong one and reported `MISSION_COMPLETE`. Since 2026-11-09
+the robot turns toward a confirmed detection left off its camera axis, the first
+localization accepts 0.40 on the confirmed detection's ray, and every position must
+show G1's head and torso in depth ([G1 position check](exploration/architecture.md#g1-position-check)).
+That check is qualified on Gazebo views only; the 2026-11-09 G1 position-check
+record under archived evidence holds the runs.
 
 **Completion criteria.** Measure detection over G1 headings, backgrounds and a
-humanoid distractor in both simulators; decide whether relocalization needs a
-second viewpoint when a static view fails, whether a first localization may use a
-confirmed detection's track, and how the depth estimate rejects surfaces behind G1.
+humanoid distractor in both simulators; qualify the head and torso check on Isaac
+and hardware depth (the real D455 is noisier beyond 4 m, where Gazebo G1s were
+localized from up to 10 m); decide whether a static view that still fails needs a
+second viewpoint.
+
+## Parking clearance beside G1
+
+**Gap.** The reach band (task point 0.30-0.60 m from G1's axis, planned to 0.54 m),
+the rear bin 0.217 m inside the rear edge and the 0.29 m generic keep-out stop the
+rear edge 0.29-0.32 m from G1's axis, while depth puts G1's lower legs within
+0.17 m of it. The remaining 0.12-0.15 m must hold the LiDAR monitor's 0.05 m margin,
+the stopping path and the relative error between the camera-based G1 estimate and
+the robot's live map pose. In the Gazebo workstation scene that error was 0.08-0.2 m
+(the estimate against G1's mapped legs, and a return seen in free space while
+driving), and the monitor vetoed every approach on 2026-11-08 and 2026-11-09. The
+planner now refuses poses within the monitor's margin of mapped obstacles; nothing
+aligns the final approach to G1's legs as the LiDARs see them. The 2026-11-09 G1
+position-check record under archived evidence holds the runs.
+
+**Completion criteria.** Decide between a final-approach alignment on G1's live
+LiDAR leg returns, a G1 reference taken from its mapped legs, or a revised reach or
+keep-out budget; then park beside G1 in the workstation scene with ground-truth
+reach and clearance.
 
 ## Parking plan invalidated by a delayed odometry stamp
 
@@ -258,6 +281,10 @@ checks are long (10.5 m); most likely the manager's callbacks back up behind the
 odometry message can be handled before the clock catches up. The robot stops
 safely at its observation pose. The 2026-11-05 workstation-scenes record under
 archived evidence holds the run.
+
+The same blocking checks made a verified plan's G1 estimate older than its 5 s
+limit before driving on 2026-11-09 (`target_stale`); while the robot stands still
+for planning, new views of G1 at its estimate now keep the estimate's stamp fresh.
 
 **Completion criteria.** Decide whether a timestamp fault seen right after
 blocking path checks should restart the stationary interval, as a restarted

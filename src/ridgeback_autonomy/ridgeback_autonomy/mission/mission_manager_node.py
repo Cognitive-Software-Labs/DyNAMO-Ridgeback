@@ -68,8 +68,10 @@ from ridgeback_autonomy.mission.target_localization import (
     TargetLocalizationAdapter,
 )
 from ridgeback_autonomy.mission.target_orientation import (
-    combined_axis, combined_estimate, depth_metres, depth_to_map_points, estimate_body_axis,
-    G1_BODY_RADIUS_M, estimate_target_yaw, occupied_cells, overhead_obstacle_points,
+    box_pixels, combined_axis, combined_estimate, combined_head, depth_metres, depth_to_map_points,
+    estimate_body_axis, G1_BODY_RADIUS_M, estimate_target_yaw, head_axis, head_observation,
+    occupied_cells, overhead_obstacle_points, surface_is_g1, surface_offset_from_head,
+    torso_confirmed, torso_points,
 )
 from ridgeback_autonomy.mission.parking_planner import (
     GridSnapshot,
@@ -270,6 +272,15 @@ _ALLOWED_STATE_NAMES = {state.name: frozenset(target.name for target in targets)
                         for state, targets in _ALLOWED_TRANSITIONS.items()}
 
 
+# Planning states in which the robot stands still at its view of G1.
+_REFRESH_STATES = (
+    MissionState.G1_LOCALIZED,
+    MissionState.PARKING_CANDIDATES_READY,
+    MissionState.EVALUATING_PARKING_PATHS,
+    MissionState.PARKING_PATH_FEASIBLE,
+)
+
+
 class MissionManagerNode(Node):
     """Coordinate the safe exploration-to-localization mission prefix."""
 
@@ -352,6 +363,9 @@ class MissionManagerNode(Node):
         self.declare_parameter('parking_front_sector_half_deg', 30.0)
         # The legs' axis replaces the surface-based G1 position, unless it is this far off.
         self.declare_parameter('target_axis_max_shift_m', 0.25)
+        # A localized position is used only when depth shows G1 there (head and torso);
+        # false is for tests that model no depth image.
+        self.declare_parameter('target_body_check', True)
         # Parking executions in total; a retry excludes the directions that failed.
         self.declare_parameter('parking_max_attempts', 3)
         self.declare_parameter('parking_retry_exclusion_deg', 20.0)
@@ -362,6 +376,10 @@ class MissionManagerNode(Node):
         self.declare_parameter('observation_yaw_tolerance_rad', 0.10)
         self.declare_parameter('observation_camera_frame', 'camera_0_color_optical_frame')
         self.declare_parameter('observation_camera_half_view_rad', 0.60)
+        # Before the first localization the robot turns its camera toward the confirmed
+        # detection when the stop left it this far off the camera axis (an image edge or
+        # out of view after the robot's stopping distance).
+        self.declare_parameter('first_view_turn_min_deg', 10.0)
         self.declare_parameter('exploration_resume_service', 'mission/resume')
         self.declare_parameter('explorer_status_topic', 'explore/status')
         self.declare_parameter('odom_frame', 'odom')
@@ -508,6 +526,13 @@ class MissionManagerNode(Node):
             map_frame=self.map_frame,
             base_frame=self.base_frame,
         )
+        # One-sample observations of the localized G1 while the robot stands still for
+        # planning: they keep the estimate's stamp fresh, never move it.
+        self._refresh_adapter = TargetLocalizationAdapter(
+            self.tf_buffer,
+            map_frame=self.map_frame,
+            base_frame=self.base_frame,
+        )
 
         status_qos = QoSProfile(depth=1)
         status_qos.durability = DurabilityPolicy.TRANSIENT_LOCAL
@@ -584,6 +609,7 @@ class MissionManagerNode(Node):
             'parking_side_sector_half_deg', 'parking_rear_sector_half_deg',
             'parking_front_sector_half_deg'))
         self.target_axis_max_shift_m = float(self.get_parameter('target_axis_max_shift_m').value)
+        self.target_body_check = bool(self.get_parameter('target_body_check').value)
         self.parking_max_attempts = int(self.get_parameter('parking_max_attempts').value)
         self.parking_retry_exclusion_rad = math.radians(
             float(self.get_parameter('parking_retry_exclusion_deg').value))
@@ -599,6 +625,7 @@ class MissionManagerNode(Node):
         self._plan_rays_grid = None
         self.target_heading = None
         self._overhead_points = None
+        self._localization_box = None
         self._depth_frames = deque(
             maxlen=int(self.get_parameter('target_orientation_frames').value))
         self._camera_intrinsics = None
@@ -627,6 +654,9 @@ class MissionManagerNode(Node):
         self.observation_camera_frame = str(self.get_parameter('observation_camera_frame').value)
         self.observation_camera_half_view_rad = float(
             self.get_parameter('observation_camera_half_view_rad').value)
+        self.first_view_turn_min_rad = math.radians(
+            float(self.get_parameter('first_view_turn_min_deg').value))
+        self._confirmed_ray = None
         self._g1_exploration_deadline_s = None
         self._g1_explorer_resumed = False
         self._g1_frontiers_exhausted = False
@@ -751,6 +781,12 @@ class MissionManagerNode(Node):
         self.clearance_limits = ClearanceLimits(
             margin_m=float(self.get_parameter('parking_lidar_margin_m').value),
             scan_max_age_s=float(self.get_parameter('parking_lidar_max_age_s').value))
+        # Planned poses keep the LiDAR check's margin to mapped obstacles at their final
+        # tolerance; in the 2026-11-08 workstation runs the planner chose poses 0.017 and
+        # 0.079 m from G1's mapped legs, and the LiDAR check vetoed both approaches.
+        self.planner_config = replace(
+            self.planner_config,
+            min_obstacle_clearance_m=self.clearance_limits.margin_m + self.final_xy_tolerance_m)
         self._scans = {}
         self._laser_in_base = {}
         self._clearance = None
@@ -909,13 +945,18 @@ class MissionManagerNode(Node):
                     self._fall_back_to_observation_pose(
                         'target localization did not stabilize in place')
                     return
+                # A position refused by the depth check is a perception failure; say so.
+                unverified = (self.last_issue is not None
+                              and self.last_issue.code == 'target_position_unverified')
+                detail = (f'; G1 position not verified in depth: {self.last_issue.reason}'
+                          if unverified else '')
                 if self._give_up_parking('target_localization_timeout',
-                                         'G1 not relocalized for the next parking attempt'):
+                                         f'G1 not relocalized for the next parking attempt{detail}'):
                     self._localization_deadline_s = None
                     return
                 self._fail_terminal(
                     'target_localization_timeout',
-                    'Target localization did not stabilize before the timeout',
+                    f'Target localization did not stabilize before the timeout{detail}',
                 )
                 return
             if self.state == MissionState.G1_LOCALIZED:
@@ -930,20 +971,23 @@ class MissionManagerNode(Node):
                 MissionState.STOPPING_EXPLORATION,
                 MissionState.SETTLING_MOTION,
                 MissionState.LOCALIZE_G1,
-            ):
+            ) + _REFRESH_STATES:
                 self._guard_failed(
                     'target detection',
                     f'detections are ignored in {self.state.name}',
                 )
                 return
 
-            # Search and the first localization keep the G1 floor; relocalizing a
-            # localized G1 may associate weaker views, gated by position below.
+            # Search keeps the G1 floor. Once G1 is confirmed, its first localization and
+            # later relocalizations may associate weaker views of the same G1, gated in
+            # process_measurement by the confirmed detection's ray or the known position.
             result = self.detection_adapter.observe(
                 msg,
                 minimum_score=(
                     RELOCALIZATION_DETECTION_THRESHOLD
-                    if self.target_position is not None else None
+                    if self.target_position is not None or (
+                        self._confirmed_ray is not None and self.state != MissionState.SEARCH_G1)
+                    else None
                 ),
             )
             if not result.message_valid:
@@ -965,6 +1009,8 @@ class MissionManagerNode(Node):
 
             self.confirmed_detection = result.selected
             self.target_committed = True
+            self._confirmed_ray = self._detection_ray(
+                result.selected, result.stamp_ns, int(msg.image_width))
             # The original ranked parking sides against the robot pose at commit.
             self.approach_pose = self._current_robot_pose()
             self.get_logger().info(
@@ -1012,6 +1058,9 @@ class MissionManagerNode(Node):
         now_ns: int | None = None,
     ) -> None:
         with self._lock:
+            if self.state in _REFRESH_STATES and self.target_position is not None:
+                self._refresh_target(msg, now_ns)
+                return
             if self.state != MissionState.LOCALIZE_G1:
                 self._guard_failed(
                     'target measurement',
@@ -1042,8 +1091,10 @@ class MissionManagerNode(Node):
                     None if known is None else (known.map_x_m, known.map_y_m)
                 ),
                 weak_minimum_score=(
-                    None if known is None else RELOCALIZATION_DETECTION_THRESHOLD
+                    None if known is None and self._confirmed_ray is None
+                    else RELOCALIZATION_DETECTION_THRESHOLD
                 ),
+                known_ray=None if known is not None else self._confirmed_ray,
             )
             if not result.accepted:
                 details = result.reason
@@ -1055,6 +1106,8 @@ class MissionManagerNode(Node):
                 self._record_recoverable('localization_sample_rejected', details)
                 return
 
+            # The head-region check reads this view's detection box (stationary view).
+            self._localization_box = (association.bbox_xyxy, (msg.image_width, msg.image_height))
             if result.stabilized is None:
                 sample_count = self.localization_adapter.sample_count_for(
                     result.observation.source
@@ -1067,7 +1120,14 @@ class MissionManagerNode(Node):
                 return
 
             self.target_position = result.stabilized
-            self._observe_target_body()
+            unverified = self._observe_target_body()
+            if unverified is not None:
+                # Nothing is planned or parked against a position depth does not show as G1.
+                # The samples start again; the localization deadline bounds the retries.
+                self.target_position = known
+                self.localization_adapter.reset()
+                self._record_recoverable('target_position_unverified', unverified)
+                return
             self._target_map_odom = self._map_odom(Time.from_msg(msg.header.stamp))
             self._localization_deadline_s = None
             self._clear_recoverable_issue()
@@ -1088,13 +1148,41 @@ class MissionManagerNode(Node):
                     'planning uses the larger keep-out margin'
                 )
                 self._planning_deadline_s = self._monotonic() + self.parking_input_timeout_s
-                if self._observation_pose is None:
-                    # A later parking retry relocalizes G1 from here if needed.
-                    self._observation_pose = self._current_robot_pose()
+                # A later relocalization falls back to the latest pose G1 was localized and
+                # verified from: the first one can be 10 m away (2026-11-09), and the return
+                # to it then ran past its deadline.
+                self._observation_pose = self._current_robot_pose() or self._observation_pose
                 # Plan from the map at hand first; a planning failure that more mapping
                 # could resolve resumes the explorer instead (_fail_planning).
                 if self.parking_planning_enabled or not self._maybe_explore_around_g1():
                     self.try_plan_parking(self._monotonic(), now_ns=now_ns)
+
+    def _refresh_target(self, msg, now_ns):
+        """While the robot stands still for planning, a new observation of G1 within the
+        localization's sample jump of its estimate renews the estimate's stamp: the
+        freshness limit then means that G1 was seen there recently. The position, its depth
+        check and the plan are unchanged; an observation elsewhere renews nothing."""
+        stamp_ns = int(msg.header.stamp.sec) * 1_000_000_000 + int(msg.header.stamp.nanosec)
+        association = self._associations.get(stamp_ns)
+        if association is None:
+            return
+        known = self.target_position
+        self._refresh_adapter.reset()
+        result = self._refresh_adapter.observe(
+            msg, association=association,
+            now_ns=self.get_clock().now().nanoseconds if now_ns is None else int(now_ns),
+            known_target=(known.map_x_m, known.map_y_m),
+            weak_minimum_score=RELOCALIZATION_DETECTION_THRESHOLD)
+        if not result.accepted or result.observation is None or stamp_ns <= known.last_stamp_ns:
+            return
+        seen = result.observation
+        if math.hypot(seen.map_x_m - known.map_x_m, seen.map_y_m - known.map_y_m) > \
+                self._refresh_adapter.max_sample_jump_m:
+            return
+        self.target_position = replace(known, last_stamp_ns=stamp_ns)
+        plan = self.parking_plan
+        if plan is not None and (plan.target.x, plan.target.y) == (known.map_x_m, known.map_y_m):
+            plan.target = replace(plan.target, stamp_ns=stamp_ns)
 
     def reset_mission(self, *, clear_start_pose: bool = True) -> None:
         """Reset manager-local state; MissionGuard resume remains explicit."""
@@ -1126,6 +1214,7 @@ class MissionManagerNode(Node):
             self._g1_preview_map, self._g1_planned_cells = None, set()
             self.target_heading = None
             self._overhead_points = None
+            self._localization_box = None
             self._g1_best_planned_rank = PREFERENCE_RANKS
             self._parking_attempts, self._failed_bearings = 0, []
             self._failed_labels, self._failed_sides, self._last_veto_xy = [], set(), None
@@ -1157,6 +1246,7 @@ class MissionManagerNode(Node):
             self.detection_adapter.reset()
             self.localization_adapter.reset()
             self.confirmed_detection = None
+            self._confirmed_ray = None
             self.target_committed = False
             self.target_position = None
             self.approach_pose = None
@@ -1400,10 +1490,51 @@ class MissionManagerNode(Node):
             if self._transition(MissionState.RETURNING_TO_OBSERVATION, f'{reason}; {how}'):
                 self._set_goal_tolerance(self.observation_tolerance, self._send_observation_goal)
             return
+        turn = self._first_view_turn() if self.target_position is None else None
+        if turn is not None:
+            goal, how = turn
+            # If G1 is not localized after the turn, the robot turns back once: the detector's
+            # score depends on the exact view, and the centred view can score lower.
+            self._observation_pose = self._current_robot_pose()
+            self._observation_goal, self._observation_fallback = goal, self._observation_pose is not None
+            if self._transition(MissionState.RETURNING_TO_OBSERVATION, f'{reason}; {how}'):
+                self._set_goal_tolerance(self.observation_tolerance, self._send_observation_goal)
+            return
         self.motion.reset()
         self._motion_deadline_s = self._monotonic() + self.motion_settlement_timeout_s
         self._transition(MissionState.SETTLING_MOTION,
                          f'{reason}; waiting for physical motion settlement')
+
+    def _detection_ray(self, candidate, stamp_ns, image_width):
+        """((x, y), (ux, uy)): the map camera ray through the detection's centre column,
+        from the camera pose at the detection's stamp."""
+        if self._camera_intrinsics is None:
+            return None
+        view = self._camera_view_at(Time(nanoseconds=int(stamp_ns))) or self._camera_view_at(Time())
+        if view is None:
+            return None
+        fx, _, cx, _ = self._camera_intrinsics
+        scale = (2.0 * cx / image_width) if image_width > 0 and cx > 0 else 1.0
+        u = 0.5 * (candidate.bbox_xyxy[0] + candidate.bbox_xyxy[2]) * scale
+        bearing = view[2] - math.atan2(u - cx, fx)
+        return (view[0], view[1]), (math.cos(bearing), math.sin(bearing))
+
+    def _first_view_turn(self):
+        """(goal, description) turning the camera in place parallel to the confirmed
+        detection's ray, or None when it already points within the limit or no ray exists.
+        The robot stops within its stopping distance of the ray's origin, small against the
+        detection ranges, so the ray's direction is the bearing to G1."""
+        if self._confirmed_ray is None:
+            return None
+        robot, view = self._current_robot_pose(), self._camera_view()
+        if robot is None or view is None:
+            return None
+        _, (ux, uy) = self._confirmed_ray
+        offset = normalize_angle(math.atan2(uy, ux) - view[2])
+        if abs(offset) < self.first_view_turn_min_rad:
+            return None
+        return ((robot[0], robot[1], normalize_angle(robot[2] + offset)),
+                f'turning toward the confirmed G1 detection in place ({math.degrees(offset):+.0f} deg)')
 
     def _reacquisition_goal(self):
         """(goal, description): the current position facing G1, when the camera range allows
@@ -1444,6 +1575,7 @@ class MissionManagerNode(Node):
             return
         self._motion_deadline_s = None
         self._depth_frames.clear()
+        self._localization_box = None
         self.localization_adapter.reset()
         self._clear_recoverable_issue()
         self._localization_deadline_s = self._monotonic() + self.localization_timeout_s
@@ -2319,9 +2451,12 @@ class MissionManagerNode(Node):
 
     def _camera_view(self):
         """(x, y, heading) in the map of the camera's optical axis (+z), or None."""
+        return self._camera_view_at(Time())
+
+    def _camera_view_at(self, stamp):
         try:
             transform = self.tf_buffer.lookup_transform(
-                self.map_frame, self.observation_camera_frame, Time())
+                self.map_frame, self.observation_camera_frame, stamp)
         except TransformException:
             return None
         t, q = transform.transform.translation, transform.transform.rotation
@@ -2484,6 +2619,17 @@ class MissionManagerNode(Node):
             self.get_logger().info(f'LiDAR clearance in {self.state.name}: '
                                    f'{self._clearance_legs.get(self.state.value)}')
         if self.state == MissionState.RETURNING_TO_OBSERVATION:
+            if self.target_position is None:
+                # The turn before the first localization: localize from wherever it stopped.
+                if not ok:
+                    self.get_logger().warning(f'Turn toward the confirmed G1 detection failed: {detail}; '
+                                              'localizing from here')
+                self.motion.reset()
+                self._motion_deadline_s = self._monotonic() + self.motion_settlement_timeout_s
+                self._transition(MissionState.SETTLING_MOTION,
+                                 'turn toward G1 finished; waiting for physical motion settlement')
+                self._restore_shared_tolerance('the turn toward G1')
+                return
             if not ok and self._observation_fallback:
                 self._fall_back_to_observation_pose(f'turn toward G1 failed: {detail}')
                 return
@@ -3147,33 +3293,72 @@ class MissionManagerNode(Node):
         return None if self.target_heading is None else self.target_heading.yaw_rad
 
     def _observe_target_body(self):
-        """G1's heading and body axis from this localization's stationary depth frames. The
-        heading only ranks poses at the next planning, and is None when the frames do not
-        show it reliably. The axis replaces the surface-based position, which the forearms
-        pull toward a camera G1 faces; the keep-out reference stays generic."""
+        """G1's heading and body axis from this localization's stationary depth frames, and
+        whether depth shows G1 at the position: None when it does, else why not.
+
+        The detector's surface estimate is first checked against G1's head region in the
+        detection box, and re-seeded on the head when another object (a worktable edge, a
+        panel's end) is what the surface range measured. The axis then replaces the
+        surface-based position, which the forearms pull toward a camera G1 faces; the
+        keep-out reference stays generic. A position is used only with G1's torso above
+        it. The heading only ranks poses at the next planning, and is None when the frames
+        do not show it reliably."""
         frames = list(self._depth_frames)
         self._depth_frames.clear()
-        center = (self.target_position.map_x_m, self.target_position.map_y_m)
+        surface = center = (self.target_position.map_x_m, self.target_position.map_y_m)
         rotation_translation = self._camera_to_map()
+        if rotation_translation is None or self._camera_intrinsics is None:
+            if self.target_body_check:
+                return f'camera transform or intrinsics unavailable for {len(frames)} depth frames'
+            self.target_heading = None
+            return None
+        camera_xy = rotation_translation[1][:2]
+        depths = [d for d in (depth_metres(msg) for msg in frames) if d is not None]
+        clouds = [depth_to_map_points(d, self._camera_intrinsics, *rotation_translation)
+                  for d in depths]
+        head = None
+        if self._localization_box is not None and depths:
+            box_xyxy, image_size = self._localization_box
+            box = box_pixels(box_xyxy, image_size, depths[0].shape)
+            head = combined_head([head_observation(d, box, self._camera_intrinsics,
+                                                   *rotation_translation) for d in depths])
+        if head is None and self.target_body_check:
+            return (f'no consistent depth in the head region of the detection box '
+                    f'({len(depths)} depth frames)')
+        if head is not None:
+            offset = surface_offset_from_head(surface, head, camera_xy)
+            if not surface_is_g1(offset):
+                center = head_axis(head, camera_xy)
+                self.get_logger().warning(
+                    f'G1 surface estimate ({surface[0]:.3f}, {surface[1]:.3f}) lies {offset:+.2f} m '
+                    f'{"in front of" if offset > 0 else "behind"} G1\'s head at {head.range_m:.2f} m: '
+                    f'another object in the detection box; position re-seeded on the head '
+                    f'({center[0]:.3f}, {center[1]:.3f})')
         estimates, axes = [], []
-        if rotation_translation is not None and self._camera_intrinsics is not None:
-            for msg in frames:
-                depth = depth_metres(msg)
-                if depth is not None:
-                    points = depth_to_map_points(depth, self._camera_intrinsics, *rotation_translation)
-                    estimates.append(estimate_target_yaw(points, center))
-                    axes.append(estimate_body_axis(points, center, rotation_translation[1][:2]))
-                    # The latest view also shows what the 2D LiDARs pass under.
-                    self._overhead_points = overhead_obstacle_points(points, center)
-        self.target_heading = combined_estimate(estimates)
+        for points in clouds:
+            estimates.append(estimate_target_yaw(points, center))
+            axes.append(estimate_body_axis(points, center, camera_xy))
         axis = combined_axis(axes)
-        if axis is None or math.hypot(axis[0] - center[0], axis[1] - center[1]) > self.target_axis_max_shift_m:
+        if axis is not None and math.hypot(axis[0] - center[0], axis[1] - center[1]) <= self.target_axis_max_shift_m:
+            position = axis
+            self.get_logger().info(f'G1 position from its body axis: ({axis[0]:.3f}, {axis[1]:.3f}), '
+                                   f'surface estimate ({surface[0]:.3f}, {surface[1]:.3f})')
+        else:
+            position = center
             self.get_logger().info(f'G1 position kept at ({center[0]:.3f}, {center[1]:.3f}): '
                                    f'body axis {axis} not usable')
-        else:
-            self.target_position = replace(self.target_position, map_x_m=axis[0], map_y_m=axis[1])
-            self.get_logger().info(f'G1 position from its body axis: ({axis[0]:.3f}, {axis[1]:.3f}), '
-                                   f'surface estimate ({center[0]:.3f}, {center[1]:.3f})')
+        torso = [torso_points(points, position) for points in clouds]
+        if self.target_body_check and not torso_confirmed(torso):
+            return (f'depth shows no G1 torso above ({position[0]:.3f}, {position[1]:.3f}): '
+                    f'{torso} points in {len(clouds)} frames')
+        self.target_position = replace(self.target_position, map_x_m=position[0], map_y_m=position[1])
+        if clouds:
+            # The view also shows what the 2D LiDARs pass under.
+            self._overhead_points = overhead_obstacle_points(clouds[-1], position)
+        self.target_heading = combined_estimate(estimates)
+        if head is not None:
+            self.get_logger().info(f'G1 verified in depth: head {head.range_m:.2f} m from the camera, '
+                                   f'torso points {torso}')
         if self.target_heading is None:
             self.get_logger().info(f'G1 heading unknown: no reliable forearm view in {len(frames)} '
                                    'depth frames; parking ranking stays undirected')
@@ -3182,6 +3367,7 @@ class MissionManagerNode(Node):
                 f'G1 heading {math.degrees(self.target_heading.yaw_rad):.1f} deg from depth: '
                 f'{self.target_heading.support_points} points, inliers '
                 f'{self.target_heading.inlier_fraction}')
+        return None
 
     def _camera_to_map(self):
         """(rotation, translation) from the colour optical frame depth is aligned to; the

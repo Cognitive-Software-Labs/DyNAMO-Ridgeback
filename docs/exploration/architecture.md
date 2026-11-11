@@ -111,6 +111,12 @@ validation gates before motion is enabled.
 `frontier_explorer_node` reads the Nav2 global costmap, chooses frontiers, and
 sends `NavigateToPose` goals. It is the only supported explorer; its sources
 live under `src/ridgeback_autonomy/ridgeback_autonomy/frontier_explorer/`.
+Each goal faces from the robot towards the goal (`navigator.facing_quaternion`),
+so the forward camera looks along the way into the frontier; with the earlier
+fixed yaw the holonomic base often drove sideways or backwards. The shared goal
+checker keeps its heading tolerance (0.40 rad), which the mission's return,
+observation and parking goals rely on; the group's `dev` also relaxes it to any
+heading (`ede9bd1`), which is not applied here.
 
 ### Navigation ownership handoff
 
@@ -181,6 +187,46 @@ was 0.025 m from ground truth on average (maximum 0.049 m) over the same 72
 views, from any seed. It uses no forearms and does not feed the heading. The
 keep-out reference stays `generic_target_position`.
 
+### G1 position check
+
+The detector's surface estimate is the nearest surface in G1's whole detection
+box. When something stands in front of G1's legs or beside it, that is the other
+object: on 2026-11-08 a worktable's edge 1.25 m in front of G1 and a panel's end
+about 1 m off, and the first of those runs parked beside the table and reported
+`MISSION_COMPLETE`. Each localization therefore checks the position against G1
+itself in the same stationary depth frames (`target_orientation.py`):
+
+1. The top quarter of the detection box, across its middle 40%, is G1's head and
+   upper torso: above a worktable or bed, and away from the box's sides. The
+   nearest fifth of those depths gives G1's range (3 of 5 frames within 0.10 m).
+2. A surface estimate more than 0.50 m in front of that range (G1's forearm tips
+   reach 0.44 m forward of its axis) or 0.30 m behind it is another object, and
+   the position is re-seeded on the head, 0.07 m behind its surface.
+3. The body axis is then taken from the legs around that seed, as above.
+4. The position is used only when at least 20 depth points stand within 0.25 m
+   of it at 0.85-1.40 m, G1's torso and head, in 3 of the frames.
+
+Otherwise the localization is not accepted (`target_position_unverified`): the
+samples start again, and the existing localization deadline ends the attempt as a
+timeout, with the observation-pose fallback or the return after a parking attempt.
+Nothing is planned or parked against an unverified position. On Gazebo views
+recorded at the 2026-11-08 run poses, the checked position was 0.018-0.034 m from
+G1's ground truth, including both mislocalized views; there was no torso on the
+table edge the run had parked beside. The shared estimators and benchmarks are
+unchanged. `target_body_check` turns the check off only for tests without depth.
+
+Before the first localization the robot turns its camera in place toward the
+confirmed detection when the stop left it more than `first_view_turn_min_deg`
+(10°) off the camera axis: the bearing comes from the detection box's centre
+column and the camera pose at that detection's stamp. Detections confirmed while
+the robot moved otherwise ended at an image edge (score 0.445 with G1 cut off) or
+out of view after the stopping distance. The turn uses the observation goal
+checker below; if it fails, the robot localizes from where it stopped. If G1 is
+not localized after the turn, the robot turns back once to the view it stopped
+in, as the observation-pose fallback below: the detector's score depends on the
+exact view, and on 2026-11-09 the centred view of G1 7 m away scored below 0.40
+where the views before the turn had scored 0.42-0.52.
+
 The heading only orders candidates, and only when planning runs; it never
 changes a footprint, keep-out, reach, route or LiDAR check, or a ray's colour,
 and a goal is never changed while driving. Without a heading, the ranking is the
@@ -202,7 +248,11 @@ a safe alternative. With a heading, the clearance score also counts G1's legs,
 the keep-out is a circle while G1 is wider than deep, and its mapped leg cells
 are too coarse to separate poses whose real leg clearance differs by centimetres.
 The LiDAR monitor treats those legs as obstacles, so a pose with little real
-clearance is stopped on the final approach.
+clearance is stopped on the final approach. A valid pose therefore also keeps the
+monitor's margin plus the final-pose tolerance (0.05 + 0.03 m) to occupied cell
+centres, G1's mapped legs included (`obstacle_clearance` otherwise): on
+2026-11-08 the planner chose poses 0.017 and 0.079 m from G1's mapped legs and
+the monitor vetoed both approaches. The reach band itself is unchanged.
 Nothing verifies that G1's hands can reach the rear bin. With the held forearms,
 the nearest hand is about 0.53 m from the task point straight beside G1, 0.23 m at
 the front edge of the side sector, and 0.9 m behind G1; the manager logs this
@@ -272,16 +322,22 @@ If the camera is `g1_reacquire_min_range_m`–`g1_reacquire_max_range_m`
 (1.7–3.5 m) from the G1 estimate, the robot turns in place to point the camera
 at it. Closer, G1's feet leave the image: the camera is 1.03 m up with a 32°
 vertical half view. Otherwise, and once if the turn, its view check or the localization
-fails, it returns to the observation pose: the pose at which G1 was first
-localized, where the detector has already found it. The detector's score near
+fails, it returns to the observation pose: the latest pose from which G1 was
+localized and verified, where the detector has already found it. (The first
+localization can be 10 m away; returning there ran past its deadline.) The detector's score near
 its threshold depends on the exact view: a lateral shift of 0.1 m or an 18°
 turn can put the same, fully visible G1 just below it, and a static simulated
 view scores the same on every frame. Relocalizing a G1 that already has a
 position therefore uses hysteresis: search confirmation (three of five frames)
-and the first localization keep the mission's G1 floor of 0.50, while a later
-relocalization also accepts the same label from 0.40 when that sample's map
-position lies within the 0.75 m sample jump of the known G1
-(`weak_detection_away_from_known_target` otherwise). The parking launch runs the
+keeps the mission's G1 floor of 0.50, while a later relocalization also accepts
+the same label from 0.40 when that sample's map position lies within the 0.75 m
+sample jump of the known G1 (`weak_detection_away_from_known_target` otherwise).
+The first localization has no G1 position yet; it accepts the same label from
+0.40 only within 0.75 m of the confirmed detection's camera ray (the box centre's
+bearing from the camera pose at that detection), ahead of the camera. G1 confirmed
+at 0.556 from about 9 m while the robot moved scored 0.44 on every frame of the
+static view after the stop (2026-11-09), as earlier workstation runs did at
+0.42-0.45. Every position is still checked for G1's head and torso in depth. The parking launch runs the
 detector at that 0.40 floor in local localization mode; generic exploration and
 benchmarking keep 0.55. Both goals apply a
 temporary goal checker of 0.03 m and 0.10 rad (`observation_xy_tolerance_m`,

@@ -4,7 +4,11 @@ from dataclasses import dataclass
 import math
 
 
-FAULT_REASONS = frozenset({'odometry_frame', 'odometry_nonfinite', 'odometry_timestamp',
+# An odometry stamp ahead of this node's clock is not one: after blocking path checks
+# the node's clock callback trails the odometry, so such a sample only restarts the
+# stationary interval, which must still complete within the settlement timeout. On
+# 2026-11-05 and 2026-11-09 it discarded verified plans after long route checks.
+FAULT_REASONS = frozenset({'odometry_frame', 'odometry_nonfinite',
                            'odometry_not_advancing', 'robot_moving'})
 
 

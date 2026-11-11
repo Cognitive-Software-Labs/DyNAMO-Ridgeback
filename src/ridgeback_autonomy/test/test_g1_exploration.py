@@ -706,7 +706,8 @@ def test_one_valid_side_does_not_stop_the_other_from_being_evaluated(manager_fac
 
 def test_blocked_sides_are_decided_and_the_rear_is_planned_without_exploring(
         manager_factory, monkeypatch):
-    table = lambda d, a: (d > 0.75) & (d < 1.0) & sides(d, a)
+    # A table beside G1, far enough that rear poses keep the LiDAR clearance margin to it.
+    table = lambda d, a: (d > 0.95) & (d < 1.2) & sides(d, a)
     m = localized_on(manager_factory, NOTHING, occupied=table,
                      prepare=seeing(monkeypatch, [WEST] * 5))
     assert m.resume_client.calls == []

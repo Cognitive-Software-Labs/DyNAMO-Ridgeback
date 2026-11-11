@@ -157,15 +157,27 @@ error and clearance come from Gazebo ground truth. Clearance is the smallest
 plan distance between a robot part (base, mast, camera, basket) and an
 obstacle collision box at an overlapping height, or G1's 0.19 m lower body. It is
 sampled at about 1 Hz, so it can miss a brief closer approach. Isaac runs report
-estimated state only. Bags hold only the mission state, parking display, plan
-and map; scans are not recorded.
+estimated state only. Bags hold the mission state, parking display, plan, map,
+detections and both 2D scans. The G1 localization error is the distance from the
+position the mission used to G1's ground truth, with the SLAM map frame taken as
+the world frame (both start at the spawn), so it includes SLAM drift.
+
+`probe_g1_views.sh SCENARIO OUT_DIR NAME:X:Y:YAW_DEG...` (Gazebo) starts a
+`--plan-only` scene, moves the robot to each pose with `capture_g1_views.py` and
+saves what the camera sees of G1 there: depth frames, the camera pose, the
+detector's boxes and G1's ground truth, for offline localization review. The
+robot is moved, so that session's map is not usable afterwards.
+`make_g1_view_fixture.py` cuts small test fixtures from those recordings
+(`test/data/g1_views_2026-11-09.npz`).
 
 ## Limitations
 
 - The basket, the mast-top enclosure and G1's hand reach are not measured.
 - Height is checked only near G1 and only where the camera has looked.
-- Side poses come close to G1's legs; the LiDAR monitor stops such approaches,
-  and a retry moves to another side.
+- Side poses come close to G1's legs: the reach band leaves 0.12-0.15 m between
+  the rear edge and G1's legs, and the LiDAR monitor stops approaches whose map
+  pose has drifted that far relative to G1's estimate; a retry moves to another
+  side.
 - A static view of a side-on G1 against a matching background can still score
   below 0.40, and relocalization then times out without parking.
 - During G1-centred exploration the shared explorer can stop within a few

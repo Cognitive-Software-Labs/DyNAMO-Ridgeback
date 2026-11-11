@@ -245,6 +245,25 @@ def test_delayed_odometry_restart_keeps_a_feasible_plan_and_waits_to_drive(manag
     assert m.state == MissionState.NAVIGATING_TO_PREPARKING
 
 
+def test_odometry_ahead_of_a_lagging_node_clock_restarts_instead_of_invalidating(
+        manager_factory, monkeypatch):
+    """Test A run 5 on 2026-11-09: after the path checks of an 8.1 m route, an odometry
+    stamp ahead of the manager's clock discarded the verified plan
+    (motion_evidence_lost: odometry_timestamp) with the robot standing still."""
+    m, _ = feasible(manager_factory, monkeypatch, enabled=False)
+    m.parking_navigation_enabled = True
+    ns, wall = m.motion.last_ns + 100_000_000, m.motion.last_wall + 0.1
+    m.motion.observe((0.,) * 6, ns + 300_000_000, ns, wall)    # stamped ahead of the clock
+    assert m.motion.reason == 'odometry_timestamp'
+    m.test_ros_ns, m._monotonic.value = ns, wall
+    m.tick()
+    assert m.state == MissionState.PARKING_PATH_FEASIBLE   # plan kept, not driven yet
+    hold_still(m)
+    m.tf_buffer.stamp_ns = m.test_ros_ns
+    m.tick()
+    assert m.state == MissionState.NAVIGATING_TO_PREPARKING
+
+
 def test_motion_after_planning_still_invalidates_the_plan(manager_factory, monkeypatch):
     m, _ = feasible(manager_factory, monkeypatch, enabled=False)
     _delayed_sample(m, velocity=0.05, wall_gap=0.1)

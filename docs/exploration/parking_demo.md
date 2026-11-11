@@ -124,8 +124,12 @@ different from its committed USD. Manager odometry defaults to
 `platform/odom/filtered` on Gazebo and `platform/odom` on Isaac, with
 `odometry_topic:=...` available as an override. Nav2 retains filtered odometry.
 The detector runs at `detection_threshold:=0.40` in local localization mode, for
-the [relocalization hysteresis](architecture.md#observation-return); the mission
-still confirms and first localizes G1 at 0.50.
+the [localization hysteresis](architecture.md#observation-return); the mission
+still confirms G1 at 0.50. Every localized position must show
+G1's head and torso in the same depth frames
+([G1 position check](architecture.md#g1-position-check)): a worktable or panel
+inside G1's detection box no longer becomes G1's position, and a position that
+fails the check is never planned or parked against.
 Use the normal pinned dependency installation, including the maintained
 Clearpath sensor and namespaced SLAM patches; an old system-only generator is
 not the repository's sensor contract.

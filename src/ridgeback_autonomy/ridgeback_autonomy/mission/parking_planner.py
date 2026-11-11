@@ -163,6 +163,10 @@ class PlannerConfig:
     # Planned reach is capped at reach_max_m - reach_allowance_m so the actual
     # reach stays inside the band after final-pose and target-reference error.
     reach_allowance_m: float = 0.0
+    # Clearance a valid pose keeps to occupied map cells (G1's legs included): the live
+    # LiDAR clearance margin plus the final-pose tolerance, so a pose the parking legs'
+    # LiDAR check would veto on arrival is not planned. 0 disables it.
+    min_obstacle_clearance_m: float = 0.0
 
 
 @dataclass
@@ -569,6 +573,8 @@ def plan_parking(
         + config.clearance_cap_m)
     unsafe = near & ((values == -1) | (values >= config.occupied_threshold))
     unsafe_xy = (cx[unsafe], cy[unsafe])
+    occupied = near & (values >= config.occupied_threshold)
+    occupied_xy = (cx[occupied], cy[occupied])
     if target.facing_yaw_rad is not None:
         # Quality only, never validity: the keep-out is a circle, but G1 is wider than deep.
         left_x = -math.sin(target.facing_yaw_rad) * G1_LEG_LATERAL_M
@@ -599,6 +605,12 @@ def plan_parking(
                 decision.status, decision.reason = 'rejected', 'reach_budget'
         if decision.status == 'valid':
             decision.clearance_m = footprint_clearance_m(polygon, grid, unsafe_xy, config.clearance_cap_m)
+            # To occupied cell centres: the LiDAR returns that mapped a cell lie around its
+            # centre, and SLAM already spreads G1's legs (0.17 m) over cells up to 0.23 m.
+            if (config.min_obstacle_clearance_m > 0.0 and occupied_xy[0].size and float(
+                    points_to_polygon_distance(occupied_xy[0], occupied_xy[1], polygon).min())
+                    < config.min_obstacle_clearance_m):
+                decision.status, decision.reason = 'rejected', 'obstacle_clearance'
         plan.candidates.append(decision)
     if rays:
         plan.radial_rays = radial_profile(grid, target, config, plan.candidates)

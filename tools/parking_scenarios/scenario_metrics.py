@@ -139,6 +139,22 @@ def run(d):
     m['g1_heading_estimated'] = 'facing_yaw' in log or 'G1 heading' in log
     heads = re.findall(r'G1 heading[^\n]*?(-?\d+\.\d+) ?(?:deg|°)', log)
     m['g1_heading_log'] = heads[-1] if heads else None
+    # The G1 positions the mission used: since 2026-11-09 each must be followed by its depth
+    # check ("G1 verified in depth"); an unverified one is never used.
+    used, pending = [], None
+    for line in log.splitlines():
+        found = re.search(r'G1 position (?:from its body axis|kept at):? \((-?[\d.]+), (-?[\d.]+)\)', line)
+        if found:
+            pending = (float(found[1]), float(found[2]))
+            if 'G1 verified in depth' not in log:
+                used.append(pending)
+        elif 'G1 verified in depth' in line and pending:
+            used.append(pending)
+        elif 'target_position_unverified' in line:
+            pending = None
+    m['g1_estimates'] = used
+    m['unverified_localizations'] = len(re.findall(r'Recoverable mission issue \[target_position_unverified\]', log))
+    m['reseeded_on_head'] = len(re.findall(r'position re-seeded on the head', log))
     m['returned_to_start'] = 'Arrived at start' in log or 'returned to start pose' in log
     m['parked'] = any(b == 'PARKED' for t, a, b, w in tr)
     path = f'{d}/truth_track.csv'
@@ -149,6 +165,13 @@ def run(d):
     g1 = next(((float(r[4]), float(r[5]), float(r[6])) for r in rows if r[4]), None)
     obs = obstacles(layout)
     m['g1_truth'] = [round(v, 3) for v in g1] if g1 else None
+    if g1 and used:
+        # The SLAM map frame starts at the spawn, which is the world origin: map = world.
+        m['localization_errors_m'] = [round(math.hypot(x - g1[0], y - g1[1]), 3) for x, y in used]
+        m['localization_error_m'] = m['localization_errors_m'][-1]
+    if g1 and m['g1_heading_log'] is not None:
+        rel = math.radians(float(m['g1_heading_log'])) - g1[2]
+        m['heading_error_deg'] = round(abs(math.degrees(math.atan2(math.sin(rel), math.cos(rel)))), 1)
     if track:
         c = min((clearance(x, y, yaw, obs, g1[:2] if g1 else None) + (t,) for t, x, y, yaw in track),
                 key=lambda v: v[0])
