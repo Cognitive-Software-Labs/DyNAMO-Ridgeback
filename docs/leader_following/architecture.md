@@ -149,7 +149,13 @@ their start poses until the follow stack publishes. It also writes
 `robot_truth.csv` from simulator truth: the Isaac rig pose, or the Gazebo
 `r100_0001/robot` model pose. Gazebo's odometry topic is
 `platform/odom/filtered`; pass `odom_topic:=platform/odom/filtered` to the
-launch. Run the two in one private ROS domain:
+launch. Gazebo's mecanum wheel model reports about twice the true heading
+change when the base strafes while turning, and Clearpath's EKF takes
+absolute yaw from wheel odometry. Gazebo `--drive` runs therefore write a
+run-local `ekf_node` override that fuses only wheel velocities and takes yaw
+from the IMU rate. Wheel velocities still overstate strafing, so odometry
+position can drift by about a metre over the explainer scene; heading stays
+within about one degree. Run the two in one private ROS domain:
 
 ```bash
 export ROS_DOMAIN_ID=171 RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
@@ -193,3 +199,4 @@ wrapper on 24,000 scripted frames with no differences.
 - [First closed-loop following in Isaac](../../archive/engineering/2026-11-11-f4-first-follow.md) — leader-alone tuning runs and distance-keeping results.
 - [Closed-loop following in Gazebo](../../archive/engineering/2026-11-11-f4-gazebo-follow.md) — first Gazebo leader-alone run.
 - [Following speed and heading in the explainer office](../../archive/engineering/2026-11-11-f4-office-speed.md) — MPPI speed cap, stop zone, leader-facing turn control and the Gazebo lock losses.
+- [Gazebo odometry heading during following](../../archive/engineering/2026-11-11-f4-gazebo-odometry.md) — mecanum yaw error, the IMU-yaw EKF override and the corrected explainer result.

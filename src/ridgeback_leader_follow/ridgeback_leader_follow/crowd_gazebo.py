@@ -25,6 +25,36 @@ def wait_for_follower(drive, monitor):
 ROBOT_MODEL = 'r100_0001/robot'
 
 
+# Gazebo's mecanum wheel model reports roughly twice the true heading change
+# when the base strafes while turning (measured 102 deg against 52 deg), and
+# Clearpath's EKF takes absolute yaw from wheel odometry. Closed-loop runs
+# therefore fuse only wheel velocities and take yaw from the IMU rate.
+DRIVE_EKF = {
+    'odom0_config': [False, False, False, False, False, False,
+                     True, True, False, False, False, False,
+                     False, False, False],
+    'imu0': 'sensors/imu_0/data',
+    'imu0_config': [False, False, False, False, False, False,
+                    False, False, False, False, False, True,
+                    True, False, False],
+    'imu0_differential': False,
+    'imu0_queue_size': 10,
+    'imu0_remove_gravitational_acceleration': True,
+}
+
+
+def drive_localization(declaration: dict) -> dict:
+    """Run-local robot declaration for Gazebo closed-loop runs (hardware config untouched)."""
+    import copy
+    result = copy.deepcopy(declaration)
+    extras = result.setdefault('platform', {}).setdefault('extras', {})
+    parameters = extras.get('ros_parameters') or {}
+    if 'ekf_node' in parameters:
+        raise ValueError('robot declaration already overrides ekf_node')
+    extras['ros_parameters'] = {**parameters, 'ekf_node': dict(DRIVE_EKF)}
+    return result
+
+
 def apply_real_time_factor(world: str, factor: float) -> str:
     """Pace a generated world; closed-loop runs slow it so perception keeps up."""
     old = '<real_time_factor>1</real_time_factor>'

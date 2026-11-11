@@ -76,3 +76,14 @@ def test_heading_rate_turns_toward_the_leader_and_saturates():
     assert heading_rate((0., 0., 0.), (0., 2.), 2., 1.) == pytest.approx(1.)
     assert heading_rate((0., 0., 3.), (-2., -.1), 2., 1.) == pytest.approx(
         max(-1., min(1., 2. * math.atan2(math.sin(math.atan2(-.1, -2.) - 3.), math.cos(math.atan2(-.1, -2.) - 3.)))))
+
+
+def test_gazebo_drive_localization_takes_yaw_from_the_imu_only():
+    from ridgeback_leader_follow.crowd_gazebo import drive_localization
+    source = {'platform': {'extras': {'ros_parameters': {}}}}
+    ekf = drive_localization(source)['platform']['extras']['ros_parameters']['ekf_node']
+    assert source == {'platform': {'extras': {'ros_parameters': {}}}}
+    assert ekf['odom0_config'][5] is False and ekf['odom0_config'][11] is False
+    assert ekf['odom0_config'][6] and ekf['odom0_config'][7] and ekf['imu0_config'][11]
+    with pytest.raises(ValueError):
+        drive_localization({'platform': {'extras': {'ros_parameters': {'ekf_node': {}}}}})

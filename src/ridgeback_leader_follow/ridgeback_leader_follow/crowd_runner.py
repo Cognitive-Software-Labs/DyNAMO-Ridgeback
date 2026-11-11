@@ -160,7 +160,11 @@ def main(argv=None):
     (output / 'setup').mkdir()
     import yaml
     declaration=yaml.safe_load((Path.cwd()/'clearpath/robot.yaml').read_text())
-    (output/'setup/robot.yaml').write_text(yaml.safe_dump(tuning.setup_robot(declaration),sort_keys=False))
+    robot_declaration = tuning.setup_robot(declaration)
+    if drive is not None and args.backend == 'gz':
+        from ridgeback_leader_follow.crowd_gazebo import drive_localization
+        robot_declaration = drive_localization(robot_declaration)
+    (output/'setup/robot.yaml').write_text(yaml.safe_dump(robot_declaration,sort_keys=False))
     os.environ['ROS_DOMAIN_ID'] = str(args.ros_domain)
     os.environ.setdefault('RMW_IMPLEMENTATION', 'rmw_cyclonedds_cpp')
     from ament_index_python.packages import get_package_share_directory, get_package_prefix

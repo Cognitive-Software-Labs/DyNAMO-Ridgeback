@@ -1,0 +1,4 @@
+== explainer-gz-diag
+{"duration": 23.95, "correct_s": 11.28, "wrong_s": 0.0, "unmatched_s": 0.0, "not_locked_s": 12.61, "distance_median": 4.36, "distance_error_median": 3.16, "distance_min": 1.43, "final_distance": 12.27, "min_bystander_clearance": 2.38, "status_counts": {"holding": 10, "stopped": 67, "following": 58}}
+== explainer-gz-ekf
+{"duration": 23.95, "correct_s": 20.56, "wrong_s": 0.0, "unmatched_s": 0.0, "not_locked_s": 3.34, "distance_median": 4.96, "distance_error_median": 3.76, "distance_min": 1.44, "final_distance": 5.68, "min_bystander_clearance": 0.33, "status_counts": {"following": 103, "stopped": 19, "holding": 13}}
