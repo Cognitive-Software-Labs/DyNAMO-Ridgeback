@@ -1,0 +1,23 @@
+<!--
+  Leader following: the follow_controller sends one navigate_to_pose goal with
+  this tree, then refreshes the standoff pose on goal_update. Replans at 5 Hz;
+  FollowPath keeps running while the goal moves. Derived from Nav2's
+  follow_point.xml without path truncation (the controller already supplies
+  the standoff point).
+-->
+<root BTCPP_format="4" main_tree_to_execute="MainTree">
+  <BehaviorTree ID="MainTree">
+    <PipelineSequence name="FollowLeader">
+      <ControllerSelector selected_controller="{selected_controller}" default_controller="FollowPath" topic_name="controller_selector"/>
+      <PlannerSelector selected_planner="{selected_planner}" default_planner="GridBased" topic_name="planner_selector"/>
+      <RateController hz="5.0">
+        <GoalUpdater input_goal="{goal}" output_goal="{updated_goal}">
+          <ComputePathToPose goal="{updated_goal}" path="{path}" planner_id="{selected_planner}" error_code_id="{compute_path_error_code}"/>
+        </GoalUpdater>
+      </RateController>
+      <KeepRunningUntilFailure>
+        <FollowPath path="{path}" controller_id="{selected_controller}" error_code_id="{follow_path_error_code}"/>
+      </KeepRunningUntilFailure>
+    </PipelineSequence>
+  </BehaviorTree>
+</root>

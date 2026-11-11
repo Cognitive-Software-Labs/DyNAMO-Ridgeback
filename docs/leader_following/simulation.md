@@ -55,8 +55,10 @@ Gazebo includes the existing Clearpath `robot_spawn` bringup. Isaac reuses the
 committed Ridgeback USD, `RidgebackRig`, `RosIO`, and production camera/lidar
 bindings, with a generated `robot_state_publisher` description. Neither path
 starts frontier exploration, Nav2 or a following controller. No F1 code
-publishes a robot velocity command. Isaac consumes no external drive commands;
-Gazebo's standard command path remains present on the private simulation domain.
+publishes a robot velocity command. Isaac consumes no external drive commands
+unless `--drive` is given for closed-loop following
+([follow_controller](architecture.md#follow_controller-node)); Gazebo's
+standard command path remains present on the private simulation domain.
 
 The robot configuration is copied from `clearpath/robot.yaml` into each run's
 `setup/` directory. Existing host or hardware configurations are not edited.

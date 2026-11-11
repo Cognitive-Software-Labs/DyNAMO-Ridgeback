@@ -99,15 +99,63 @@ injected so a learned re-identification model plugs in unchanged. It is a
 library only and one candidate in the F2 detector and tracker benchmark, not a
 chosen method; it needs `ultralytics` in the compute environment.
 
+## `follow_controller` node
+
+F4 closed-loop following, started in simulation. `follow_controller`
+subscribes to `leader_follow/leader` and sends Nav2's `navigate_to_pose` a
+standoff goal `follow_distance` short of the leader, facing it, with the
+[`follow_leader.xml`](../../src/ridgeback_leader_follow/config/behavior_trees/follow_leader.xml)
+behaviour tree. While the lock holds it refreshes that goal on `goal_update`;
+the tree replans at 5 Hz. The goal leads the leader's smoothed velocity by
+`lead_time` plus the state's age. Without that lead the robot only matched the
+leader's speed and trailed by a constant gap. Within
+`follow_distance + hold_tolerance` the robot only turns to face the leader.
+
+It cancels navigation, which stops the robot, whenever the state is not
+`LOCKED`, is older than `stale_timeout`, is not in `global_frame`, or the robot
+pose is unavailable. Nav2 supplies planning, obstacle clearance, speed limits
+and the collision monitor. `leader_follow/follow_status` publishes
+`following`, `holding` or `stopped` with its reason.
+
+| Parameter | Default | Meaning |
+|---|---|---|
+| `follow_distance` | `1.2` | Metres from robot centre to the leader |
+| `hold_tolerance` | `0.15` | Extra metres within which the robot only turns |
+| `lead_time` | `1.5` | Seconds of predicted leader motion added to the goal |
+| `stale_timeout` | `0.5` | Seconds before a missing `LOCKED` state stops the robot |
+| `global_frame`, `base_frame` | `odom`, `base_link` | Goal frame and robot frame |
+
+`follow_leader.launch.py` starts the F3 recognition pipeline, the Nav2
+servers from `config/follow_nav2_params.yaml` and `follow_controller`. That
+file is the exploration Nav2 configuration with `odom` as the global frame (no
+map or SLAM), a 20 m rolling global costmap without a static layer, a 0.9 m/s
+MPPI forward limit and a 0.3 rad goal heading tolerance. Exploration
+configuration is unchanged. In Isaac, `--drive` lets the crowd runner consume
+`cmd_vel`, paces it to `--real-time-factor` (default 0.5, so perception keeps
+up) and holds people at their start poses until the follow stack publishes.
+It also writes `robot_truth.csv`. Run the two in one private ROS domain:
+
+```bash
+export ROS_DOMAIN_ID=171 RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+OMNI_KIT_ACCEPT_EULA=YES isaac_venv/bin/python -m ridgeback_leader_follow.crowd_runner \
+  --backend isaac --scene-profile f3 --scenario leader_alone --drive --ros-domain 171 &
+ros2 launch ridgeback_leader_follow follow_leader.launch.py
+```
+
+Run both from the workspace root so the tracker finds `perception_venv`.
+Gazebo driving, the remaining scenarios and the plan's metrics are not yet
+implemented.
+
 ## Crowd simulation
 
 The F1 `crowd_scene` and `qualify_crowd` executables provide all six scene
 families, including three crowd densities, in Gazebo and Isaac. They use a
 shared licensed animated human asset, the production Ridgeback model and
 camera/lidar bindings, and separate simulator-observed ground-truth logs.
-The observation robot stays stationary. The [F2 benchmark](benchmarks.md)
+The observation robot stays stationary unless an Isaac run passes `--drive`
+(see [`follow_controller`](#follow_controller-node)). The [F2 benchmark](benchmarks.md)
 evaluates tracking; [F3 recognition](recognition.md) uses separate outfit-profile
-recordings. Following control remains later-phase work.
+recordings.
 
 The [crowd simulation reference](simulation.md) owns scene definitions,
 commands, asset attribution, sensor readiness, recording, artifact contracts,
@@ -120,3 +168,7 @@ repository's
 [`leader_follow` package](https://github.com/Cognitive-Software-Labs/OmTrackVLA/tree/86b1c6e/leader_follow),
 where the state machine was checked against the original OmTrackVLA target
 wrapper on 24,000 scripted frames with no differences.
+
+## Archived evidence
+
+- [First closed-loop following in Isaac](../../archive/engineering/2026-11-11-f4-first-follow.md) — leader-alone tuning runs and distance-keeping results.

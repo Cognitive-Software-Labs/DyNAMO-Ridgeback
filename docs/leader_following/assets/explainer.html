@@ -436,9 +436,10 @@ footer { color: var(--muted); font-size: .85rem; border-top: 1px solid var(--lin
       <p class="done"><b>Done when</b> every network has a row in the results table (correct picks among nearby people, look-alike scene included, and time per frame), the robot locks onto the leader in every scene with the chosen one, and keeps the lock while the leader walks out of camera view.</p>
     </article>
     <article class="task">
-      <div class="task-top"><span class="num">4</span><span class="pill later">then</span></div>
+      <div class="task-top"><span class="num">4</span><span class="pill next">in progress</span></div>
       <h3>Follow in simulation</h3>
       <p>A follow controller that keeps the set distance through the existing navigation stack and moves only while the leader is confirmed.</p>
+      <p>The controller now drives the simulated robot in Isaac behind a lone walking leader, about 1.5 m back, and stops whenever the leader is not confirmed. Gazebo, the other five scenes and the eight scores are still to come.</p>
       <p class="done"><b>Done when</b> all six scenes run start to finish in both simulators, the robot never moves behind the wrong person, and all eight scores are reported for both simulators.</p>
     </article>
     <article class="task">

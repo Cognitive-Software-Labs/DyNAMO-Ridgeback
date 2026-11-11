@@ -15,6 +15,8 @@ if(gz-sim8_FOUND)
 endif()
 install(PROGRAMS ridgeback_leader_follow/leader_identity_node.py
   DESTINATION lib/${PROJECT_NAME} RENAME leader_identity)
+install(PROGRAMS ridgeback_leader_follow/follow_controller.py
+  DESTINATION lib/${PROJECT_NAME} RENAME follow_controller)
 install(PROGRAMS ridgeback_leader_follow/crowd_runner.py
   DESTINATION lib/${PROJECT_NAME} RENAME crowd_scene)
 install(PROGRAMS ridgeback_leader_follow/crowd_qualify.py
@@ -60,6 +62,7 @@ if(BUILD_TESTING)
   ament_add_pytest_test(test_lock_on test/test_lock_on.py)
   ament_add_pytest_test(test_camera_people test/test_camera_people.py)
   ament_add_pytest_test(test_leader_identity test/test_leader_identity.py)
+  ament_add_pytest_test(test_follow_controller test/test_follow_controller.py)
   ament_add_pytest_test(test_crowd_scenarios test/test_crowd_scenarios.py)
   ament_add_pytest_test(test_people_benchmark test/test_people_benchmark.py)
 endif()

@@ -50,9 +50,9 @@ def run_gazebo(scenario, duration, output, writer, gui, record=False, scene_prof
     return run(scenario, duration, output, writer, gui, record, scene_profile, environment, render_quality, tuning)
 
 
-def run_isaac(scenario, duration, output, writer, gui, finish, record=False, scene_profile="baseline", environment=None, render_quality="reference", tuning=None):
+def run_isaac(scenario, duration, output, writer, gui, finish, record=False, scene_profile="baseline", environment=None, render_quality="reference", tuning=None, drive=None):
     from ridgeback_leader_follow.crowd_isaac import run
-    return run(scenario, duration, output, writer, gui, finish, record, scene_profile, environment, render_quality, tuning)
+    return run(scenario, duration, output, writer, gui, finish, record, scene_profile, environment, render_quality, tuning, drive)
 
 
 def main(argv=None):
@@ -76,12 +76,26 @@ def main(argv=None):
     parser.add_argument('--isaac-step-hz', type=int, choices=(30, 60),
                         help='Isaac updates per simulated second (default: recorded timing); '
                              '60 doubles viewport updates while sensors keep their tick rates')
+    parser.add_argument('--drive', action='store_true',
+                        help='Isaac only: move the robot from cmd_vel (closed-loop following); '
+                             'people wait at their start poses until a follow stack publishes')
+    parser.add_argument('--real-time-factor', type=float, default=.5,
+                        help='With --drive: simulated seconds per wall second (perception must keep up)')
     parser.add_argument('--gui', action='store_true', help='Open a simulator window')
     parser.add_argument('--crowd-size', type=int, choices=CROWD_SIZES, default=4)
     parser.add_argument('--record', action='store_true', help='Record sensor topics to a ROS bag')
     parser.add_argument('--ros-domain', type=int, help='Override the private ROS domain (0..232)')
     args = parser.parse_args(argv)
     from ridgeback_leader_follow.simulation_performance import resolve_tuning
+    if args.drive and args.backend != 'isaac':
+        parser.error('--drive currently requires --backend isaac')
+    drive = None
+    if args.drive:
+        from ridgeback_leader_follow.simulation_performance import DriveOptions
+        try:
+            drive = DriveOptions(real_time_factor=args.real_time_factor)
+        except ValueError as error:
+            parser.error(str(error))
     if args.isaac_step_hz is not None and args.backend != 'isaac':
         parser.error('--isaac-step-hz requires --backend isaac')
     tuning=resolve_tuning(args.performance_profile,args.human_detail,args.sensor_quality,args.collision_quality,args.isaac_step_hz)
@@ -135,7 +149,7 @@ def main(argv=None):
                 'geometry': ('CC0 Innerscene Maya, furnished lab corridor' if args.scene_profile == 'lab'
                              else 'Cesium Man CC-BY-4.0 skinned animation; baseline corridor'),
                 'crowd_size': (10 if scenario.name=='explainer' else args.crowd_size), 'ros_domain': args.ros_domain,
-                'runtime_tuning':asdict(tuning), 'camera_contract':asdict(tuning.camera_profile()), 'render_quality': args.render_quality, 'frame': 'world', 'floor_z': 0., 'output_dir': str(output)}
+                'runtime_tuning':asdict(tuning), 'camera_contract':asdict(tuning.camera_profile()), 'render_quality': args.render_quality, 'drive': asdict(drive) if drive else None, 'frame': 'world', 'floor_z': 0., 'output_dir': str(output)}
     if args.scene_profile == 'f3':
         from ridgeback_leader_follow.f3_scene import GEOMETRY, manifest_entry
         # Evidence for scoring only; appearance identities are never published.
@@ -190,7 +204,7 @@ def main(argv=None):
                     if error is not None:
                         manifest['error'] = f'{type(error).__name__}: {error}'
                     manifest_path.write_text(json.dumps(manifest, indent=2) + '\n')
-                run_isaac(scenario, duration, output, writer, args.gui, finish, args.record, args.scene_profile, args.environment, args.render_quality, tuning)
+                run_isaac(scenario, duration, output, writer, args.gui, finish, args.record, args.scene_profile, args.environment, args.render_quality, tuning, drive)
         manifest['status'] = 'complete'
     except BaseException as exc:
         manifest.update(status='failed', error=f'{type(exc).__name__}: {exc}')

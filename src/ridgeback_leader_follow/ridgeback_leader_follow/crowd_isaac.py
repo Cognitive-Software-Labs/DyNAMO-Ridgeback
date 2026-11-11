@@ -10,7 +10,27 @@ from ridgeback_leader_follow.crowd_geometry import create_isaac_scene, animate_i
 from ridgeback_leader_follow.crowd_sensors import SensorEvidence
 
 
-def run(scenario, duration, output, writer, gui, finish, record=False, scene_profile="baseline", environment=None, render_quality="reference", tuning=None):
+def wait_for_follower(drive, ros, rig, app, dt, timeline, publish_robot):
+    """Step the frozen scene until the follow stack publishes commands and a leader state."""
+    deadline = time.monotonic() + drive.startup_timeout
+    settle = round(drive.settle_seconds / dt)
+    while True:
+        ready = (ros.node.count_publishers('cmd_vel') > 0
+                 and ros.node.count_publishers('leader_follow/leader') > 0)
+        if ready and settle <= 0:
+            return
+        if ready:
+            settle -= 1
+        if time.monotonic() > deadline:
+            raise TimeoutError('Follow stack (cmd_vel and leader_follow/leader publishers) did not start')
+        rig.step(dt, now=timeline.get_current_time())
+        app.update()
+        publish_robot()
+        time.sleep(dt / drive.real_time_factor)
+
+
+def run(scenario, duration, output, writer, gui, finish, record=False, scene_profile="baseline", environment=None, render_quality="reference", tuning=None, drive=None):
+    """``drive`` (a DriveOptions) lets cmd_vel move the robot; None keeps it stationary."""
     from ridgeback_leader_follow.simulation_performance import RuntimeTuning
     tuning=tuning or RuntimeTuning()
     from ament_index_python.packages import get_package_share_directory
@@ -150,8 +170,18 @@ def run(scenario, duration, output, writer, gui, finish, record=False, scene_pro
             rig.step(dt, now=timeline.get_current_time())
             app.update()
             publish_robot()
+        if drive is not None:
+            # People hold their start poses until the follow stack is up, so
+            # the leader can be acquired before it walks away.
+            wait_for_follower(drive, ros, rig, app, dt, timeline, publish_robot)
         origin = timeline.get_current_time()
         monitor.epoch = origin
+        robot_truth = None
+        if drive is not None:
+            robot_truth = (output / 'robot_truth.csv').open('w')
+            robot_truth.write('stamp,scenario_time,x,y,yaw,cmd_vx,cmd_vy,cmd_wz\n')
+        last_command = (0., 0., 0.)
+        pace = (dt / drive.real_time_factor) if drive is not None else (dt if gui else 0.)
         for index in range(round(duration / dt)):
             tick_start = time.monotonic()
             if not app.is_running():
@@ -159,7 +189,13 @@ def run(scenario, duration, output, writer, gui, finish, record=False, scene_pro
             elapsed = (index + 1) * dt
             for person in scenario.people:
                 animate_isaac_person(people[person.name], person, elapsed,animation_cache)
-            # No command is consumed. The F1 observation robot stays stationary.
+            # Without a drive option no command is consumed: the F1 observation
+            # robot stays stationary.
+            if drive is not None:
+                command = ros.take_cmd()
+                if command is not None:
+                    last_command = command
+                    rig.set_cmd(*command, now=timeline.get_current_time())
             rig.step(dt, now=timeline.get_current_time())
             app.update()
             publish_robot()
@@ -173,8 +209,14 @@ def run(scenario, duration, output, writer, gui, finish, record=False, scene_pro
                     direction = matrix.TransformDir(Gf.Vec3d(1, 0, 0))
                     write_sample(writer, person, stamp, stamp-origin, elapsed,
                                  (*position, math.atan2(direction[1], direction[0])))
-            if gui:
-                time.sleep(max(0., dt - (time.monotonic() - tick_start)))
+                if robot_truth is not None:
+                    x, y, yaw = rig.ground_truth()
+                    robot_truth.write(f'{stamp:.6f},{elapsed:.6f},{x:.6f},{y:.6f},{yaw:.6f},'
+                                      + ','.join(f'{v:.6f}' for v in last_command) + '\n')
+            if pace:
+                time.sleep(max(0., pace - (time.monotonic() - tick_start)))
+        if robot_truth is not None:
+            robot_truth.close()
         stage.GetRootLayer().Export(str(output / 'final_scene.usda'))
     except BaseException as exc:
         error = exc

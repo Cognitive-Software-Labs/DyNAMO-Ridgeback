@@ -40,6 +40,18 @@ class RuntimeTuning:
         return result
 
 
+@dataclass(frozen=True)
+class DriveOptions:
+    """Closed-loop Isaac runs: consume cmd_vel, pace to ``real_time_factor``."""
+    real_time_factor: float = .5
+    startup_timeout: float = 300.
+    settle_seconds: float = 3.
+
+    def __post_init__(self):
+        if not 0 < self.real_time_factor <= 2:
+            raise ValueError('real_time_factor must be in (0, 2]')
+
+
 def resolve_tuning(profile='reference',human_detail=None,sensor_quality=None,collision_quality=None,isaac_step_hz=None):
     defaults=RuntimeTuning('distant','reduced','simple') if profile=='balanced' else RuntimeTuning()
     return RuntimeTuning(human_detail or defaults.human_detail,sensor_quality or defaults.sensor_quality,

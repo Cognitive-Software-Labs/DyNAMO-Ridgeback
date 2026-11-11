@@ -1,0 +1,12 @@
+== alone-r1
+leader distance after 3 s: median 2.17 min 1.53 max 2.26
+robot end (6.48, 0.35) yaw 0.78
+== alone-r2
+leader distance after 3 s: median 2.18 min 1.53 max 2.23
+robot end (6.47, 0.37) yaw 0.79
+== alone-r3
+leader distance after 3 s: median 1.67 min 1.29 max 1.83
+robot end (6.66, 0.52) yaw 1.05
+== alone-r4
+leader distance after 3 s: median 1.47 min 1.13 max 1.79
+robot end (6.76, 0.58) yaw 1.17
