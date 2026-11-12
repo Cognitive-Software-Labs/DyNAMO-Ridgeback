@@ -55,8 +55,12 @@ class LeaderIdentity:
 
     def __init__(self, lock: LeaderLock, max_range: float, half_angle: float,
                  acquire_distance_tolerance: float = 0., acquire_lateral_tolerance: float = 0.,
-                 continuity_min_confidence: float = .5) -> None:
+                 continuity_min_confidence: float = .5, duplicate_radius: float = 0.) -> None:
         self.lock = lock
+        # Tracks whose observations lie within this distance of the selected
+        # person are duplicates of that person (bodies cannot overlap), not
+        # competing identities. Zero keeps every nearby track a competitor.
+        self.duplicate_radius = float(duplicate_radius)
         # Track continuity ignores observations below this confidence, and
         # nearby people at or above it count as competing hypotheses.
         self.continuity_min_confidence = float(continuity_min_confidence)
@@ -118,6 +122,8 @@ class LeaderIdentity:
             for other_id, other in observations.items():
                 if other_id == track.track_id or other.confidence < self.continuity_min_confidence:
                     continue
+                if math.hypot(other.position.x-current.position.x, other.position.y-current.position.y) < self.duplicate_radius:
+                    continue
                 competing = math.hypot(other.position.x-predicted[0],other.position.y-predicted[1])
                 if math.isfinite(competing) and competing <= error+.1:
                     return False
@@ -148,7 +154,13 @@ class LeaderIdentity:
             if not gated:
                 return []
             gated.sort(key=lambda pair:pair[0])
-            return [candidate for distance,candidate in gated if distance <= gated[0][0]+.1]
+            best = observations[gated[0][1].track_id].position
+            def duplicate(candidate):
+                point = observations[candidate.track_id].position
+                return (candidate is not gated[0][1]
+                        and math.hypot(point.x-best.x, point.y-best.y) < self.duplicate_radius)
+            return [candidate for distance,candidate in gated
+                    if distance <= gated[0][0]+.1 and not duplicate(candidate)]
         def confirm(candidates):
             plausible=motion_candidates(candidates)
             if len(plausible) != 1:
@@ -190,17 +202,19 @@ class LeaderIdentityNode(Node):
                         base_frame="base_link", acquire_range=2.0, acquire_half_angle_deg=30.0,
                         acquire_interval=8, acquire_frames=3, lost_frames=8, match_threshold=0.72, recovery_margin=0.05, tf_wait_timeout=0.25,
                         acquire_distance_tolerance=0.0, acquire_lateral_tolerance=0.0,
-                        continuity_min_confidence=0.5)
+                        continuity_min_confidence=0.5, duplicate_radius=0.0,
+                        hold_on_appearance_mismatch=False)
         for name, value in defaults.items():
             self.declare_parameter(name, value)
         p = lambda name: self.get_parameter(name).value
         self.base_frame = p("base_frame")
         lock = LeaderLock(acquire_interval=p("acquire_interval"), acquire_frames=p("acquire_frames"),
                           lost_frames=p("lost_frames"), match_threshold=p("match_threshold"),
-                          recovery_margin=p("recovery_margin"))
+                          recovery_margin=p("recovery_margin"),
+                          continuity_overrides_appearance=p("hold_on_appearance_mismatch"))
         self.identity = LeaderIdentity(lock, p("acquire_range"), math.radians(p("acquire_half_angle_deg")),
                                        p("acquire_distance_tolerance"),p("acquire_lateral_tolerance"),
-                                       p("continuity_min_confidence"))
+                                       p("continuity_min_confidence"), p("duplicate_radius"))
         self.tf_wait_timeout = float(p("tf_wait_timeout"))
         self.pending = deque(maxlen=100)
         self.last_received_stamp = -math.inf

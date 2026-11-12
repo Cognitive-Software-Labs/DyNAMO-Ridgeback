@@ -6,6 +6,7 @@ from sensor_msgs.msg import Image,CameraInfo
 from rclpy.time import Time
 from ridgeback_leader_follow.people_tracker_node import PeopleTrackerNode
 from ridgeback_leader_follow.benchmarking.dataset import stamp
+from ridgeback_leader_follow.fusion import LidarMovers
 
 
 @pytest.mark.parametrize("previous", [1.9, -1.])
@@ -25,7 +26,8 @@ def test_tick_uses_newest_complete_bundle_when_latest_rgb_is_unpaired(previous):
     node=SimpleNamespace(appearance_encoder=None,queues={'rgb':[older,newer]},last_rgb=previous,last_output=previous,
         output_frame='odom',observation_timeout=.15,get_clock=lambda:SimpleNamespace(now=lambda:Time(seconds=2)),
         prepare_inputs=prepare,get_logger=lambda:SimpleNamespace(warning=lambda *a,**k:None),
-        fusion=SimpleNamespace(stamp=1.9,update=lambda at,measurements:processed.append(at) or []),
+        fusion=SimpleNamespace(stamp=1.9,update=lambda at,measurements:processed.append(at) or [],unmatched_lidar=[]),
+        movers=LidarMovers(),mover_publisher=SimpleNamespace(publish=lambda msg:None),
         detector=SimpleNamespace(detect=lambda pixels:[]),image_association=SimpleNamespace(update=lambda boxes,shape:[]),lidars={},
         publisher=SimpleNamespace(publish=published.append))
     node.lidar_measurements=lambda scans,matrices:[]

@@ -16,7 +16,7 @@ from ridgeback_leader_follow.benchmarking.dataset import image_array, stamp
 from ridgeback_leader_follow.benchmarking.detectors import CameraDetector
 from ridgeback_leader_follow.benchmarking.lidar_detectors import lidar_detector
 from ridgeback_leader_follow.image_association import ImageAssociation
-from ridgeback_leader_follow.fusion import Measurement, PeopleFusion, box_measurement, rigid_matrix
+from ridgeback_leader_follow.fusion import LidarMovers, Measurement, PeopleFusion, box_measurement, rigid_matrix
 
 
 class PeopleTrackerNode(Node):
@@ -58,6 +58,9 @@ class PeopleTrackerNode(Node):
         for key,(topic,kind) in topics.items():
             self.subscriptions_.append(self.create_subscription(kind,topic,lambda m,k=key:self.queues[k].append(m),qos_profile_sensor_data,callback_group=self.sensor_group))
         self.publisher=self.create_publisher(People,'leader_follow/people',10)
+        # Lidar-only walkers, for collision avoidance; never leader candidates.
+        self.movers=LidarMovers()
+        self.mover_publisher=self.create_publisher(People,'leader_follow/moving_people',10)
         self.last_rgb=-1.
         self.last_output=-1.
         self.create_timer(.02,self.tick)
@@ -173,6 +176,14 @@ class PeopleTrackerNode(Node):
             person.velocity.x,person.velocity.y=map(float,track.state[2:])
             person.confidence=float(track.confidence); person.appearance=list(track.appearance)
             result.people.append(person)
+        # Published first, so a consumer of both sees the movers for this stamp.
+        moving=People(); moving.header=result.header
+        for track in self.movers.update(at,[(m.x,m.y) for m in self.fusion.unmatched_lidar]):
+            person=Person(); person.id=track.identity
+            person.position.x,person.position.y=map(float,track.state[:2])
+            person.velocity.x,person.velocity.y=map(float,track.state[2:])
+            moving.people.append(person)
+        self.mover_publisher.publish(moving)
         self.publisher.publish(result)
         self.last_output=at
 

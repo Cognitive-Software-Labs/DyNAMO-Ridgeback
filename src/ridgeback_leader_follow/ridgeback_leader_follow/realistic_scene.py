@@ -54,10 +54,14 @@ def load_scenario(name,crowd_size=4,environment='office'):
     the earlier realistic worlds keep their recorded routes (alone adds turns)."""
     from dataclasses import replace
     from .crowd_scenarios import load_scenario as baseline,Waypoint
-    if name=='explainer':
-        if environment!='modern_office':raise ValueError('explainer requires modern_office')
-        from .explainer_motion import load_scenario as illustration
-        return illustration()
+    if name=='wander':
+        if environment!='modern_office':raise ValueError('wander requires modern_office')
+        from .wander_scenario import load_wander_scenario
+        return load_wander_scenario()
+    if name in ('explainer','explainer_weave'):
+        if environment!='modern_office':raise ValueError(f'{name} requires modern_office')
+        from .explainer_motion import load_scenario as illustration, load_weave_scenario
+        return illustration() if name=='explainer' else load_weave_scenario()
     scenario=baseline(name,crowd_size)
     if environment=='modern_office':
         return natural_scenario(name,crowd_size,scenario)

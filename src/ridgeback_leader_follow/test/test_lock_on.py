@@ -120,3 +120,19 @@ def test_motion_filter_excludes_lookalike_on_an_incompatible_path():
         update=lock.update([person(7,LEADER),person(8,LEADER)],propose(7),
                            recovery_filter=lambda tracks:[t for t in tracks if t.track_id==7])
     assert update.valid(lock.state) and update.selected.track_id==7
+
+
+def test_continuity_can_hold_the_lock_through_an_appearance_change():
+    held = LeaderLock(continuity_overrides_appearance=True)
+    lock_on(held)
+    gallery = [g.copy() for g in held.gallery]
+    update = held.update([person(1, OTHER)], nobody, continuity=lambda track: True)
+    assert (held.state, held.reason) == ('LOCKED', 'appearance_mismatch_held_by_track_continuity')
+    assert update.valid(held.state) and len(held.gallery) == len(gallery)
+    # A broken track still drops the lock, and without continuity the default holds.
+    held.update([person(1, OTHER)], nobody, continuity=lambda track: False)
+    assert (held.state, held.reason) == ('UNCERTAIN', 'track_discontinuity')
+    plain = LeaderLock()
+    lock_on(plain)
+    plain.update([person(1, OTHER)], nobody, continuity=lambda track: True)
+    assert (plain.state, plain.reason) == ('UNCERTAIN', 'appearance_mismatch')

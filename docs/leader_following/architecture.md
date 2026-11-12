@@ -133,13 +133,57 @@ unchanged. `leader_follow/follow_status` publishes
 | `heading_gain`, `max_heading_rate` | `2.0`, `1.0` | Turn toward the leader: rad/s per rad of bearing error, and its limit |
 | `global_frame`, `base_frame` | `odom`, `base_link` | Goal frame and robot frame |
 
+Whenever the controller server is silent for 0.15 s (navigation cancelled,
+aborted or not started), `follow_controller` publishes an explicit zero
+command, still turning toward a locked leader. Gazebo's drive bridge has no
+command timeout and otherwise kept executing the last non-zero command.
+
+## `people_predictor` node
+
+`people_predictor` tells Nav2 where bystanders are heading. It takes the
+tracker's people and its lidar-only walkers (`leader_follow/moving_people`,
+people outside the camera view; see the [tracker](people_tracker.md#lidar-walkers)).
+It drops the leader and any lidar walker within `leader_exclusion` of the
+leader's last track, extrapolated for up to `leader_memory` seconds. For
+everyone else it publishes:
+
+- `leader_follow/people_obstacles`: a `PointCloud2` in the robot frame marking
+  each body (0.3 m) now and along 1 s of constant-velocity prediction. The
+  `people_layer` in both follow costmaps consumes it; a ring of points beyond
+  its 6 m marking range clears the previous prediction on every update.
+- `speed_limit`: Nav2's controller speed limit. Candidate speeds from
+  `max_speed` down to `min_speed` along the robot's direction of travel (its
+  heading when nearly still) are rolled out with the `acceleration` limit over
+  `horizon` seconds. A predicted contact closer than `contact` is scored by
+  impact speed, so an unavoidable contact is met slowly. Otherwise the score is
+  how close and how soon the nearest pass comes inside `comfort`. The lowest
+  score wins, with a small preference for speed. The robot brakes for a walker
+  it would meet, but not for one who will pass behind it. Nav2 reads 0 as "no
+  limit", so the floor is 0.05 m/s.
+
+| Parameter | Default | Meaning |
+|---|---|---|
+| `horizon`, `mark_horizon` | `3.0`, `1.0` | Seconds of prediction for the speed limit and for the costmap |
+| `comfort`, `contact` | `1.2`, `0.7` | Centre distances: no slowing needed, and treated as touching |
+| `min_speed`, `max_speed`, `acceleration` | `0.05`, `1.3`, `1.0` | Speed-limit range (m/s) and the platform acceleration used in rollouts |
+| `leader_exclusion`, `leader_memory` | `1.0`, `2.0` | Metres and seconds around the leader's last track where lidar walkers are ignored |
+| `moving_max_age` | `0.25` | Seconds a lidar-walker message stays usable |
+
+## Following launch and simulation
+
 `follow_leader.launch.py` starts the F3 recognition pipeline, the Nav2
-servers from `config/follow_nav2_params.yaml` and `follow_controller`. That
+servers from `config/follow_nav2_params.yaml`, `people_predictor` and
+`follow_controller`. That
 file is the exploration Nav2 configuration with `odom` as the global frame (no
-map or SLAM), a 20 m rolling global costmap without a static layer, a 0.9 m/s
-MPPI forward limit with wider forward-speed sampling (`vx_std` 0.3) and a
-stronger `PathFollowCritic` (weight 10, offset 8), and a 0.3 rad goal heading
-tolerance. With the exploration weights MPPI itself stayed near 0.6 m/s. The
+map or SLAM), a 20 m rolling global costmap without a static layer, a 10 m
+local costmap, the platform's 1.3 m/s as MPPI's forward limit with wider
+forward-speed sampling (`vx_std` 0.3), a stronger `PathFollowCritic` (weight
+20, offset 20), a `people_layer` in both costmaps, and a 0.3 rad goal heading
+tolerance. With the exploration weights MPPI itself stayed near 0.6 m/s, and a
+5 m local costmap capped it below 1 m/s because MPPI follows only the path
+inside it. The launch gives every costmap observation source its fully
+qualified topic: Jazzy resolves relative ones inside the costmap's namespace,
+where nothing publishes. The
 collision monitor adds a stop zone about 0.25 m around the body and counts
 two lidar points, so a person's legs register. Exploration
 configuration is unchanged. In both simulators `--drive` lets the crowd
@@ -168,8 +212,30 @@ For Gazebo, run `ros2 run ridgeback_leader_follow crowd_scene --backend gz ...`
 with the same scene options. Run both from the workspace root so the tracker
 finds `perception_venv`. Add `--scene-profile realistic --environment
 modern_office --scenario explainer` for the explainer office with all eleven
-walkers. The plan's metrics are not yet implemented. Scripted walkers do not
-avoid the robot, so a stopped robot can still be walked into.
+walkers. Two more scenarios use the same office and walkers:
+`explainer_weave`, where the leader drifts 0.6 m either side of the
+illustrated route, and `wander`, where the leader walks a random route through
+the open hall for 40 s (`--seed`, default 0), clear of furniture and of the
+other walkers.
+
+`tools/run_leader_follow_sim` runs one simulation with the follow stack in a
+private ROS domain and stops both when the scene ends. It defaults to Isaac,
+the office and the wandering leader:
+
+```bash
+tools/run_leader_follow_sim --backend isaac --scenario crowd --gui
+```
+
+`--backend gz`, `--scenario NAME`, `--seed N` and other `crowd_runner`
+options pass through. Evidence goes to `artifacts/leader-following/<time>-follow-<backend>-<scenario>/`
+with the follow-stack log beside it.
+
+The plan's metrics are not yet implemented. Scripted walkers do not avoid the
+robot, so a stopped robot can still be walked into. Two faults are open: with
+the leader standing still, the robot has driven to within 0.1 m of them
+instead of holding `follow_distance`, and after a crosser hides the leader the
+lock can be lost for good. Under heavy host load, Clearpath's Gazebo controller
+spawner can time out (5 s), leaving the robot unable to move; rerun.
 
 ## Crowd simulation
 
@@ -178,7 +244,7 @@ families, including three crowd densities, in Gazebo and Isaac. They use a
 shared licensed animated human asset, the production Ridgeback model and
 camera/lidar bindings, and separate simulator-observed ground-truth logs.
 The observation robot stays stationary unless an Isaac run passes `--drive`
-(see [`follow_controller`](#follow_controller-node)). The [F2 benchmark](benchmarks.md)
+(see [following launch](#following-launch-and-simulation)). The [F2 benchmark](benchmarks.md)
 evaluates tracking; [F3 recognition](recognition.md) uses separate outfit-profile
 recordings.
 
@@ -200,3 +266,4 @@ wrapper on 24,000 scripted frames with no differences.
 - [Closed-loop following in Gazebo](../../archive/engineering/2026-11-11-f4-gazebo-follow.md) — first Gazebo leader-alone run.
 - [Following speed and heading in the explainer office](../../archive/engineering/2026-11-11-f4-office-speed.md) — MPPI speed cap, stop zone, leader-facing turn control and the Gazebo lock losses.
 - [Gazebo odometry heading during following](../../archive/engineering/2026-11-11-f4-gazebo-odometry.md) — mecanum yaw error, the IMU-yaw EKF override and the corrected explainer result.
+- [Predicting bystanders during following](../../archive/engineering/2026-11-12-f4-people-prediction.md) — the side-crosser near miss, the speed-limit crossing grid, Gazebo office runs and the open leader-approach fault.

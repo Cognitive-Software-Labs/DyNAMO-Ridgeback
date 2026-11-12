@@ -5,10 +5,15 @@
 # follow_controller selects config/behavior_trees/follow_leader.xml per goal.
 # The goal checker requires the standoff heading (within 0.3 rad), so the robot
 # turns to keep the leader in camera view. The launch rewrites odom_topic per
-# simulator. MPPI vx_max is 0.9 m/s (exploration: 0.5), with wider vx sampling
+# simulator. MPPI vx_max is the platform limit, 1.3 m/s (exploration: 0.5), so
+# the robot can catch up after yielding; with wider vx sampling
 # and a stronger PathFollowCritic: the exploration weights held MPPI near
 # 0.6 m/s. The collision monitor adds a stop zone and
-# counts two lidar points, so legs register.
+# counts two lidar points, so legs register; it is an emergency backstop. Both
+# costmaps add people_layer (predicted bystanders from people_predictor), and
+# the controller follows people_predictor's speed_limit, so planning and pacing
+# respond to where people are heading. The local costmap is 10 x 10 m: MPPI only
+# follows the path inside it, and a 5 m window capped it below 1 m/s.
 bt_navigator:
   ros__parameters:
     enable_stamped_cmd_vel: true
@@ -63,7 +68,7 @@ controller_server:
       vx_std: 0.3
       vy_std: 0.1
       wz_std: 0.4
-      vx_max: 0.9
+      vx_max: 1.3
       vx_min: -0.35
       vy_max: 0.5
       wz_max: 1.9
@@ -127,8 +132,8 @@ controller_server:
       PathFollowCritic:
         enabled: true
         cost_power: 1
-        cost_weight: 10.0
-        offset_from_furthest: 8
+        cost_weight: 20.0
+        offset_from_furthest: 20
         threshold_to_consider: 1.4
       PathAngleCritic:
         enabled: true
@@ -147,8 +152,8 @@ local_costmap:
       global_frame: odom
       robot_base_frame: base_link
       rolling_window: true
-      width: 5
-      height: 5
+      width: 10
+      height: 10
       resolution: 0.05
       footprint: '[[0.475762, 0.073265], [0.409768, 0.319557], [0.393065, 0.348488], [0.367198, 0.374355], [0.339166, 0.390539], [0.302752, 0.400297], [-0.302752, 0.400297], [-0.339166, 0.390539], [-0.367198,
         0.374355], [-0.393065, 0.348488], [-0.409768, 0.319557], [-0.475762, 0.073265], [-0.475762, -0.073265], [-0.409768, -0.319557], [-0.393065, -0.348488], [-0.367198, -0.374355], [-0.339166, -0.390539],
@@ -157,7 +162,27 @@ local_costmap:
       always_send_full_costmap: true
       plugins:
       - voxel_layer
+      - people_layer
       - inflation_layer
+      people_layer:
+        plugin: nav2_costmap_2d::ObstacleLayer
+        enabled: true
+        # Bystanders' current and predicted positions from people_predictor.
+        # Its ring of points beyond obstacle_max_range clears the previous
+        # prediction on every update; the lidar layer is unaffected.
+        observation_sources: people
+        people:
+          topic: leader_follow/people_obstacles
+          data_type: PointCloud2
+          marking: true
+          clearing: true
+          min_obstacle_height: 0.0
+          max_obstacle_height: 2.0
+          obstacle_min_range: 0.0
+          obstacle_max_range: 6.0
+          raytrace_min_range: 0.0
+          raytrace_max_range: 7.5
+          inf_is_valid: false
       inflation_layer:
         plugin: nav2_costmap_2d::InflationLayer
         cost_scaling_factor: 5.0
@@ -212,7 +237,27 @@ global_costmap:
       always_send_full_costmap: true
       plugins:
       - obstacle_layer
+      - people_layer
       - inflation_layer
+      people_layer:
+        plugin: nav2_costmap_2d::ObstacleLayer
+        enabled: true
+        # Bystanders' current and predicted positions from people_predictor.
+        # Its ring of points beyond obstacle_max_range clears the previous
+        # prediction on every update; the lidar layer is unaffected.
+        observation_sources: people
+        people:
+          topic: leader_follow/people_obstacles
+          data_type: PointCloud2
+          marking: true
+          clearing: true
+          min_obstacle_height: 0.0
+          max_obstacle_height: 2.0
+          obstacle_min_range: 0.0
+          obstacle_max_range: 6.0
+          raytrace_min_range: 0.0
+          raytrace_max_range: 7.5
+          inf_is_valid: false
       obstacle_layer:
         plugin: nav2_costmap_2d::ObstacleLayer
         enabled: true

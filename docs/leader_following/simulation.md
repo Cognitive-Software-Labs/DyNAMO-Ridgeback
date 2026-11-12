@@ -57,11 +57,11 @@ bindings, with a generated `robot_state_publisher` description. Neither path
 starts frontier exploration, Nav2 or a following controller. No F1 code
 publishes a robot velocity command. Isaac consumes no external drive commands
 unless `--drive` is given for closed-loop following
-([follow_controller](architecture.md#follow_controller-node)). Gazebo's
+([following launch](architecture.md#following-launch-and-simulation)). Gazebo's
 standard command path remains present on the private simulation domain; its
 `--drive` option holds the crowd until a follow stack publishes, slows the
 world's real-time factor and takes odometry yaw from the IMU in the run-local
-declaration ([details](architecture.md#follow_controller-node)).
+declaration ([details](architecture.md#following-launch-and-simulation)).
 
 The robot configuration is copied from `clearpath/robot.yaml` into each run's
 `setup/` directory. Existing host or hardware configurations are not edited.

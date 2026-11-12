@@ -1,7 +1,8 @@
 """Closed-loop leader following in simulation: recognition, Nav2 and follow_controller.
 
 Starts the F3 recognition pipeline (people_tracker + leader_identity), the Nav2
-servers configured in config/follow_nav2_params.yaml (odom frame, no map), and
+servers configured in config/follow_nav2_params.yaml (odom frame, no map),
+people_predictor (predicted bystanders for the costmaps and a speed limit) and
 follow_controller. The robot moves only while leader_identity reports LOCKED.
 Start a simulator that consumes cmd_vel first, e.g. ``crowd_scene --drive``.
 """
@@ -26,12 +27,24 @@ def generate_launch_description():
     namespace = LaunchConfiguration('namespace')
     use_sim_time = LaunchConfiguration('use_sim_time')
     odom_topic = LaunchConfiguration('odom_topic')
+    # Jazzy costmap layers resolve relative observation topics inside the
+    # costmap's own namespace (…/local_costmap/sensors/…), where nothing
+    # publishes. Give every layer source its fully qualified topic.
+    layer_topics = {
+        'local_costmap.local_costmap.ros__parameters.voxel_layer.scan.topic': 'sensors/lidar2d_0/scan',
+        'local_costmap.local_costmap.ros__parameters.voxel_layer.scan_rear.topic': 'sensors/lidar2d_1/scan',
+        'local_costmap.local_costmap.ros__parameters.people_layer.people.topic': 'leader_follow/people_obstacles',
+        'global_costmap.global_costmap.ros__parameters.obstacle_layer.scan.topic': 'sensors/lidar2d_0/scan',
+        'global_costmap.global_costmap.ros__parameters.obstacle_layer.scan_rear.topic': 'sensors/lidar2d_1/scan',
+        'global_costmap.global_costmap.ros__parameters.people_layer.people.topic': 'leader_follow/people_obstacles',
+    }
     params = ParameterFile(RewrittenYaml(
         source_file=os.path.join(share, 'config', 'follow_nav2_params.yaml'), root_key=namespace,
         param_rewrites={'autostart': 'true',
                         'bt_navigator.ros__parameters.odom_topic': odom_topic,
                         'controller_server.ros__parameters.odom_topic': odom_topic,
-                        'velocity_smoother.ros__parameters.odom_topic': odom_topic},
+                        'velocity_smoother.ros__parameters.odom_topic': odom_topic,
+                        **{key: ['/', namespace, '/', topic] for key, topic in layer_topics.items()}},
         convert_types=True), allow_substs=True)
     tf = [('/tf', 'tf'), ('/tf_static', 'tf_static')]
 
@@ -64,6 +77,8 @@ def generate_launch_description():
             Node(package='nav2_lifecycle_manager', executable='lifecycle_manager',
                  name='lifecycle_manager_follow', output='screen',
                  parameters=[{'autostart': True, 'node_names': LIFECYCLE_NODES}]),
+            Node(package='ridgeback_leader_follow', executable='people_predictor', output='screen',
+                 parameters=[{'odom_topic': odom_topic}], remappings=tf),
             Node(package='ridgeback_leader_follow', executable='follow_controller', output='screen',
                  parameters=[{name: ParameterValue(LaunchConfiguration(name), value_type=float)
                               for name in ('follow_distance', 'hold_tolerance', 'lead_time')}],

@@ -106,6 +106,8 @@ class PeopleFusion:
         self.tracks=[]
         self.next_id=1
         self.stamp=None
+        # Lidar people detections no track claimed on the latest update.
+        self.unmatched_lidar=[]
 
     def update(self, stamp, measurements):
         if not math.isfinite(stamp) or self.stamp is not None and stamp <= self.stamp:
@@ -120,6 +122,7 @@ class PeopleFusion:
             t.covariance=f@t.covariance@f.T+self.acceleration**2*g@g.T
             t.appearance=()
         observed=set()
+        self.unmatched_lidar=[]
         # Camera first gives semantic confirmation; lidar refines existing tracks.
         sources=('camera','lidar','support') if self.appearance_weight else ('camera','lidar')
         for source in sources:
@@ -169,6 +172,8 @@ class PeopleFusion:
                         if feature is not None:t.association_feature=tuple(feature)
                         if m.camera_id is not None:t.camera_id=m.camera_id
                     observed.add(t.identity); matched.add(j)
+            if source == 'lidar':
+                self.unmatched_lidar=[m for j,m in enumerate(samples) if j not in matched]
             if source == 'camera':
                 for j,m in enumerate(samples):
                     if j in matched: continue
@@ -177,3 +182,75 @@ class PeopleFusion:
                     if feature is not None:t.association_feature=tuple(feature)
                     self.next_id+=1; self.tracks.append(t); observed.add(t.identity)
         return [t for t in self.tracks if t.identity in observed]
+
+
+@dataclass
+class Mover:
+    identity: int
+    state: np.ndarray
+    covariance: np.ndarray
+    last_seen: float
+    origin: np.ndarray
+    hits: int = 1
+
+
+class LidarMovers:
+    """Moving people seen only by lidar, for collision avoidance only.
+
+    PeopleFusion requires the camera before a person exists, so someone
+    approaching from outside the camera view is invisible to the identity and
+    prediction layers until they enter it. This tracker follows the lidar
+    people detections that no confirmed track claimed and reports those that
+    are clearly walking: seen on ``min_hits`` updates, at least
+    ``min_displacement`` from where they were first seen, and faster than
+    ``min_speed``. Static detections (furniture false positives, standing
+    people) stay out: the lidar costmap already handles them. These tracks
+    carry no appearance and never become leader candidates.
+    """
+    def __init__(self, gate=.6, max_age=.5, acceleration=3., variance=.02,
+                 min_hits=3, min_speed=.3, min_displacement=.3):
+        if not all(math.isfinite(v) and v > 0 for v in (gate,max_age,acceleration,variance)) or min_hits < 1:
+            raise ValueError('Mover parameters must be positive and finite')
+        self.gate,self.max_age,self.acceleration,self.variance=gate,max_age,acceleration,variance
+        self.min_hits,self.min_speed,self.min_displacement=min_hits,min_speed,min_displacement
+        self.tracks=[]
+        self.next_id=1
+        self.stamp=None
+
+    def update(self, stamp, points):
+        if not math.isfinite(stamp):
+            raise ValueError('Mover stamps must be finite')
+        if self.stamp is not None and stamp <= self.stamp:
+            self.tracks=[]  # Clock reset or duplicate stamp: start over.
+        dt=0. if self.stamp is None or stamp <= self.stamp else stamp-self.stamp
+        self.stamp=stamp
+        self.tracks=[t for t in self.tracks if stamp-t.last_seen <= self.max_age]
+        f=np.eye(4); f[0,2]=f[1,3]=dt
+        g=np.array([[dt*dt/2,0],[0,dt*dt/2],[dt,0],[0,dt]])
+        for t in self.tracks:
+            t.state=f@t.state
+            t.covariance=f@t.covariance@f.T+self.acceleration**2*g@g.T
+        points=[np.asarray(p,dtype=float)[:2] for p in points]
+        matched=set()
+        if points and self.tracks:
+            costs=np.array([[float(np.linalg.norm(t.state[:2]-p)) for p in points] for t in self.tracks])
+            valid=costs <= self.gate
+            rows,cols=linear_sum_assignment(np.where(valid,costs,(min(costs.shape)+1)*(self.gate+1)))
+            r=np.eye(2)*self.variance
+            for i,j in zip(rows,cols):
+                if not valid[i,j]:continue
+                t=self.tracks[i]
+                gain=np.linalg.solve(t.covariance[:2,:2]+r,t.covariance[:,:2].T).T
+                t.state=t.state+gain@(points[j]-t.state[:2])
+                a=np.eye(4); a[:,:2]-=gain
+                t.covariance=a@t.covariance@a.T+gain@r@gain.T
+                t.last_seen=stamp; t.hits+=1
+                matched.add(j)
+        for j,p in enumerate(points):
+            if j in matched:continue
+            self.tracks.append(Mover(self.next_id,np.array([p[0],p[1],0.,0.]),
+                                     np.diag([self.variance,self.variance,4.,4.]),stamp,p.copy()))
+            self.next_id+=1
+        return [t for t in self.tracks if t.last_seen == stamp and t.hits >= self.min_hits
+                and math.hypot(*t.state[2:]) >= self.min_speed
+                and float(np.linalg.norm(t.state[:2]-t.origin)) >= self.min_displacement]

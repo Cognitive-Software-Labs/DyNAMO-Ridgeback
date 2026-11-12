@@ -81,6 +81,19 @@ sensor/TF bundles. `observation_timeout` bounds this interval; a paused
 simulator clock does not advance it.
 A reset starts a new track session.
 
+### Lidar walkers
+
+Lidar detections that match no person track feed a separate constant-velocity
+Kalman tracker (`LidarMovers` in `fusion.py`) with Hungarian association
+inside a 0.6 m gate. Only tracks with at least 3 hits that have moved at least
+0.3 m and walk at least 0.3 m/s are published, in the people frame, on
+`leader_follow/moving_people` with the same header as `People`. Walls and
+furniture therefore stay out, while a person approaching from outside the
+camera view appears before the camera sees them. These walkers have no
+appearance and serve collision avoidance only
+([`people_predictor`](architecture.md#people_predictor-node)); they are never
+leader candidates.
+
 ## Runtime
 
 Build and source the workspace, prepare the candidate dependencies/checkpoints

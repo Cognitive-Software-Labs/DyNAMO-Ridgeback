@@ -1,0 +1,4 @@
+run                                 onLdr wrong unmat   off  medD  endD   clr vNear view% stops minLim
+v7-gz-crowd-s0-96                    19.7   0.0   0.0   0.2  3.80  1.49  0.27  1.39 100.0     2   0.15
+v9-gz-wander-s0-1                    38.7   0.0   0.0   1.2  3.30  1.60  1.50  0.00  94.0     2   0.05
+v9-gz-office-crowd-1                  8.2   0.0   0.0  11.7  8.34  8.34  1.79  0.00 100.0     0   0.10

@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+# Run one closed-loop leader-following simulation and stop everything when it ends.
+#
+#   tools/run_leader_follow_sim [--backend isaac|gz] [--scenario NAME] [--seed N] [--gui] [crowd_runner options]
+#
+# Defaults: Isaac, the modern office, the randomly wandering leader (seed 0).
+# Starts the simulator (crowd_runner --drive) and the follow stack
+# (follow_leader.launch.py) in one private ROS domain, waits for the scene to
+# finish, then stops the follow stack. Ctrl+C stops both. Output goes to
+# artifacts/leader-following/<timestamp>/ plus follow.log beside it.
+set -euo pipefail
+root="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$root"
+backend=isaac scenario=wander seed=0 extra=()
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --backend) backend="$2"; shift 2 ;;
+    --scenario) scenario="$2"; shift 2 ;;
+    --seed) seed="$2"; shift 2 ;;
+    *) extra+=("$1"); shift ;;
+  esac
+done
+set +u; source /opt/ros/jazzy/setup.bash; source install/setup.bash; set -u
+export RMW_IMPLEMENTATION="${RMW_IMPLEMENTATION:-rmw_cyclonedds_cpp}"
+export ROS_DOMAIN_ID="${ROS_DOMAIN_ID:-$((100 + RANDOM % 100))}"
+export ROS_LOG_DIR="${ROS_LOG_DIR:-$root/artifacts/ros}"
+output="artifacts/leader-following/$(date -u +%Y%m%dT%H%M%SZ)-follow-$backend-$scenario"
+odom=platform/odom; [[ "$backend" == gz ]] && odom=platform/odom/filtered
+echo "Domain $ROS_DOMAIN_ID; evidence: $output"
+setsid ros2 launch ridgeback_leader_follow follow_leader.launch.py "odom_topic:=$odom" > "$output.follow.log" 2>&1 &
+follow=$!
+stop_follow() { kill -INT -- "-$follow" 2>/dev/null || true; sleep 5; kill -TERM -- "-$follow" 2>/dev/null || true; }
+trap stop_follow EXIT
+args=(--backend "$backend" --scene-profile realistic --environment modern_office --scenario "$scenario"
+      --seed "$seed" --drive --ros-domain "$ROS_DOMAIN_ID" --output-dir "$output" "${extra[@]}")
+if [[ "$backend" == isaac ]]; then
+  OMNI_KIT_ACCEPT_EULA=YES isaac_venv/bin/python -m ridgeback_leader_follow.crowd_runner "${args[@]}"
+else
+  python3 -m ridgeback_leader_follow.crowd_runner "${args[@]}"
+fi
+echo "Scene finished; stopping the follow stack."

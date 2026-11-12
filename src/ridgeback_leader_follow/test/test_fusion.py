@@ -106,3 +106,43 @@ def test_f3_track_memory_survives_occlusion_without_publishing_predictions():
     restored=fusion.update(1.5,[Measurement(1.,0.,.01,.9,'camera',(1.,0.),7)])
     assert len(restored)==1 and restored[0].identity==identity
     assert fusion.update(5.,[])==[] and not fusion.tracks
+
+
+def test_fusion_reports_lidar_detections_no_track_claimed():
+    fusion=PeopleFusion()
+    fusion.update(0.,[Measurement(1.,0.,.04,.9,'camera')])
+    fusion.update(.1,[Measurement(1.05,0.,.09,.5,'lidar'),Measurement(0.,3.,.09,.5,'lidar')])
+    assert [(m.x,m.y) for m in fusion.unmatched_lidar] == [(0.,3.)]
+    fusion.update(.2,[])
+    assert fusion.unmatched_lidar == []
+
+
+def test_lidar_movers_report_walkers_but_not_static_or_jittering_detections():
+    from ridgeback_leader_follow.fusion import LidarMovers
+    rng=np.random.default_rng(0)
+    movers=LidarMovers()
+    reported=[]
+    for k in range(15):
+        at=.1*k
+        walker=(-1.35*at,4.)  # crossing from the side at 1.35 m/s
+        static=(2.+rng.normal(0,.05),-1.+rng.normal(0,.05))
+        reported.append(movers.update(at,[walker,static]))
+    # Not before three sightings and 0.3 m of travel; afterwards only the walker.
+    assert reported[0] == reported[1] == []
+    late=reported[-1]
+    assert len(late) == 1
+    assert late[0].state[0] == pytest.approx(-1.35*1.4,abs=.1)
+    assert late[0].state[2] == pytest.approx(-1.35,abs=.15)
+    assert all(len(r) <= 1 for r in reported)
+
+
+def test_lidar_movers_forget_unseen_walkers_and_restart_on_clock_reset():
+    from ridgeback_leader_follow.fusion import LidarMovers
+    movers=LidarMovers()
+    for k in range(6):
+        movers.update(.1*k,[(1.*.1*k,0.)])
+    assert movers.update(.6,[(.6,0.)])
+    assert movers.update(1.2,[]) == [] and movers.tracks == []
+    movers.update(1.3,[(0.,0.)])
+    movers.update(.1,[(0.,0.)])
+    assert len(movers.tracks) == 1 and movers.tracks[0].hits == 1

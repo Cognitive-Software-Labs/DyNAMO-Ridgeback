@@ -164,6 +164,12 @@ def main():
             # camera stays on the leader while the holonomic base sidesteps.
             self.cmd_out = self.create_publisher(TwistStamped, p('output_cmd_topic'), 10)
             self.create_subscription(TwistStamped, p('controller_cmd_topic'), self.on_controller_cmd, 10)
+            # Whenever the controller is silent (navigation cancelled, aborted or
+            # not yet started), command zero explicitly. A base without a command
+            # timeout, such as Gazebo's drive bridge, otherwise keeps executing
+            # the last non-zero command.
+            self.last_controller_cmd = None
+            self.create_timer(.05, self.hold_still)
             self.create_subscription(LeaderState, p('leader_topic'), self.on_leader, 10)
             self.create_timer(1. / float(p('update_rate')), self.tick)
 
@@ -175,7 +181,20 @@ def main():
             else:
                 self.velocity.reset()
 
-        def on_controller_cmd(self, cmd):
+        def hold_still(self):
+            now = self.get_clock().now()
+            if (self.last_controller_cmd is not None
+                    and (now - self.last_controller_cmd).nanoseconds * 1e-9 < .15):
+                return
+            zero = TwistStamped()
+            zero.header.stamp = now.to_msg()
+            zero.header.frame_id = self.base_frame
+            # Holding or between goals while LOCKED: stay in place but keep
+            # turning toward the leader so the camera does not lose them.
+            self.face_leader(zero)
+            self.cmd_out.publish(zero)
+
+        def face_leader(self, cmd):
             msg = self.leader
             if (self.mode in ('following', 'holding') and msg is not None and msg.state == LeaderState.LOCKED
                     and msg.has_leader and msg.header.frame_id == self.global_frame):
@@ -184,6 +203,10 @@ def main():
                 if robot is not None and age <= self.stale_timeout:
                     cmd.twist.angular.z = heading_rate(robot, (msg.position.x, msg.position.y),
                                                        self.heading_gain, self.max_heading_rate)
+
+        def on_controller_cmd(self, cmd):
+            self.last_controller_cmd = self.get_clock().now()
+            self.face_leader(cmd)
             self.cmd_out.publish(cmd)
 
         def robot_pose(self) -> Optional[Pose2D]:

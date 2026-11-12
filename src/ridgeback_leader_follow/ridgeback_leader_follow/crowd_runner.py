@@ -58,7 +58,8 @@ def run_isaac(scenario, duration, output, writer, gui, finish, record=False, sce
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--backend', required=True, choices=('gz', 'isaac'))
-    parser.add_argument('--scenario', default='crossing', choices=(*SCENARIOS,'leader_out_of_view','explainer'))
+    parser.add_argument('--scenario', default='crossing', choices=(*SCENARIOS,'leader_out_of_view','explainer','explainer_weave','wander'))
+    parser.add_argument('--seed', type=int, default=0, help='wander: seed for the random leader route')
     parser.add_argument('--duration', type=float, help='Shorten the selected scenario')
     parser.add_argument('--output-dir', type=Path)
     parser.add_argument('--demo-cycles', type=int, default=0,
@@ -110,11 +111,17 @@ def main(argv=None):
         args.ros_domain = 100 + int(uuid.uuid4().hex[:8], 16) % 100
     if not 0 <= args.ros_domain <= 232:
         parser.error('ros-domain must be between 0 and 232')
-    if args.scenario == 'explainer':
+    if args.scenario == 'wander':
         if args.scene_profile!='realistic' or args.environment!='modern_office':
-            parser.error('explainer requires realistic profile and modern_office')
+            parser.error('wander requires realistic profile and modern_office')
+        from ridgeback_leader_follow.wander_scenario import load_wander_scenario
+        scenario=load_wander_scenario(args.seed)
+    elif args.scenario in ('explainer', 'explainer_weave'):
+        if args.scene_profile!='realistic' or args.environment!='modern_office':
+            parser.error(f'{args.scenario} requires realistic profile and modern_office')
         from ridgeback_leader_follow.explainer_motion import load_scenario as explainer_scenario
-        scenario=explainer_scenario()
+        from ridgeback_leader_follow.explainer_motion import load_weave_scenario
+        scenario=explainer_scenario() if args.scenario=='explainer' else load_weave_scenario()
     elif args.scenario == 'leader_out_of_view':
         if args.scene_profile != 'f3':
             parser.error('leader_out_of_view requires --scene-profile f3')
@@ -146,7 +153,7 @@ def main(argv=None):
                 'scene_profile': args.scene_profile,
                 'geometry': ('CC0 Innerscene Maya, furnished lab corridor' if args.scene_profile == 'lab'
                              else 'Cesium Man CC-BY-4.0 skinned animation; baseline corridor'),
-                'crowd_size': (10 if scenario.name=='explainer' else args.crowd_size), 'ros_domain': args.ros_domain,
+                'crowd_size': (10 if scenario.name in ('explainer','explainer_weave','wander') else args.crowd_size), 'seed': args.seed, 'ros_domain': args.ros_domain,
                 'runtime_tuning':asdict(tuning), 'camera_contract':asdict(tuning.camera_profile()), 'render_quality': args.render_quality, 'drive': asdict(drive) if drive else None, 'frame': 'world', 'floor_z': 0., 'output_dir': str(output)}
     if args.scene_profile == 'f3':
         from ridgeback_leader_follow.f3_scene import GEOMETRY, manifest_entry

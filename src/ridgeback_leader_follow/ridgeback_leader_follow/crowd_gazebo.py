@@ -137,9 +137,14 @@ def run(scenario, duration, output, writer, gui, record=False, scene_profile='ba
                 wait_for_follower(drive, monitor)
                 robot_truth = (output / 'robot_truth.csv').open('w')
                 robot_truth.write('stamp,scenario_time,x,y,yaw,cmd_vx,cmd_vy,cmd_wz\n')
-            ok, response = transport.request('/leader_follow/start', Empty(), Empty, Boolean, 10000)
-            if not ok or not response.data:
-                raise RuntimeError('Crowd start failed')
+            # The start service is idempotent; a busy host can time a request out.
+            for _ in range(5):
+                ok, response = transport.request('/leader_follow/start', Empty(), Empty, Boolean, 10000)
+                if ok and response.data:
+                    break
+                monitor.spin(.2)
+            else:
+                raise RuntimeError('Crowd start failed after 5 requests')
             by_name = {p.name: p for p in scenario.people}
             last = -1.
             wall_deadline = time.monotonic() + max(120., duration * 10 / (drive.real_time_factor if drive else 1.))

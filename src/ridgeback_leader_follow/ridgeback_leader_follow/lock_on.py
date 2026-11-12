@@ -60,6 +60,7 @@ class LeaderLock:
         gallery_size: int = 8,
         recovery_margin: float = 0.05,
         min_update_score: float = 0.50,
+        continuity_overrides_appearance: bool = False,
     ) -> None:
         self.acquire_interval = max(1, int(acquire_interval))
         self.acquire_frames = max(1, int(acquire_frames))
@@ -69,6 +70,11 @@ class LeaderLock:
         self.gallery_size = max(1, int(gallery_size))
         self.recovery_margin = float(recovery_margin)
         self.min_update_score = float(min_update_score)
+        # When true, a visible appearance mismatch does not drop a lock that the
+        # continuity check still confirms (same track, consistent motion, no
+        # competing person): the leader turning to face the camera changes
+        # appearance without changing identity. The gallery is not updated.
+        self.continuity_overrides_appearance = bool(continuity_overrides_appearance)
         self.reset()
 
     def reset(self) -> None:
@@ -106,6 +112,11 @@ class LeaderLock:
                     and continuity is not None and continuity(selected)):
                 self.missing_frames = 0
                 self.reason = "identity_held_by_track_continuity"
+            elif (selected is not None and self.continuity_overrides_appearance and continuity is not None
+                    and (similarity is None or similarity < self.match_threshold)):
+                # Continuity was confirmed by the first branch's check.
+                self.missing_frames = 0
+                self.reason = "appearance_mismatch_held_by_track_continuity"
             elif selected is None or similarity is None or similarity < self.match_threshold:
                 self._begin_uncertain("target_missing" if selected is None else "appearance_mismatch")
             else:

@@ -267,3 +267,43 @@ def test_performance_lighting_preserves_cast_paths_and_office(tmp_path):
         assert normalized(reference)==normalized(fast),tag
     assert fast.find('scene/shadows').text=='false'
     assert len(fast.findall('light'))==3
+
+
+def test_explainer_weave_only_changes_the_leader_and_stays_natural():
+    from ridgeback_leader_follow.explainer_motion import load_scenario as illustration, load_weave_scenario
+    from ridgeback_leader_follow.realistic_scene import scene_layout
+    base,weave=illustration(),load_weave_scenario()
+    assert weave.name=='explainer_weave' and weave.duration==base.duration
+    assert weave.people[1:]==base.people[1:]
+    leader,original=weave.people[0],base.people[0]
+    times=np.linspace(0,24,481)
+    path=np.array([leader.sample(t)[:2] for t in times])
+    route=np.array([original.sample(t)[:2] for t in times])
+    sideways=np.hypot(*(path-route).T)
+    assert .5<sideways.max()<=.61 and sideways[0]==pytest.approx(0) and sideways[-1]==pytest.approx(0,abs=1e-6)
+    speed=np.hypot(*np.diff(path,axis=0).T)/(times[1]-times[0])
+    assert speed.max()<1.25
+    for person in weave.people[1:]:
+        other=np.array([person.sample(t)[:2] for t in times])
+        assert np.hypot(*(path-other).T).min()>.75,person.name
+    assert scene_layout('modern_office',weave)==layout('modern_office')
+
+
+@pytest.mark.parametrize('seed',(0,1,5))
+def test_wander_leader_is_random_reproducible_and_clear(seed):
+    from ridgeback_leader_follow.wander_scenario import (FURNITURE_CLEARANCE, PEOPLE_CLEARANCE,
+                                                         furniture_distance, load_wander_scenario, static_obstacles)
+    scenario=load_wander_scenario(seed)
+    assert scenario==load_wander_scenario(seed)
+    assert scenario.people[0].waypoints!=load_wander_scenario(seed+10).people[0].waypoints
+    leader=scenario.people[0]
+    times=np.arange(0,scenario.duration,.1)
+    path=np.array([leader.sample(t)[:2] for t in times])
+    assert path[0]==pytest.approx((1.4,0.))
+    assert np.hypot(*np.diff(path,axis=0).T).sum()>20.
+    assert (np.hypot(*np.diff(path,axis=0).T)/.1).max()<1.1
+    obstacles=static_obstacles()
+    assert min(furniture_distance(p,obstacles) for p in path[::5])>FURNITURE_CLEARANCE-.06
+    for person in scenario.people[1:]:
+        other=np.array([person.sample(t)[:2] for t in times])
+        assert np.hypot(*(path-other).T).min()>=PEOPLE_CLEARANCE-1e-6

@@ -13,9 +13,11 @@ lock coverage is 87–100% with the profile's continuity confidence floor
 ([reference](../leader_following/recognition.md)).
 Robot/Thor performance is deferred until hardware access. F4 has started:
 `follow_controller` drove the robot through Nav2 behind the leader in the
-leader-alone scene in both Isaac and Gazebo
+leader-alone scene in both Isaac and Gazebo, and through the office crowd and
+a randomly wandering leader with predicted bystanders slowing it
 ([reference](../leader_following/architecture.md#follow_controller-node)).
-The other scenarios and the metrics remain. F5–F6 remain open;
+Open: the robot can drive into a standing leader, the lock can be lost after a
+crosser hides the leader, and the metrics remain. F5–F6 remain open;
 no leader-following controller has driven the physical robot.
 
 ## Goal

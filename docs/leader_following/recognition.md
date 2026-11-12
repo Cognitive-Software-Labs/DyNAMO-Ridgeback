@@ -91,7 +91,13 @@ with confidence at least `continuity_min_confidence`, unchanged frame, successiv
 750 ms apart, and position within `.75 m` of the previous velocity prediction.
 A competing observation at or above that confidence, with prediction error
 within `.1 m` of the selected track, makes continuity ambiguous and drops the
-lock. The node default floor is `.5`; the F3 profile uses `.25`. Partly
+lock. The node default floor is `.5`; the F3 profile uses `.25`. Observations
+within `duplicate_radius` of the selected track (profile `.3 m`, node default
+`0`) are duplicates of the same body, not competing people, for continuity and
+motion recovery. With `hold_on_appearance_mismatch` (profile `true`, node
+default `false`), a visible appearance mismatch does not drop a lock that
+continuity still confirms: a leader turning toward the camera changes
+appearance, not identity. The gallery is not updated from such frames. Partly
 occluded leaders often produce camera boxes scored around `.3` that still carry
 a matching appearance. At `.5`, those single frames caused almost every lock
 drop in the F3 cases. Appearance is still checked on every frame that has it.
