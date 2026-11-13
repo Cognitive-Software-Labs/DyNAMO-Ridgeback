@@ -139,14 +139,18 @@ The state check takes one snapshot. The `bench_` entities present must be
 exactly the kept props, objects and targets, each within 0.005 m and
 0.002 rad of its commanded pose, with the robot within the same tolerance of
 its placement. Otherwise the trial fails with `state_mismatch` and is skipped,
-with every difference logged. The check also records a SHA-256 fingerprint
-over run-independent labels (`robot`, `bg_<prop>`, `obj_<i>`, `target_<i>`),
-so the same scene gives the same fingerprint in any run and any order. The
-trial's own rollback still covers only its objects and targets. At the end of
-the run every prop is deleted and the robot returns home. An interrupted run
-leaves the rest under the `bench_` prefix, which the sweep reaps and which
-makes the next single run refuse to start; a robot it leaves placed is moved
-home by the next placed run.
+with every difference logged. Isaac audits Fabric, its render scene, after
+entity deletion and attempts to remove leftover prims. Isaac reports any
+residue it still finds when queried, so `state_mismatch` can list a `bench_`
+entity the run already deleted.
+
+The check also records a SHA-256 fingerprint over run-independent labels
+(`robot`, `bg_<prop>`, `obj_<i>`, `target_<i>`), so the same scene gives the
+same fingerprint in any run and any order. The trial's own rollback still
+covers only its objects and targets. At the end of the run every prop is
+deleted and the robot returns home. An interrupted run leaves the rest under
+the `bench_` prefix, which the sweep reaps and which makes the next single run
+refuse to start. The next placed run moves the robot home.
 
 **Control arm.** `background_props:=false` (only with a background) places
 every scene by the same `dx` and runs the same moves and state checks in the

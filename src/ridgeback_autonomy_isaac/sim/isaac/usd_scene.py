@@ -53,9 +53,37 @@ def freeze_dynamics(prim) -> int:
 class UsdScene:
     """Spawns, removes, and reads static entities on one stage."""
 
-    def __init__(self, stage, scope: str = SPAWNED_ENTITY_SCOPE) -> None:
+    def __init__(self, stage, scope: str = SPAWNED_ENTITY_SCOPE, *,
+                 stage_id: int | None = None) -> None:
         self._stage = stage
         self._scope = scope
+        self._stage_id = stage_id
+        self._fabric_stage = None
+
+    def _fabric(self):
+        if self._fabric_stage is None and self._stage_id is not None:
+            from usdrt import Usd
+
+            self._fabric_stage = Usd.Stage.Attach(self._stage_id)
+        return self._fabric_stage
+
+    def fabric_prims_under(self, prefix: str) -> list[str]:
+        fabric = self._fabric()
+        if fabric is None:
+            return []
+        # Select directly from Fabric. A stale child may outlive its parent,
+        # and it can have any type, including guide geometry and Xforms.
+        paths = fabric.SelectPrims(device='cpu', want_paths=True).GetPaths()
+        prefix = prefix.rstrip('/')
+        return [path for path in map(str, paths)
+                if path == prefix or path.startswith(prefix + '/')]
+
+    def remove_fabric_prims(self, paths: list[str]) -> list[str]:
+        fabric = self._fabric()
+        if fabric is None:
+            return []
+        return [path for path in sorted(paths, key=lambda path: (-path.count('/'), path))
+                if fabric.RemovePrim(path)]
 
     def spawn(self, prim_path, resource_path, position, orientation) -> None:
         from pxr import Gf, Sdf, Tf, UsdGeom

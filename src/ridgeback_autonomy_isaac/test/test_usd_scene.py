@@ -120,3 +120,25 @@ def test_registry_and_stage_stay_in_step(stage, tmp_path) -> None:
     entities.delete(name)
     assert scope.GetChildren() == []
     assert entities.names() == ['r100_0001/robot']
+
+
+def test_without_kit_fabric_operations_are_noops(stage):
+    scene = UsdScene(stage)
+    assert scene.fabric_prims_under(ENTITY) == []
+    assert scene.remove_fabric_prims([ENTITY]) == []
+
+
+def test_fabric_removal_is_deepest_first(stage, monkeypatch):
+    parent = f'{ENTITY}/model'
+    child = f'{parent}/leaf'
+    attempted = []
+
+    class Fabric:
+        def RemovePrim(self, path):
+            attempted.append(path)
+            return path != parent
+
+    scene = UsdScene(stage)
+    monkeypatch.setattr(scene, '_fabric_stage', Fabric())
+    assert scene.remove_fabric_prims([ENTITY, parent, child]) == [child, ENTITY]
+    assert attempted == [child, parent, ENTITY]

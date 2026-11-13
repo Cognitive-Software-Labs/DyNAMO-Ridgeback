@@ -382,8 +382,8 @@ def run(app, args) -> int:
     # thread and run below, once per update, so no ROS callback ever edits the
     # stage. A placement goes through the same rig reset as sim/reset.
     scene_control = SceneControlService(SceneEntities(
-        UsdScene(stage), robot_name=robot_entity_name(args.namespace),
-        move_robot=rig.set_planar_pose))
+        UsdScene(stage, stage_id=ctx.get_stage_id()),
+        robot_name=robot_entity_name(args.namespace), move_robot=rig.set_planar_pose))
     print(f"scene control services under {scene_control.service_namespace}",
           flush=True)
 
