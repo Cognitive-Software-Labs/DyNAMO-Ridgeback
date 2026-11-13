@@ -120,8 +120,13 @@ The controller server publishes `cmd_vel_mppi`. While following or holding,
 `follow_controller` replaces its turn rate with `heading_gain` times the
 leader's bearing error, limited to `max_heading_rate`, and republishes it on
 `cmd_vel_nav`. The holonomic base then keeps the camera on the leader while
-MPPI steers translation around people. Otherwise the command passes through
-unchanged. `leader_follow/follow_status` publishes
+MPPI steers translation around people. While following, it also caps the
+translation speed at the leader's pace: the leader's velocity away from the
+robot plus `pace_gain` per metre beyond `follow_distance`, at most
+`max_pace`, keeping MPPI's direction. The robot slows and stops with the
+leader, and a leader who turns back toward the robot stops it rather than
+raising the cap. The cap only lowers MPPI's speed. Otherwise the command
+passes through unchanged. `leader_follow/follow_status` publishes
 `following`, `holding` or `stopped` with its reason.
 
 | Parameter | Default | Meaning |
@@ -131,6 +136,7 @@ unchanged. `leader_follow/follow_status` publishes
 | `lead_time` | `1.5` | Seconds of predicted leader motion added to the goal |
 | `stale_timeout` | `0.5` | Seconds before a missing `LOCKED` state stops the robot |
 | `heading_gain`, `max_heading_rate` | `2.0`, `1.0` | Turn toward the leader: rad/s per rad of bearing error, and its limit |
+| `pace_matching`, `pace_gain`, `max_pace` | `true`, `0.8`, `1.3` | Cap translation at the leader's receding speed plus this gain per metre of gap error, and its limit |
 | `global_frame`, `base_frame` | `odom`, `base_link` | Goal frame and robot frame |
 
 Whenever the controller server is silent for 0.15 s (navigation cancelled,
@@ -216,7 +222,12 @@ walkers. Two more scenarios use the same office and walkers:
 `explainer_weave`, where the leader drifts 0.6 m either side of the
 illustrated route, and `wander`, where the leader walks a random route through
 the open hall for 40 s (`--seed`, default 0), clear of furniture and of the
-other walkers.
+other walkers. In `wander` the other walkers stand once their 24 s routes end.
+`roam` keeps all of them moving for 60 s, each walking its route forward and
+back, which preserves their spacing. Its leader takes 2–4.5 m legs with turns
+up to 120°, a new pace of 0.6–1.35 m/s per stretch, and 1–3 s stops at about a
+third of the corners. Routes that would walk the leader within 0.9 m of a
+simulated follower are rejected (`--seed` as for `wander`).
 
 `tools/run_leader_follow_sim` runs one simulation with the follow stack in a
 private ROS domain and stops both when the scene ends. It defaults to Isaac,
@@ -226,16 +237,47 @@ the office and the wandering leader:
 tools/run_leader_follow_sim --backend isaac --scenario crowd --gui
 ```
 
-`--backend gz`, `--scenario NAME`, `--seed N` and other `crowd_runner`
-options pass through. Evidence goes to `artifacts/leader-following/<time>-follow-<backend>-<scenario>/`
-with the follow-stack log beside it.
+`--backend gz`, `--scenario NAME`, `--seed N`, `--output DIR` and other
+`crowd_runner` options pass through. `--rviz` opens RViz with
+`rviz/follow.rviz`: the leader and tracked people from `follow_markers`
+(leader green while `LOCKED`, amber `UNCERTAIN`, red `LOST`), the global and
+MPPI plans, the follow goal, both costmaps, predicted bystanders, the lidar
+scans, the collision stop zone and the front camera. `--no-pace-matching`
+turns the speed cap off. Evidence goes to
+`artifacts/leader-following/<time>-follow-<backend>-<scenario>/`, with the
+follow-stack log, `follow_recorder` events (`.events.jsonl`) and the
+`follow_metrics` result (`.metrics.json`) beside it.
 
-The plan's metrics are not yet implemented. Scripted walkers do not avoid the
-robot, so a stopped robot can still be walked into. Two faults are open: with
-the leader standing still, the robot has driven to within 0.1 m of them
-instead of holding `follow_distance`, and after a crosser hides the leader the
-lock can be lost for good. Under heavy host load, Clearpath's Gazebo controller
-spawner can time out (5 s), leaving the robot unable to move; rerun.
+## Following metrics
+
+`follow_recorder` logs the leader state, follow status, collision-monitor
+actions and odometry during a run. `follow_metrics RUN...` scores runs against
+simulator truth with the plan's metrics: correct-lock fraction, wrong-follow
+time (locked on a bystander while not stopped), ID switches (changes of the
+simulated person the lock points at), recovery time after each loss of the
+leader and any unrecovered loss at the end, distance-keeping error
+|centre distance − 1.2 m| from the first lock, closest leader approach,
+minimum bystander clearance and collision-monitor stops. Lock targets are
+mapped from odometry into the world through the recorded odometry and truth
+robot poses, so odometry drift does not mislabel them. A run succeeds when the
+scene completed with no wrong-follow time, locked on the leader in its last
+second and within 3 m of them. For repeated configurations it reports the
+success rate and each metric's median and range.
+
+`tools/run_leader_follow_campaign` runs the matrix: by default the six
+scenarios, with crowds of 2, 4 and 8, in both simulators, ten repetitions
+each, one after another. It retries a run whose simulator failed or whose
+Gazebo controller spawner timed out, keeps finished runs so an interrupted
+campaign resumes, and writes `metrics.json` and `metrics.md`.
+
+Scripted walkers do not avoid the robot, so a stopped robot can still be
+walked into; the robot does not back away from a leader who walks back toward
+it. After the lock is `LOST`, the robot stands still and does not turn to look
+for a leader behind it. In the first Isaac `roam` runs (2026-11-13) the robot
+reached 1.3 m/s but typically moved at about 0.45 m/s whatever the leader's
+pace, trailing 2.5–2.8 m. The limiting stage, the bystander speed limit or
+MPPI's approach to each short goal, is not yet identified. Under heavy host load, Clearpath's Gazebo controller spawner can time out
+(5 s), leaving the robot unable to move.
 
 ## Crowd simulation
 
@@ -266,4 +308,4 @@ wrapper on 24,000 scripted frames with no differences.
 - [Closed-loop following in Gazebo](../../archive/engineering/2026-11-11-f4-gazebo-follow.md) — first Gazebo leader-alone run.
 - [Following speed and heading in the explainer office](../../archive/engineering/2026-11-11-f4-office-speed.md) — MPPI speed cap, stop zone, leader-facing turn control and the Gazebo lock losses.
 - [Gazebo odometry heading during following](../../archive/engineering/2026-11-11-f4-gazebo-odometry.md) — mecanum yaw error, the IMU-yaw EKF override and the corrected explainer result.
-- [Predicting bystanders during following](../../archive/engineering/2026-11-12-f4-people-prediction.md) — the side-crosser near miss, the speed-limit crossing grid, Gazebo office runs and the open leader-approach fault.
+- [Predicting bystanders during following](../../archive/engineering/2026-11-12-f4-people-prediction.md) — the side-crosser near miss, the speed-limit crossing grid, Gazebo office runs and closest approaches.

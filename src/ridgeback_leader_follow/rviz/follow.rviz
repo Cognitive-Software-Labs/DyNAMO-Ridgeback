@@ -1,0 +1,203 @@
+Panels:
+  - Class: rviz_common/Displays
+    Name: Displays
+    Help Height: 0
+    Splitter Ratio: 0.5
+    Tree Height: 400
+  - Class: rviz_common/Views
+    Name: Views
+    Splitter Ratio: 0.5
+Visualization Manager:
+  Class: ""
+  Displays:
+    - Class: rviz_default_plugins/Grid
+      Name: Grid
+      Enabled: true
+      Cell Size: 1
+      Plane Cell Count: 40
+      Color: 160; 160; 164
+      Alpha: 0.4
+      Reference Frame: <Fixed Frame>
+      Value: true
+    - Class: rviz_default_plugins/Map
+      Name: Global costmap
+      Enabled: true
+      Color Scheme: costmap
+      Alpha: 0.35
+      Draw Behind: true
+      Topic:
+        Depth: 5
+        Durability Policy: Transient Local
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: global_costmap/costmap
+      Value: true
+    - Class: rviz_default_plugins/Map
+      Name: Local costmap
+      Enabled: true
+      Color Scheme: costmap
+      Alpha: 0.5
+      Topic:
+        Depth: 5
+        Durability Policy: Transient Local
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: local_costmap/costmap
+      Value: true
+    - Class: rviz_default_plugins/RobotModel
+      Name: RobotModel
+      Enabled: true
+      Description Source: Topic
+      Description Topic:
+        Depth: 5
+        Durability Policy: Transient Local
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: robot_description
+      TF Prefix: ""
+      Value: true
+    - Class: rviz_default_plugins/LaserScan
+      Name: Front lidar
+      Enabled: true
+      Color Transformer: FlatColor
+      Color: 255; 60; 60
+      Size (m): 0.05
+      Style: Flat Squares
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Reliability Policy: Best Effort
+        Value: sensors/lidar2d_0/scan
+      Value: true
+    - Class: rviz_default_plugins/LaserScan
+      Name: Rear lidar
+      Enabled: true
+      Color Transformer: FlatColor
+      Color: 255; 140; 60
+      Size (m): 0.05
+      Style: Flat Squares
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Reliability Policy: Best Effort
+        Value: sensors/lidar2d_1/scan
+      Value: true
+    - Class: rviz_default_plugins/Path
+      Name: Global plan
+      Enabled: true
+      Color: 40; 120; 255
+      Line Style: Billboards
+      Line Width: 0.04
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: plan
+      Value: true
+    - Class: rviz_default_plugins/Path
+      Name: Local plan (MPPI)
+      Enabled: true
+      Color: 0; 220; 220
+      Line Style: Billboards
+      Line Width: 0.05
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: local_plan
+      Value: true
+    - Class: rviz_default_plugins/Pose
+      Name: Follow goal
+      Enabled: true
+      Shape: Arrow
+      Color: 255; 0; 255
+      Shaft Length: 0.5
+      Head Length: 0.2
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: goal_update
+      Value: true
+    - Class: rviz_default_plugins/Polygon
+      Name: Collision stop zone
+      Enabled: true
+      Color: 255; 0; 0
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: collision_monitor/stop_zone
+      Value: true
+    - Class: rviz_default_plugins/MarkerArray
+      Name: People and leader
+      Enabled: true
+      Namespaces: {}
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: leader_follow/markers
+      Value: true
+    - Class: rviz_default_plugins/PointCloud2
+      Name: Predicted bystanders
+      Enabled: true
+      Color Transformer: FlatColor
+      Color: 255; 200; 0
+      Size (m): 0.08
+      Style: Flat Squares
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: leader_follow/people_obstacles
+      Value: true
+    - Class: rviz_default_plugins/Image
+      Name: Front camera
+      Enabled: true
+      Normalize Range: true
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Reliability Policy: Best Effort
+        Value: sensors/camera_0/color/image
+      Value: true
+  Enabled: true
+  Global Options:
+    Background Color: 40; 40; 48
+    Fixed Frame: odom
+    Frame Rate: 30
+  Name: root
+  Tools:
+    - Class: rviz_default_plugins/MoveCamera
+    - Class: rviz_default_plugins/Select
+  Value: true
+  Views:
+    Current:
+      Class: rviz_default_plugins/Orbit
+      Name: Current View
+      Target Frame: base_link
+      Distance: 14
+      Pitch: 1.0
+      Yaw: 3.14
+      Focal Point:
+        X: 2
+        Y: 0
+        Z: 0
+      Near Clip Distance: 0.01
+      Value: Orbit (rviz)
+    Saved: ~
+Window Geometry:
+  Width: 1500
+  Height: 950
+  Front camera:
+    collapsed: false

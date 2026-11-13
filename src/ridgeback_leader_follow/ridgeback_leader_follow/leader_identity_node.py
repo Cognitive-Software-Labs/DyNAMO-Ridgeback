@@ -169,12 +169,22 @@ class LeaderIdentity:
         update = self.lock.update(tracks, acquire=propose, confirm=confirm, continuity=continuity,
                                   recovery_filter=motion_candidates)
         if update.valid(self.lock.state):
-            self.nonleader_ids.discard(update.selected.track_id)
-            self.nonleader_features.pop(update.selected.track_id,None)
-            self.nonleader_ids.update(track_id for track_id in observations
-                                      if track_id != update.selected.track_id)
+            leader_point = observations[update.selected.track_id].position
+            def same_body(track_id):
+                # A second track within duplicate_radius is the leader seen
+                # twice, not a bystander: keep it out of the non-leader memory,
+                # or the leader's own appearance blocks recovery on it later.
+                point = observations[track_id].position
+                return math.hypot(point.x-leader_point.x, point.y-leader_point.y) < self.duplicate_radius
+            others = {track_id for track_id in observations
+                      if track_id != update.selected.track_id and not same_body(track_id)}
+            for track_id in observations:
+                if track_id not in others:
+                    self.nonleader_ids.discard(track_id)
+                    self.nonleader_features.pop(track_id,None)
+            self.nonleader_ids.update(others)
             for track in tracks:
-                if track.track_id != update.selected.track_id and np.asarray(track.feature).size:
+                if track.track_id in others and np.asarray(track.feature).size:
                     history=self.nonleader_features.setdefault(track.track_id,[])
                     history.append(np.asarray(track.feature,dtype=np.float32).copy())
                     self.nonleader_features[track.track_id]=history[-8:]

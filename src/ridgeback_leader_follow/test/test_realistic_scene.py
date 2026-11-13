@@ -307,3 +307,42 @@ def test_wander_leader_is_random_reproducible_and_clear(seed):
     for person in scenario.people[1:]:
         other=np.array([person.sample(t)[:2] for t in times])
         assert np.hypot(*(path-other).T).min()>=PEOPLE_CLEARANCE-1e-6
+
+
+@pytest.mark.parametrize('seed',(0,3))
+def test_roam_leader_stops_changes_pace_and_everyone_keeps_moving(seed):
+    import itertools
+    from ridgeback_leader_follow.wander_scenario import (FOLLOWER_CLEARANCE, FURNITURE_CLEARANCE, PEOPLE_CLEARANCE,
+                                                         ROAM_PACE, follower_gap, furniture_distance,
+                                                         load_roam_scenario, static_obstacles)
+    from ridgeback_leader_follow.explainer_motion import load_scenario as illustration
+    scenario=load_roam_scenario(seed)
+    assert scenario==load_roam_scenario(seed) and len(scenario.people)==11
+    times=np.arange(0,scenario.duration,.1)
+    path=np.array([scenario.people[0].sample(t)[:2] for t in times])
+    speed=np.hypot(*np.diff(path,axis=0).T)/.1
+    assert path[0]==pytest.approx((1.4,0.))
+    assert speed.max()<ROAM_PACE[1]+.05
+    assert follower_gap(path,.1)>=FOLLOWER_CLEARANCE
+    assert sum(1 for a,b in zip(speed,speed[1:]) if a>.1 and b<.01)>=3          # stops
+    assert np.percentile(speed[speed>.1],90)-np.percentile(speed[speed>.1],10)>.25  # pace changes
+    obstacles=static_obstacles()
+    assert min(furniture_distance(p,obstacles) for p in path[::5])>FURNITURE_CLEARANCE-.06
+    others=[np.array([p.sample(t)[:2] for t in times]) for p in scenario.people[1:]]
+    for other in others:
+        assert np.hypot(*(path-other).T).min()>=PEOPLE_CLEARANCE-1e-6
+    # Walkers ping-pong: still moving after the 24 s choreography, clearances unchanged.
+    original=[np.array([p.sample(t)[:2] for t in np.arange(0,24,.1)]) for p in illustration().people[1:]]
+    moved=[np.hypot(*np.diff(o[-100:],axis=0).T).sum()>1. for o in others]
+    assert sum(moved)==sum(np.hypot(*np.diff(o,axis=0).T).sum()>1. for o in original)
+    gap=lambda tracks:min(np.hypot(*(a-b).T).min() for a,b in itertools.combinations(tracks,2))
+    assert gap(others)==pytest.approx(gap(original),abs=.02)
+
+
+def test_follower_gap_catches_a_leader_who_walks_back_into_the_robot():
+    from ridgeback_leader_follow.wander_scenario import follower_gap
+    t=np.arange(0,10,.1)
+    away=np.stack([1.4+1.*t,0*t],axis=1)
+    back=np.stack([np.where(t<4,1.4+t,5.4-1.3*(t-4)),0*t],axis=1)
+    assert follower_gap(away,.1)>1.1
+    assert follower_gap(back,.1)<.5

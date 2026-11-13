@@ -87,3 +87,33 @@ def test_gazebo_drive_localization_takes_yaw_from_the_imu_only():
     assert ekf['odom0_config'][6] and ekf['odom0_config'][7] and ekf['imu0_config'][11]
     with pytest.raises(ValueError):
         drive_localization({'platform': {'extras': {'ros_parameters': {'ekf_node': {}}}}})
+
+
+def test_pace_matches_the_leader_and_closes_the_gap():
+    from ridgeback_leader_follow.follow_controller import pace_speed
+    # At the follow distance the robot walks at the leader's pace.
+    assert pace_speed(1.2, 1., 1.2, .8, 1.3) == pytest.approx(1.)
+    # Lagging 1 m behind a walking leader: faster, capped at the platform limit.
+    assert pace_speed(2.2, 1., 1.2, .8, 1.3) == pytest.approx(1.3)
+    # Leader stopped 0.5 m beyond the follow distance: a slow approach.
+    assert pace_speed(1.7, 0., 1.2, .8, 1.3) == pytest.approx(.4)
+    # Too close or invalid input: no translation.
+    assert pace_speed(.9, 0., 1.2, .8, 1.3) == 0.
+    assert pace_speed(math.nan, 1., 1.2, .8, 1.3) == 0.
+    # Leader turned and walks back toward the robot from 2 m: stop, do not speed up.
+    assert pace_speed(2., -1.3, 1.2, .8, 1.3) == 0.
+
+
+def test_receding_speed_is_the_component_away_from_the_robot():
+    from ridgeback_leader_follow.follow_controller import receding_speed
+    assert receding_speed((0., 0.), (2., 0.), (1., 0.)) == pytest.approx(1.)
+    assert receding_speed((0., 0.), (2., 0.), (-1.3, 0.)) == pytest.approx(-1.3)
+    assert receding_speed((0., 0.), (2., 0.), (0., 1.)) == pytest.approx(0.)
+
+
+def test_speed_limit_keeps_nav2_direction():
+    from ridgeback_leader_follow.follow_controller import limit_speed
+    vx, vy = limit_speed(.6, .8, .5)
+    assert math.hypot(vx, vy) == pytest.approx(.5)
+    assert math.atan2(vy, vx) == pytest.approx(math.atan2(.8, .6))
+    assert limit_speed(.3, 0., .5) == (.3, 0.)

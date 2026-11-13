@@ -11,6 +11,7 @@ import os
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, GroupAction, IncludeLaunchDescription
+from launch.conditions import IfCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node, PushRosNamespace, SetParameter
@@ -61,6 +62,10 @@ def generate_launch_description():
         DeclareLaunchArgument('follow_distance', default_value='1.2'),
         DeclareLaunchArgument('hold_tolerance', default_value='0.15'),
         DeclareLaunchArgument('lead_time', default_value='1.5'),
+        DeclareLaunchArgument('pace_matching', default_value='true',
+                              description="Cap the robot's speed at the leader's pace plus the gap error"),
+        DeclareLaunchArgument('rviz', default_value='false',
+                              description='Open RViz with the follow view (people, leader, costmaps, plans)'),
         IncludeLaunchDescription(PythonLaunchDescriptionSource(
             os.path.join(share, 'launch', 'leader_recognition.launch.py')),
             launch_arguments={'namespace': namespace, 'use_sim_time': use_sim_time}.items()),
@@ -81,7 +86,13 @@ def generate_launch_description():
                  parameters=[{'odom_topic': odom_topic}], remappings=tf),
             Node(package='ridgeback_leader_follow', executable='follow_controller', output='screen',
                  parameters=[{name: ParameterValue(LaunchConfiguration(name), value_type=float)
-                              for name in ('follow_distance', 'hold_tolerance', 'lead_time')}],
+                              for name in ('follow_distance', 'hold_tolerance', 'lead_time')},
+                             {'pace_matching': ParameterValue(LaunchConfiguration('pace_matching'), value_type=bool)}],
                  remappings=tf),
+            Node(package='ridgeback_leader_follow', executable='follow_markers', output='log',
+                 condition=IfCondition(LaunchConfiguration('rviz'))),
+            Node(package='rviz2', executable='rviz2', output='log',
+                 arguments=['-d', os.path.join(share, 'rviz', 'follow.rviz')],
+                 condition=IfCondition(LaunchConfiguration('rviz')), remappings=tf),
         ]),
     ])

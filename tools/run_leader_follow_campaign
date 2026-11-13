@@ -1,0 +1,113 @@
+#!/usr/bin/env python3
+"""Run the F4 scenario matrix with tools/run_leader_follow_sim and report follow_metrics.
+
+    tools/run_leader_follow_campaign [--backends gz isaac] [--scenarios ...] [--crowd-sizes 2 4 8]
+                                     [--repetitions 10] [--output DIR]
+
+Every run uses the modern office (the run script's default scene) and a fresh
+private ROS domain, one after another. A run whose simulator failed, or whose
+Gazebo controller spawner timed out (the robot cannot move), is retried up to
+``--retries`` times; the failed attempt stays on disk with a ``-failed``
+suffix. Existing completed runs in the output directory are kept, so an
+interrupted campaign resumes where it stopped. ``metrics.json`` and
+``metrics.md`` hold every run and the per-configuration median and range.
+"""
+import argparse
+import datetime
+import json
+import os
+import subprocess
+import sys
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+SCENARIOS = ('leader_alone', 'crossing', 'lookalike_parallel', 'lookalike_crossing', 'leader_stop', 'crowd')
+SPAWNER_TIMEOUT = 'Switch controller timed out'
+
+
+def configurations(backends, scenarios, crowd_sizes):
+    for backend in backends:
+        for scenario in scenarios:
+            for size in (crowd_sizes if scenario == 'crowd' else (None,)):
+                yield backend, scenario, size
+
+
+def complete(run: Path) -> bool:
+    try:
+        return json.loads((run / 'manifest.json').read_text()).get('status') == 'complete' \
+            and Path(f'{run}.events.jsonl').exists()
+    except (OSError, ValueError):
+        return False
+
+
+def invalid_reason(run: Path, code: int):
+    if code != 0:
+        return f'exit status {code}'
+    log = run / 'simulator.log'
+    if log.exists() and SPAWNER_TIMEOUT in log.read_text(errors='replace'):
+        return 'controller spawner timed out'
+    if not complete(run):
+        return 'incomplete manifest or events'
+    return None
+
+
+def set_aside(run: Path) -> None:
+    for k in range(100):
+        target = run.with_name(f'{run.name}-failed{k}')
+        if not target.exists():
+            break
+    for suffix in ('', '.follow.log', '.events.jsonl', '.metrics.json', '.log'):
+        path = Path(f'{run}{suffix}')
+        if path.exists():
+            path.rename(Path(f'{target}{suffix}'))
+
+
+def main(argv=None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument('--backends', nargs='+', default=['gz', 'isaac'], choices=('gz', 'isaac'))
+    parser.add_argument('--scenarios', nargs='+', default=list(SCENARIOS))
+    parser.add_argument('--crowd-sizes', nargs='+', type=int, default=[2, 4, 8])
+    parser.add_argument('--repetitions', type=int, default=10)
+    parser.add_argument('--retries', type=int, default=3)
+    parser.add_argument('--output', type=Path,
+                        default=Path('artifacts/leader-following') /
+                        f"{datetime.datetime.utcnow():%Y%m%dT%H%M%SZ}-f4-campaign")
+    args, extra = parser.parse_known_args(argv)
+    os.chdir(ROOT)
+    args.output.mkdir(parents=True, exist_ok=True)
+    runs = []
+    domain = 100
+    for backend, scenario, size in configurations(args.backends, args.scenarios, args.crowd_sizes):
+        for rep in range(args.repetitions):
+            name = f"{backend}-{scenario}{f'-{size}' if size else ''}-r{rep:02d}"
+            run = args.output / name
+            if complete(run):
+                runs.append(run)
+                continue
+            for attempt in range(args.retries + 1):
+                if run.exists() or Path(f'{run}.events.jsonl').exists():
+                    set_aside(run)
+                domain = 100 + (domain - 99) % 100
+                command = [str(ROOT / 'tools/run_leader_follow_sim'), '--backend', backend, '--scenario', scenario,
+                           '--output', str(run), *(['--crowd-size', str(size)] if size else []), *extra]
+                print(f'[{name}] attempt {attempt + 1}: domain {domain}', flush=True)
+                with open(f'{run}.log', 'w') as log:
+                    code = subprocess.call(command, stdout=log, stderr=subprocess.STDOUT,
+                                           env={**os.environ, 'ROS_DOMAIN_ID': str(domain)})
+                reason = invalid_reason(run, code)
+                if reason is None:
+                    runs.append(run)
+                    break
+                print(f'[{name}] invalid: {reason}', flush=True)
+            else:
+                print(f'[{name}] gave up after {args.retries + 1} attempts', flush=True)
+    report = subprocess.run([sys.executable, str(ROOT / 'src/ridgeback_leader_follow/ridgeback_leader_follow/follow_metrics.py'),
+                             *map(str, runs), '--json', str(args.output / 'metrics.json')],
+                            capture_output=True, text=True)
+    (args.output / 'metrics.md').write_text(report.stdout + report.stderr)
+    print(report.stdout + report.stderr)
+    return report.returncode
+
+
+if __name__ == '__main__':
+    raise SystemExit(main())

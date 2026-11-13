@@ -16,8 +16,12 @@ Robot/Thor performance is deferred until hardware access. F4 has started:
 leader-alone scene in both Isaac and Gazebo, and through the office crowd and
 a randomly wandering leader with predicted bystanders slowing it
 ([reference](../leader_following/architecture.md#follow_controller-node)).
-Open: the robot can drive into a standing leader, the lock can be lost after a
-crosser hides the leader, and the metrics remain. F5–F6 remain open;
+Duplicate leader tracks no longer block re-acquisition after a crosser, the
+robot's speed follows the leader's pace, a `roam` office scene keeps all
+eleven walkers moving, and `follow_metrics` with
+`tools/run_leader_follow_campaign` score the plan's metrics. Open: the robot
+trails a walking leader at about 0.45 m/s, and the ten-repetition campaign in
+both simulators has not run. F5–F6 remain open;
 no leader-following controller has driven the physical robot.
 
 ## Goal

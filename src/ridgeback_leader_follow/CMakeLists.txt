@@ -19,6 +19,12 @@ install(PROGRAMS ridgeback_leader_follow/follow_controller.py
   DESTINATION lib/${PROJECT_NAME} RENAME follow_controller)
 install(PROGRAMS ridgeback_leader_follow/people_predictor.py
   DESTINATION lib/${PROJECT_NAME} RENAME people_predictor)
+install(PROGRAMS ridgeback_leader_follow/follow_recorder.py
+  DESTINATION lib/${PROJECT_NAME} RENAME follow_recorder)
+install(PROGRAMS ridgeback_leader_follow/follow_metrics.py
+  DESTINATION lib/${PROJECT_NAME} RENAME follow_metrics)
+install(PROGRAMS ridgeback_leader_follow/follow_markers.py
+  DESTINATION lib/${PROJECT_NAME} RENAME follow_markers)
 install(PROGRAMS ridgeback_leader_follow/crowd_runner.py
   DESTINATION lib/${PROJECT_NAME} RENAME crowd_scene)
 install(PROGRAMS ridgeback_leader_follow/crowd_qualify.py
@@ -33,7 +39,7 @@ install(PROGRAMS ridgeback_leader_follow/benchmarking/corpus.py
   DESTINATION lib/${PROJECT_NAME} RENAME record_people_corpus)
 install(PROGRAMS ridgeback_leader_follow/benchmarking/sweep.py
   DESTINATION lib/${PROJECT_NAME} RENAME benchmark_people)
-install(DIRECTORY config DESTINATION share/${PROJECT_NAME})
+install(DIRECTORY config rviz DESTINATION share/${PROJECT_NAME})
 install(DIRECTORY launch DESTINATION share/${PROJECT_NAME})
 install(DIRECTORY sim benchmark_native DESTINATION share/${PROJECT_NAME})
 install(FILES ridgeback_leader_follow/benchmarking/candidate-sources.json
@@ -66,6 +72,7 @@ if(BUILD_TESTING)
   ament_add_pytest_test(test_leader_identity test/test_leader_identity.py)
   ament_add_pytest_test(test_follow_controller test/test_follow_controller.py)
   ament_add_pytest_test(test_people_predictor test/test_people_predictor.py)
+  ament_add_pytest_test(test_follow_metrics test/test_follow_metrics.py)
   ament_add_pytest_test(test_crowd_scenarios test/test_crowd_scenarios.py)
   ament_add_pytest_test(test_people_benchmark test/test_people_benchmark.py)
 endif()

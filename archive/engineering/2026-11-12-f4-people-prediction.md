@@ -83,12 +83,20 @@ start the crowd; the start request is now retried five times.
 An operator run with `tools/run_leader_follow_sim --backend isaac --scenario
 crowd --isaac-step-hz 60 --gui` (`20261112T103934Z-follow-isaac-crowd`)
 finished and stopped by itself. The robot fell up to 6.2 m behind and caught
-up to 1.6 m at the end, at up to 1.17 m/s, with no wrong-person time. Two
-faults appeared:
+up to 1.6 m at the end, at up to 1.17 m/s, with no wrong-person time. It came
+no closer than 1.61 m to the leader and 0.99 m to a bystander.
 
-- While the leader stood still for the first 3.2 s, the robot drove to
-  0.08 m centre distance at about 0.8 m/s instead of holding 1.2 m back. Older
-  runs show the same: an earlier Isaac crowd run reached 0.00 m and a Gazebo
-  explainer diagnostic run 0.01 m. The cause is not yet known.
-- At about 15 s it overtook `lf_crowd_2`, crossing at 0.8 m/s, at 0.45 m and
-  about 1.1 m/s.
+## Closest approaches
+
+[closest_approach.py](assets/2026-11-12-f4-people-prediction/closest_approach.py)
+aligns robot and people truth on scenario time. Across the current-code runs
+the leader came closest in the wandering scene, 0.97–1.01 m, when the leader
+turned and walked back past the robot; the robot held still and followed
+again. Only two earlier wander runs (`20261111T181934Z-follow-gz-wander`,
+`v3-isaac-wander-s0-61`) reached 0.16 and 0.08 m.
+
+Correction, 2026-11-12: the first version of this record reported the robot
+driving to 0.08 m of a standing leader and passing a crosser at 0.45 m in the
+Isaac crowd run, and similar leader approaches in earlier runs. That analysis
+paired robot and leader samples from different times; re-aligned on scenario
+time, those approaches did not occur.

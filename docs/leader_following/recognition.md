@@ -94,7 +94,9 @@ within `.1 m` of the selected track, makes continuity ambiguous and drops the
 lock. The node default floor is `.5`; the F3 profile uses `.25`. Observations
 within `duplicate_radius` of the selected track (profile `.3 m`, node default
 `0`) are duplicates of the same body, not competing people, for continuity and
-motion recovery. With `hold_on_appearance_mismatch` (profile `true`, node
+motion recovery. They are also kept out of the known-bystander memory, so a
+duplicate can take over when the selected track ends; storing the leader's own
+appearance as a bystander's once blocked recovery for the rest of a run. With `hold_on_appearance_mismatch` (profile `true`, node
 default `false`), a visible appearance mismatch does not drop a lock that
 continuity still confirms: a leader turning toward the camera changes
 appearance, not identity. The gallery is not updated from such frames. Partly

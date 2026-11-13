@@ -1,22 +1,30 @@
 #!/usr/bin/env bash
 # Run one closed-loop leader-following simulation and stop everything when it ends.
 #
-#   tools/run_leader_follow_sim [--backend isaac|gz] [--scenario NAME] [--seed N] [--gui] [crowd_runner options]
+#   tools/run_leader_follow_sim [--backend isaac|gz] [--scenario NAME] [--seed N]
+#                               [--output DIR] [--gui] [--rviz] [--no-pace-matching]
+#                               [crowd_runner options]
 #
 # Defaults: Isaac, the modern office, the randomly wandering leader (seed 0).
-# Starts the simulator (crowd_runner --drive) and the follow stack
-# (follow_leader.launch.py) in one private ROS domain, waits for the scene to
-# finish, then stops the follow stack. Ctrl+C stops both. Output goes to
-# artifacts/leader-following/<timestamp>/ plus follow.log beside it.
+# Starts the simulator (crowd_runner --drive), the follow stack
+# (follow_leader.launch.py) and follow_recorder in one private ROS domain,
+# waits for the scene to finish, stops the follow stack and prints the
+# follow_metrics row. Ctrl+C stops everything. Output goes to
+# artifacts/leader-following/<timestamp>-follow-<backend>-<scenario>/ (or
+# --output) with the follow-stack log and recorder events beside it. --rviz
+# opens RViz on the follow view; --scenario roam is the livelier office scene.
 set -euo pipefail
 root="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$root"
-backend=isaac scenario=wander seed=0 extra=()
+backend=isaac scenario=wander seed=0 output="" extra=() follow_args=()
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --backend) backend="$2"; shift 2 ;;
     --scenario) scenario="$2"; shift 2 ;;
     --seed) seed="$2"; shift 2 ;;
+    --output) output="$2"; shift 2 ;;
+    --rviz) follow_args+=(rviz:=true); shift ;;
+    --no-pace-matching) follow_args+=(pace_matching:=false); shift ;;
     *) extra+=("$1"); shift ;;
   esac
 done
@@ -24,18 +32,38 @@ set +u; source /opt/ros/jazzy/setup.bash; source install/setup.bash; set -u
 export RMW_IMPLEMENTATION="${RMW_IMPLEMENTATION:-rmw_cyclonedds_cpp}"
 export ROS_DOMAIN_ID="${ROS_DOMAIN_ID:-$((100 + RANDOM % 100))}"
 export ROS_LOG_DIR="${ROS_LOG_DIR:-$root/artifacts/ros}"
-output="artifacts/leader-following/$(date -u +%Y%m%dT%H%M%SZ)-follow-$backend-$scenario"
+output="${output:-artifacts/leader-following/$(date -u +%Y%m%dT%H%M%SZ)-follow-$backend-$scenario}"
+output="${output%/}"
+mkdir -p "$(dirname "$output")"
 odom=platform/odom; [[ "$backend" == gz ]] && odom=platform/odom/filtered
 echo "Domain $ROS_DOMAIN_ID; evidence: $output"
-setsid ros2 launch ridgeback_leader_follow follow_leader.launch.py "odom_topic:=$odom" > "$output.follow.log" 2>&1 &
+setsid ros2 launch ridgeback_leader_follow follow_leader.launch.py "odom_topic:=$odom" "${follow_args[@]}" > "$output.follow.log" 2>&1 &
 follow=$!
-stop_follow() { kill -INT -- "-$follow" 2>/dev/null || true; sleep 5; kill -TERM -- "-$follow" 2>/dev/null || true; }
+setsid ros2 run ridgeback_leader_follow follow_recorder --output "$output.events.jsonl" --odom-topic "$odom" &
+recorder=$!
+stop_follow() {
+  kill -INT -- "-$follow" 2>/dev/null || true
+  sleep 5
+  kill -TERM -- "-$follow" 2>/dev/null || true
+  # Signal the recorder's whole group: ros2 run does not pass SIGINT on to its child.
+  kill -INT -- "-$recorder" 2>/dev/null || true
+  for _ in $(seq 20); do kill -0 "$recorder" 2>/dev/null || break; sleep .5; done
+  kill -KILL -- "-$recorder" 2>/dev/null || true
+  wait "$recorder" 2>/dev/null || true
+}
 trap stop_follow EXIT
 args=(--backend "$backend" --scene-profile realistic --environment modern_office --scenario "$scenario"
       --seed "$seed" --drive --ros-domain "$ROS_DOMAIN_ID" --output-dir "$output" "${extra[@]}")
+status=0
 if [[ "$backend" == isaac ]]; then
-  OMNI_KIT_ACCEPT_EULA=YES isaac_venv/bin/python -m ridgeback_leader_follow.crowd_runner "${args[@]}"
+  OMNI_KIT_ACCEPT_EULA=YES isaac_venv/bin/python -m ridgeback_leader_follow.crowd_runner "${args[@]}" || status=$?
 else
-  python3 -m ridgeback_leader_follow.crowd_runner "${args[@]}"
+  python3 -m ridgeback_leader_follow.crowd_runner "${args[@]}" || status=$?
 fi
 echo "Scene finished; stopping the follow stack."
+trap - EXIT
+stop_follow
+if [[ $status -eq 0 ]]; then
+  ros2 run ridgeback_leader_follow follow_metrics "$output" --json "$output.metrics.json" || true
+fi
+exit "$status"

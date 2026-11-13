@@ -58,8 +58,8 @@ def run_isaac(scenario, duration, output, writer, gui, finish, record=False, sce
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--backend', required=True, choices=('gz', 'isaac'))
-    parser.add_argument('--scenario', default='crossing', choices=(*SCENARIOS,'leader_out_of_view','explainer','explainer_weave','wander'))
-    parser.add_argument('--seed', type=int, default=0, help='wander: seed for the random leader route')
+    parser.add_argument('--scenario', default='crossing', choices=(*SCENARIOS,'leader_out_of_view','explainer','explainer_weave','wander','roam'))
+    parser.add_argument('--seed', type=int, default=0, help='wander, roam: seed for the random leader route')
     parser.add_argument('--duration', type=float, help='Shorten the selected scenario')
     parser.add_argument('--output-dir', type=Path)
     parser.add_argument('--demo-cycles', type=int, default=0,
@@ -111,11 +111,11 @@ def main(argv=None):
         args.ros_domain = 100 + int(uuid.uuid4().hex[:8], 16) % 100
     if not 0 <= args.ros_domain <= 232:
         parser.error('ros-domain must be between 0 and 232')
-    if args.scenario == 'wander':
+    if args.scenario in ('wander', 'roam'):
         if args.scene_profile!='realistic' or args.environment!='modern_office':
-            parser.error('wander requires realistic profile and modern_office')
-        from ridgeback_leader_follow.wander_scenario import load_wander_scenario
-        scenario=load_wander_scenario(args.seed)
+            parser.error(f'{args.scenario} requires realistic profile and modern_office')
+        from ridgeback_leader_follow.wander_scenario import load_roam_scenario, load_wander_scenario
+        scenario=(load_wander_scenario if args.scenario == 'wander' else load_roam_scenario)(args.seed)
     elif args.scenario in ('explainer', 'explainer_weave'):
         if args.scene_profile!='realistic' or args.environment!='modern_office':
             parser.error(f'{args.scenario} requires realistic profile and modern_office')
@@ -131,7 +131,7 @@ def main(argv=None):
         scenario = load_scenario(args.scenario, args.crowd_size)
     if args.scene_profile == 'realistic':
         from ridgeback_leader_follow.realistic_scene import load_scenario as realistic_scenario
-        scenario=realistic_scenario(args.scenario,args.crowd_size,args.environment)
+        scenario=realistic_scenario(args.scenario,args.crowd_size,args.environment,args.seed)
     if args.demo_cycles:
         if args.scene_profile != 'lab' or args.duration is not None or not 1 <= args.demo_cycles <= 120:
             parser.error('demo-cycles requires lab, 1..120 cycles, and no duration override')
@@ -153,7 +153,7 @@ def main(argv=None):
                 'scene_profile': args.scene_profile,
                 'geometry': ('CC0 Innerscene Maya, furnished lab corridor' if args.scene_profile == 'lab'
                              else 'Cesium Man CC-BY-4.0 skinned animation; baseline corridor'),
-                'crowd_size': (10 if scenario.name in ('explainer','explainer_weave','wander') else args.crowd_size), 'seed': args.seed, 'ros_domain': args.ros_domain,
+                'crowd_size': (10 if scenario.name in ('explainer','explainer_weave','wander','roam') else args.crowd_size), 'seed': args.seed, 'ros_domain': args.ros_domain,
                 'runtime_tuning':asdict(tuning), 'camera_contract':asdict(tuning.camera_profile()), 'render_quality': args.render_quality, 'drive': asdict(drive) if drive else None, 'frame': 'world', 'floor_z': 0., 'output_dir': str(output)}
     if args.scene_profile == 'f3':
         from ridgeback_leader_follow.f3_scene import GEOMETRY, manifest_entry

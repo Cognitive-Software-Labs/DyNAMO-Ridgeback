@@ -208,3 +208,34 @@ def test_low_confidence_neighbour_counts_as_competitor_with_lower_floor():
     msg.header.stamp.nanosec=150000000
     out=identity.update(msg,IDENTITY)
     assert out.state==LeaderState.UNCERTAIN and out.reason=='track_discontinuity'
+
+
+def stamped(at, *entries, velocity=(0., 0.)):
+    msg = people(*entries)
+    msg.header.stamp.sec, msg.header.stamp.nanosec = int(at), round((at - int(at)) * 1e9)
+    for person in msg.people:
+        person.velocity.x, person.velocity.y = velocity
+    return msg
+
+
+def test_duplicate_track_of_the_leader_can_take_over_when_the_original_ends():
+    # The office-crowd loss: the tracker carried the leader twice, 0.15 m apart.
+    identity = LeaderIdentity(LeaderLock(acquire_frames=3), 3., math.radians(30), duplicate_radius=.3)
+    for k in range(6):
+        out = identity.update(stamped(k * .05, (1, 1.2, 0., [1., 0.]), (5, 1.3, .1, [1., 0.])), IDENTITY)
+    assert out.state == LeaderState.LOCKED and out.track_id == 1
+    assert 5 not in identity.nonleader_ids
+    for k in range(6, 12):
+        out = identity.update(stamped(k * .05, (5, 1.3, .1, [1., 0.])), IDENTITY)
+    assert out.state == LeaderState.LOCKED and out.track_id == 5
+
+
+def test_someone_off_the_leaders_path_is_not_recovered():
+    identity = LeaderIdentity(LeaderLock(acquire_frames=3), 3., math.radians(30))
+    for k in range(4):
+        identity.update(stamped(k * .05, (1, 1.2 + k * .05, 0., [1., 0.])), IDENTITY)
+    for k in range(4, 30):
+        identity.update(stamped(k * .05), IDENTITY)
+    for k in range(30, 34):
+        out = identity.update(stamped(k * .05, (9, 1.4, 1.2, [1., 0.])), IDENTITY)
+    assert out.state != LeaderState.LOCKED

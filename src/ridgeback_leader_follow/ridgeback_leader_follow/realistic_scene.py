@@ -49,15 +49,15 @@ def assign_people(scenario):
     return assigned
 
 
-def load_scenario(name,crowd_size=4,environment='office'):
+def load_scenario(name,crowd_size=4,environment='office',seed=0):
     """Six scenario families. The modern office walks them at a natural pace;
     the earlier realistic worlds keep their recorded routes (alone adds turns)."""
     from dataclasses import replace
     from .crowd_scenarios import load_scenario as baseline,Waypoint
-    if name=='wander':
-        if environment!='modern_office':raise ValueError('wander requires modern_office')
-        from .wander_scenario import load_wander_scenario
-        return load_wander_scenario()
+    if name in ('wander','roam'):
+        if environment!='modern_office':raise ValueError(f'{name} requires modern_office')
+        from .wander_scenario import load_roam_scenario,load_wander_scenario
+        return (load_wander_scenario if name=='wander' else load_roam_scenario)(seed)
     if name in ('explainer','explainer_weave'):
         if environment!='modern_office':raise ValueError(f'{name} requires modern_office')
         from .explainer_motion import load_scenario as illustration, load_weave_scenario

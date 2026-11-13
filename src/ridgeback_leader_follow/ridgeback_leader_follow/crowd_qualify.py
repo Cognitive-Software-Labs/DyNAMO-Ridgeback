@@ -25,7 +25,7 @@ def validate_run(output, scene_profile='baseline'):
         scenario = load_recognition_scenario(manifest['scenario']['name'])
     elif scene_profile == 'realistic':
         from ridgeback_leader_follow.realistic_scene import load_scenario as realistic_scenario,manifest_entry
-        scenario=realistic_scenario(manifest['scenario']['name'],manifest['crowd_size'],manifest.get('environment','office'))
+        scenario=realistic_scenario(manifest['scenario']['name'],manifest['crowd_size'],manifest.get('environment','office'),manifest.get('seed',0))
         expected=json.loads(json.dumps(manifest_entry(scenario,manifest['environment'])))
         if manifest.get('appearance')!=expected['appearance']:
             raise ValueError('Recorded realistic cast differs from its rendering contract')

@@ -108,6 +108,38 @@ def heading_rate(robot: Pose2D, leader: Tuple[float, float], gain: float, max_ra
     return max(-max_rate, min(max_rate, gain * error))
 
 
+def pace_speed(gap: float, receding_speed: float, follow_distance: float, gain: float, max_speed: float) -> float:
+    """Translation speed that matches the leader's pace and closes the gap.
+
+    ``receding_speed`` is the leader's velocity along the robot-to-leader
+    direction: positive walking away, negative walking toward the robot. The
+    cap is that speed plus ``gain`` per metre the robot is too far back, so a
+    slowing or stopping leader slows the robot, a lagging robot catches up,
+    the robot glides to a stop at the follow distance, and a leader who turns
+    back toward the robot stops it rather than raising its speed.
+    """
+    if not all(math.isfinite(v) for v in (gap, receding_speed)):
+        return 0.
+    return max(0., min(max_speed, receding_speed + gain * (gap - follow_distance)))
+
+
+def receding_speed(robot: Tuple[float, float], leader: Tuple[float, float], velocity: Tuple[float, float]) -> float:
+    """Leader velocity component away from the robot (negative: approaching)."""
+    dx, dy = leader[0] - robot[0], leader[1] - robot[1]
+    distance = math.hypot(dx, dy)
+    if distance < 1e-6:
+        return 0.
+    return (velocity[0] * dx + velocity[1] * dy) / distance
+
+
+def limit_speed(vx: float, vy: float, limit: float) -> Tuple[float, float]:
+    """Scale (vx, vy) down to at most ``limit``, keeping Nav2's direction."""
+    speed = math.hypot(vx, vy)
+    if speed <= limit or speed == 0.:
+        return vx, vy
+    return vx * limit / speed, vy * limit / speed
+
+
 def yaw_to_quaternion(yaw: float):
     return 0., 0., math.sin(yaw / 2), math.cos(yaw / 2)
 
@@ -140,6 +172,7 @@ def main():
                             behavior_tree=f'{share}/config/behavior_trees/follow_leader.xml',
                             navigate_action='navigate_to_pose', goal_update_topic='goal_update',
                             heading_gain=2., max_heading_rate=1.,
+                            pace_matching=True, pace_gain=.8, max_pace=1.3,
                             controller_cmd_topic='cmd_vel_mppi', output_cmd_topic='cmd_vel_nav')
             for name, value in defaults.items():
                 self.declare_parameter(name, value)
@@ -160,6 +193,11 @@ def main():
             self.mode = None
             self.heading_gain, self.max_heading_rate = p('heading_gain'), p('max_heading_rate')
             self.stale_timeout = p('stale_timeout')
+            # Nav2 chooses the direction; this node caps the speed at the
+            # leader's pace (pace_speed) so the robot speeds up and slows
+            # down with the leader instead of rushing each standoff goal.
+            self.pace_matching, self.pace_gain, self.max_pace = p('pace_matching'), p('pace_gain'), p('max_pace')
+            self.follow_distance = p('follow_distance')
             # Nav2 plans translation; this node owns the turn rate so the
             # camera stays on the leader while the holonomic base sidesteps.
             self.cmd_out = self.create_publisher(TwistStamped, p('output_cmd_topic'), 10)
@@ -206,8 +244,22 @@ def main():
 
         def on_controller_cmd(self, cmd):
             self.last_controller_cmd = self.get_clock().now()
+            self.match_pace(cmd)
             self.face_leader(cmd)
             self.cmd_out.publish(cmd)
+
+        def match_pace(self, cmd):
+            msg = self.leader
+            if not self.pace_matching or self.mode != 'following' or msg is None or not msg.has_leader:
+                return
+            robot = self.robot_pose()
+            if robot is None:
+                return
+            leader = (msg.position.x, msg.position.y)
+            gap = math.hypot(leader[0] - robot[0], leader[1] - robot[1])
+            limit = pace_speed(gap, receding_speed(robot[:2], leader, self.velocity.velocity),
+                               self.follow_distance, self.pace_gain, self.max_pace)
+            cmd.twist.linear.x, cmd.twist.linear.y = limit_speed(cmd.twist.linear.x, cmd.twist.linear.y, limit)
 
         def robot_pose(self) -> Optional[Pose2D]:
             try:
