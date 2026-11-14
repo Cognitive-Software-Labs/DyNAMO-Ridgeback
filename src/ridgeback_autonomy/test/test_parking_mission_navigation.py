@@ -305,6 +305,7 @@ def test_path_checks_include_the_saved_mission_start_footprint(manager_factory, 
     seen = []
     monkeypatch.setattr('ridgeback_autonomy.mission.mission_manager_node.path_rejection',
                         lambda *a, **k: seen.append(k) or None)
+    m._route_check_cache = None            # planning already checked this route once
     assert m._plan_invalid_reason() is None
     assert seen == [{'occupied': m._start_footprint_poses()}]
 
@@ -623,3 +624,22 @@ def test_an_excluded_provisional_pick_is_not_revived(manager_factory, monkeypatc
     m._exclude_failed_directions(plan)
     assert plan.selected is None
     assert all(c.status == 'rejected' for c in plan.candidates if c.preference_label == 'g1_left')
+
+
+def test_an_unchanged_route_check_is_reused_and_a_changed_map_rechecks(manager_factory, monkeypatch):
+    """Gazebo standard after the dev merge (2026-11-14): sweeping a 9 m route every tick
+    delayed odometry past the stationary window and the plan expired."""
+    import ridgeback_autonomy.mission.mission_manager_node as node
+    m, _ = feasible(manager_factory, monkeypatch, enabled=False)
+    calls = []
+    real = node.path_rejection
+    monkeypatch.setattr(node, 'path_rejection', lambda *a, **k: calls.append(1) or real(*a, **k))
+    m._route_check_cache = None
+    assert m._plan_invalid_reason() is None and m._plan_invalid_reason() is None
+    assert len(calls) == 1
+    blocked = m.latest_map
+    data = list(blocked.data)
+    data[0] = 100 if data[0] != 100 else 0           # same stamp, different contents
+    blocked.data = data
+    m._plan_invalid_reason()
+    assert len(calls) == 2

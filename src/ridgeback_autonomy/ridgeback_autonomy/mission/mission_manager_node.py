@@ -17,6 +17,7 @@ from collections import OrderedDict, deque
 from copy import deepcopy
 from dataclasses import dataclass, replace
 from enum import Enum
+import hashlib
 import json
 import math
 import os
@@ -631,6 +632,7 @@ class MissionManagerNode(Node):
         self._overhead_points = None
         self._localization_box = None
         self._target_surface_xy = None
+        self._route_check_cache = None
         self._depth_frames = deque(
             maxlen=int(self.get_parameter('target_orientation_frames').value))
         self._camera_intrinsics = None
@@ -1231,6 +1233,7 @@ class MissionManagerNode(Node):
             self._overhead_points = None
             self._localization_box = None
             self._target_surface_xy = None
+            self._route_check_cache = None
             self._g1_best_planned_rank = PREFERENCE_RANKS
             self._parking_attempts, self._failed_bearings = 0, []
             self._failed_labels, self._failed_sides, self._last_veto_xy = [], set(), None
@@ -2301,9 +2304,24 @@ class MissionManagerNode(Node):
             return reason
         # Revalidate the selected route against the latest map, including same-stamp changes.
         if plan.selected is not None and plan.selected_path is not None:
-            return path_rejection(plan.selected_path, plan.selected, robot, grid, plan.target,
-                                  self.planner_config, plan.keepout_radius_m,
-                                  occupied=self._start_footprint_poses())
+            # The sweep is deterministic: the same map contents, robot pose and route give
+            # the same answer, so it is reused instead of recomputed every tick. A 9 m route
+            # took 0.27 s a sweep after the dev merge; repeated each tick it delayed the
+            # odometry callbacks past the stationary window, and the plan expired
+            # (motion_evidence_lost: collecting_stationary_interval, 2026-11-14).
+            key = (hashlib.blake2b(grid.data.tobytes(), digest_size=16).digest(), grid.origin_x,
+                   grid.origin_y, grid.width, grid.height,
+                   tuple(round(v, 3) for v in robot[:3]), id(plan.selected), id(plan.selected_path),
+                   plan.selected.base_x, plan.selected.base_y, plan.selected.yaw,
+                   len(plan.selected_path.poses), plan.target.x, plan.target.y, plan.keepout_radius_m,
+                   self._start_footprint_poses())
+            if self._route_check_cache is not None and self._route_check_cache[0] == key:
+                return self._route_check_cache[1]
+            result = path_rejection(plan.selected_path, plan.selected, robot, grid, plan.target,
+                                    self.planner_config, plan.keepout_radius_m,
+                                    occupied=self._start_footprint_poses())
+            self._route_check_cache = (key, result)
+            return result
         return None
 
     def _draw_plan_rays(self):
