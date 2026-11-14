@@ -148,20 +148,30 @@ transient-local JSON state on `parking_mission/state`. After a stabilized
 target estimate it plans parking candidates and checks their paths with
 `ComputePathToPose`. With `parking_navigation_enabled` off it stops in
 `PARKING_PATH_FEASIBLE`; with it on (simulation launch only) it drives the
-original mission tail through its own `NavigateToPose` client: pre-parking pose,
-final parking pose, the parking wait, then return to the saved start pose and
-`MISSION_COMPLETE`. A failed parking leg returns to the start pose and ends in
-`MISSION_FAILED`.
+mission tail through its own `NavigateToPose` client: pre-parking pose, final
+parking pose, the parking wait, then return to the saved start pose and
+`MISSION_COMPLETE`. When unknown space around G1 could still change the choice of
+pose, it first maps the floor around G1 and relocalizes it
+([G1-centred exploration](#g1-centred-exploration)).
+
+A parking attempt that fails for a reason specific to that attempt (a LiDAR veto
+on the route or in the stopping path, G1's protected region, a final pose that
+became invalid, or an aborted pre-parking leg) stops the robot, reacquires G1
+from the observation pose ([observation return](#observation-return)) and plans
+again with the failed direction excluded. The mission makes at most
+`parking_max_attempts` (3) parking attempts in total. When no attempt remains, no
+alternative pose is left, G1 is not relocalized for the next attempt, or the
+first plan finds no feasible pose or route, the robot returns to the saved start
+pose and the mission ends in `MISSION_FAILED` with that reason.
 
 The estimate retains its `generic_target_position` reference and false
-`is_foot_midpoint` flag. It is not yet qualified as the G1 ground center needed
-by the migrated parking geometry. Invalid samples and source-time TF misses are
-recoverable until the localization deadline; ownership or localization timeout
-is a technical `MISSION_FAILED`, not successful completion or an automatic
-return-home command. Missing pause service, failed pause transport, and an
-unsettled explorer goal are reported as distinct failures. The detailed
-migration state flow and future insertion
-point for G1-region exploration are maintained in the
+`is_foot_midpoint` flag; parking measures reach from G1's vertical axis at that
+position. Invalid samples and source-time TF misses are recoverable until the
+localization deadline. A timeout of the first localization, or of ownership, is a
+technical `MISSION_FAILED` where the robot stands, not successful completion or a
+return home. Missing pause service, failed pause transport, and an unsettled
+explorer goal are reported as distinct failures. The original migration state
+flow is kept in the
 [parking mission migration plan](../plans/EXPLORATION_parking_mission_migration.md#phase-2d-non-driving-mission-coordinator).
 
 ### G1 heading

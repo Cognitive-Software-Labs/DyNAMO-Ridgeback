@@ -21,8 +21,9 @@ camera's sight, and:
    ([G1-centred exploration](architecture.md#g1-centred-exploration));
 5. checks each pose's route with Nav2, drives to a pre-parking pose and the parking
    pose with a tight goal checker, waits five seconds and returns to its start;
-6. retries a failed attempt at most three times in total from another direction,
-   reacquiring G1 by turning in place or stepping back
+6. after a failed attempt, tries again from another direction, making at most
+   three parking attempts in total, and reacquires G1 by turning in place or
+   stepping back
    ([observation return](architecture.md#observation-return)).
 
 Every state, its limit and its measured duration are in

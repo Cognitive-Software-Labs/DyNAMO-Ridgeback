@@ -136,8 +136,7 @@ python3 tools/parking_scenarios/scenario_metrics.py artifacts/exploration/scenar
 # Scene views, then the two pages (CODE in make_results_page.py labels each recorded HEAD):
 tools/parking_scenarios/preview_scenario.sh gz right_blocked artifacts/exploration/scenes
 python3 tools/parking_scenarios/make_scenarios_page.py artifacts/exploration/scenes
-python3 tools/parking_scenarios/make_results_page.py --runs artifacts/exploration/scenarios/*/ \
-    --images artifacts/exploration/scenarios/gz_right_blocked
+python3 tools/parking_scenarios/make_results_page.py      # the runs in results_runs.txt
 ```
 
 `preview_scenario.sh gz|isaac SCENARIO OUT_DIR` starts a scene with
@@ -154,9 +153,14 @@ that are removed afterwards, Isaac through the runner's opt-in view cameras
 carry only the top-down two). Each image is checked and listed in a manifest.
 `run_scenario.sh` takes the same top-down views while parked and at the end, and
 RViz screenshots at the mission stages. `make_scenarios_page.py` and
-`make_results_page.py` build the two pages; the results page labels every image
-with the mission state active when it was captured and shows a top-down view as
-the parked position only if the robot was `PARKED` then.
+`make_results_page.py` build the two pages. The results page reads the runs listed
+in `results_runs.txt` (or the run folders given as arguments, such as
+`artifacts/exploration/scenarios/*/`): its overview,
+comparison and charts use the post-merge runs (`FINAL_SET`), its featured
+experiments name their run and captures in `FEATURED`, and every run appears in its
+filterable table. Each featured capture is shown only if it is not blank and was
+taken in the mission state its caption names; the page keeps only the images it
+uses in `assets/parking_results/`.
 
 `FRAMES=1` also saves a camera frame every `FRAMES_PERIOD` seconds (default 1;
 `FRAMES_EXT=png` is lossless and about 0.4 MB a frame).
