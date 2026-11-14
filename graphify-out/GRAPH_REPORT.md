@@ -1,7 +1,7 @@
 # Graph Report - /home/samer/DyNAMO-Ridgeback-merge-test  (2026-11-14)
 
 ## Corpus Check
-- Large corpus: 939 files · ~1,700,856 words. Semantic extraction will be expensive (many Claude tokens). Consider running on a subfolder.
+- Large corpus: 961 files · ~1,790,029 words. Semantic extraction will be expensive (many Claude tokens). Consider running on a subfolder.
 
 ## Summary
 - 9122 nodes · 20378 edges · 450 communities (383 shown, 67 thin omitted)

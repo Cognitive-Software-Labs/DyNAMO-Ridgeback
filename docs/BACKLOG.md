@@ -285,7 +285,9 @@ position-check record under archived evidence holds the runs.
 **Completion criteria.** Decide between a final-approach alignment on G1's live
 LiDAR leg returns, a G1 reference taken from its mapped legs, or a revised reach or
 keep-out budget; then park beside G1 in the workstation scene with ground-truth
-reach and clearance.
+reach and clearance. After the group's outline was merged (2026-11-14) the band
+widened (0.121-0.170 m to the legs) but the LiDAR check still vetoed both sides in
+Gazebo; that mission parked behind G1 instead.
 
 ## Parking plan invalidated by a delayed odometry stamp
 

@@ -16,7 +16,6 @@ import os
 import re
 import sys
 
-import numpy as np
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
@@ -40,8 +39,12 @@ CODE = {'fe60a88': ('P7 scenarios (G1 in front of the start)',
         '8dd2a1e': ('G1 position check (G1 out of sight)',
                     '8dd2a1e plus the changes committed as 3becd27'),
         'a67d3c6': ('Reacquisition and recorded demonstration (G1 out of sight)',
-                    'a67d3c6 plus the changes committed as 640e8ec')}
-LATEST = ('a67d3c6', '8dd2a1e')
+                    'a67d3c6 plus the changes committed as 640e8ec'),
+        '64b3176': ('After merging the group dev (P8)', '64b3176'),
+        'c1435d9': ('After merging the group dev (P8)', 'c1435d9'),
+        '99387ae': ('After merging the group dev (P8)', '99387ae'),
+        '5b5133c': ('After merging the group dev (P8)', '5b5133c')}
+LATEST = ('5b5133c', '99387ae', 'c1435d9', '64b3176')
 
 
 def run_name(run):
@@ -247,8 +250,9 @@ def main():
         '<p class="note">A video of one complete run, <code>isaac_standard_run3</code> (2026-11-11, '
         '<code>MISSION_COMPLETE</code>, parked at G1\'s right), shows its Isaac views, RViz and mission '
         'state together at 8x speed: <code>artifacts/exploration/demo_2026-11-11/isaac_standard_run3/'
-        'demo.mp4</code>, kept outside the repository; <code>tools/parking_scenarios/record_demo_run.sh'
-        '</code> records another.</p>')
+        'demo.mp4</code>, kept outside the repository; the same recording of the merged code\'s Isaac '
+        'run is <code>artifacts/exploration/p8_2026-11-14/isaac_standard/demo.mp4</code>. '
+        '<code>tools/parking_scenarios/record_demo_run.sh</code> records another.</p>')
     legend = ('<p><span class="badge ok">parked, returned</span> parking completed &nbsp; '
               '<span class="badge safe">refused to park</span> the planner found no safe pose and said why &nbsp; '
               '<span class="badge bad">perception</span> G1 not (re)localized in time, its position not '
@@ -265,7 +269,8 @@ def main():
             'gaps</a>, <a href="../../archive/engineering/2026-11-05-parking-workstation-scenes.md">workstation '
             'scenes</a>, <a href="../../archive/engineering/2026-11-09-parking-g1-position-check.md">G1 '
             'position check</a>, <a href="../../archive/engineering/2026-11-11-parking-reacquisition-and-demo.md">'
-            'reacquisition and demonstration</a>.</p></main>')
+            'reacquisition and demonstration</a>, <a href="../../archive/engineering/2026-11-14-parking-dev-integration.md">'
+            'after merging dev</a>.</p></main>')
     with open(OUT, 'w') as stream:
         stream.write(pages.page('Autonomous parking: experiments and results', pages.RESULTS_PAGE, intro, body))
     print('wrote', OUT, len(data), 'runs', len(cards), 'with screenshots')
