@@ -6,6 +6,7 @@ ROS_LOG_DIR=/tmp
 RIDGEBACK_PERCEPTION_VENV=@VENV@
 NAMESPACE=r100_0160
 BASE_FRAME=base_link
+FRONT_OFFSET_M=0.465
 ESTIMATORS=projective_ranging,euclidean_reconstruction
 DEPTH_SOURCE=stereoscopic
 MASK_GATE=box

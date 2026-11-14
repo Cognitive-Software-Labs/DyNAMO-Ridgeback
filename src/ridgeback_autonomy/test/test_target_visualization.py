@@ -1024,6 +1024,7 @@ def _published_markers(
     robot_yaw: float = 0.0,
     aged: list | None = None,
     pose_at=None,
+    front_offset_m=ROBOT_FRONT_OFFSET_M,
 ) -> list:
     """Markers from the real ``_publish_markers``, with no ROS context.
 
@@ -1047,6 +1048,7 @@ def _published_markers(
 
     stub = SimpleNamespace(
         marker_lifetime=1.5,
+        front_offset_m=front_offset_m,
         estimators=selected,
         _robot_pose_in_world=lookup,
         get_clock=lambda: SimpleNamespace(
@@ -1075,6 +1077,16 @@ def _added(markers: list) -> list:
     """
 
     return [marker for marker in markers if marker.action == Marker.ADD]
+
+
+def test_hardware_offset_is_restored_before_marker_world_rotation():
+    same_batch = [measurements(
+        1, projective_ranging_forward_m=[1.535],
+        projective_ranging_lateral_m=[0.0], projective_ranging_distance_m=[1.535])]
+    markers = _published_markers(
+        same_batch, estimators=('projective_ranging',),
+        robot_yaw=math.pi / 2, front_offset_m=.465)
+    assert _dot_xy(_added(markers)) == pytest.approx((0.0, 2.0), abs=1e-6)
 
 
 def _marker_estimators(markers: list) -> set[str]:

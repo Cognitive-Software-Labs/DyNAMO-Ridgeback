@@ -9,6 +9,15 @@ import pytest
 ROOT = Path(__file__).resolve().parents[3]
 
 
+def test_service_front_offset_matches_hardware_launch_default(tool):
+    from ridgeback_localization.core.vehicle_frame import HARDWARE_FRONT_OFFSET_M
+    module, _host, _calls, checkout = tool
+    unit = module.render('robot')
+    assert f'Environment=FRONT_OFFSET_M={HARDWARE_FRONT_OFFSET_M}' in unit
+    assert 'front_offset_m:="$FRONT_OFFSET_M"' in unit
+    assert f'FRONT_OFFSET_M={HARDWARE_FRONT_OFFSET_M}' in module.render_defaults(checkout, '/venv')
+
+
 @pytest.fixture
 def tool(tmp_path, monkeypatch):
     loader = SourceFileLoader('localization_service', str(ROOT / 'tools/intel_thor/localization_service'))

@@ -1,0 +1,5 @@
+# Recorder launch arguments applied to every capture-enabled configuration,
+# full runs and readiness checks alike. Sampled-window capture keeps the
+# 10-second live window and stores only its first five raw batches.
+sensor_capture_mode: sampled_window
+capture_batches: 5

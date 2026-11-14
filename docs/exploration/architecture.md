@@ -112,11 +112,12 @@ validation gates before motion is enabled.
 sends `NavigateToPose` goals. It is the only supported explorer; its sources
 live under `src/ridgeback_autonomy/ridgeback_autonomy/frontier_explorer/`.
 Each goal faces from the robot towards the goal (`navigator.facing_quaternion`),
-so the forward camera looks along the way into the frontier; with the earlier
-fixed yaw the holonomic base often drove sideways or backwards. The shared goal
-checker keeps its heading tolerance (0.40 rad), which the mission's return,
-observation and parking goals rely on; the group's `dev` also relaxes it to any
-heading (`ede9bd1`), which is not applied here.
+so the forward camera also looks into the frontier, and Nav2's goal checker
+accepts any heading (`yaw_goal_tolerance: 3.15`), so the base never has to turn
+on the spot to finish a goal beside a wall. The parking mission sets its own
+tight checker for each parking leg, observation turn and step back (below); only
+its return to the start uses the shared checker, which no longer requires the
+start heading.
 
 ### Navigation ownership handoff
 

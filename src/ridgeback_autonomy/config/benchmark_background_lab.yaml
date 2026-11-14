@@ -1,0 +1,82 @@
+# Background "lab": a clinical research lab furnishing target_distance_calibration.
+#
+# The master layout, spawned once per run when the runner gets background:=lab.
+# Props are only ever removed for a scene, never moved. Each scene is captured
+# shifted along world x, robot included, so its farthest target stands
+# placement.backdrop_gap_m in front of the prop behind it; that shift and the
+# props each scene removes are generated into benchmark_backgrounds/lab.yaml by
+# tools/benchmark/build_background.py. Regenerate after any edit here.
+#
+# World frame: the robot's home is the origin facing +x, camera at
+# (0.2692, 0); a scene placed at dx has them at (dx, 0) and (dx + 0.2692, 0).
+# Room interior x -5.9..11.9, y -4.9..4.9. Each model's footprint is read from
+# its Gazebo model.sdf. Convention: wall furniture has its back (local +y) to
+# the wall, 2 cm off it (wall-mounted door and whiteboard flush); seating faces
+# local +y. yaw rotates local x onto the world.
+schema: ridgeback_benchmark_background_layout/2
+world: target_distance_calibration
+room: {x_min: -5.9, x_max: 11.9, y_min: -4.9, y_max: 4.9}
+# backdrop_gap_m: the gap each scene's farthest target aims for in front of
+# its backdrop prop. dx_step_m: the grid every placement lies on.
+placement: {backdrop_gap_m: 1.0, dx_step_m: 0.05}
+
+props:
+  # East (far) wall, fronts face -x
+  - {id: e_door,         model: door,              x: 11.87,  y: -4.10, yaw: -1.5708}
+  - {id: e_bookshelf,    model: bookshelf,         x: 11.705, y: -2.95, yaw: -1.5708}
+  - {id: e_cabinet,      model: metal_cabinet,     x: 11.655, y: -1.95, yaw: -1.5708}
+  - {id: e_whiteboard,   model: wall_whiteboard,   x: 11.88,  y:  0.10, yaw: -1.5708}
+  - {id: e_desk,         model: workstation,       x: 11.546, y:  2.05, yaw: -1.5708}
+  - {id: e_desk_chair,   model: office_chair,      x: 10.62,  y:  2.00, yaw: -1.35}
+  - {id: e_low_cabinet,  model: low_cabinet,       x: 11.655, y:  3.45, yaw: -1.5708}
+  - {id: ne_plant,       model: plant,             x: 11.55,  y:  4.50, yaw: 0.0}
+
+  # North wall, fronts face -y
+  - {id: n_cart,         model: clinic_cart,       x: 4.10,  y: 4.40,  yaw: 0.20}
+  - {id: n_cabinet,      model: metal_cabinet,     x: 5.15,  y: 4.656, yaw: 0.0}
+  - {id: n_desk_a,       model: workstation,       x: 6.80,  y: 4.546, yaw: 0.0}
+  - {id: n_chair_a,      model: office_chair,      x: 6.55,  y: 3.60,  yaw: 0.40}
+  - {id: n_bin,          model: trash_bin,         x: 7.80,  y: 4.68,  yaw: 0.0}
+  - {id: n_desk_b,       model: workstation,       x: 8.85,  y: 4.546, yaw: 0.0}
+  - {id: n_chair_b,      model: office_chair,      x: 8.90,  y: 3.70,  yaw: -0.15}
+  - {id: n_bookshelf,    model: bookshelf,         x: 10.35, y: 4.705, yaw: 0.0}
+
+  # South wall, fronts face +y
+  - {id: s_plant,        model: plant,             x: 4.40,  y: -4.55,  yaw: 0.0}
+  - {id: s_cart,         model: utility_cart,      x: 5.45,  y: -4.35,  yaw: 0.15}
+  - {id: s_low_cabinet,  model: low_cabinet,       x: 6.60,  y: -4.655, yaw: 3.1416}
+  - {id: s_desk_a,       model: workstation,       x: 8.15,  y: -4.546, yaw: 3.1416}
+  - {id: s_chair_a,      model: office_chair,      x: 8.10,  y: -3.68,  yaw: 3.00}
+  - {id: s_desk_b,       model: workstation,       x: 9.72,  y: -4.546, yaw: 3.1416}
+  - {id: s_chair_b,      model: office_chair,      x: 9.95,  y: -3.62,  yaw: -2.80}
+  - {id: s_bin,          model: trash_bin,         x: 10.85, y: -4.68,  yaw: 0.0}
+
+  # Mid-field: removed only in the scenes they would affect
+  - {id: m_island,       model: workstation,       x: 7.70,  y:  2.35, yaw: 0.0}
+  - {id: m_island_chair, model: office_chair,      x: 7.55,  y:  1.52, yaw: 0.25}
+  - {id: m_cart,         model: clinic_cart,       x: 5.70,  y:  2.40, yaw: 0.50}
+  - {id: m_board,        model: mobile_whiteboard, x: 10.60, y: -0.30, yaw: 1.5708}
+  - {id: m_trolley,      model: utility_cart,      x: 9.30,  y: -1.95, yaw: 0.35}
+  - {id: m_chair,        model: visitor_chair,     x: 6.20,  y: -2.65, yaw: 1.00}
+  - {id: m_bin,          model: trash_bin,         x: 4.90,  y: -2.45, yaw: 0.0}
+
+  # Centre of the far half: a back-to-back bench pair with its chairs, a plant,
+  # a bin and a cart, in the band beyond most scenes' keep-out cones
+  - {id: c_desk_a,       model: workstation,       x: 8.191, y: -0.10, yaw: -1.5708}
+  - {id: c_desk_b,       model: workstation,       x: 8.909, y: -0.10, yaw: 1.5708}
+  - {id: c_chair_a,      model: office_chair,      x: 7.32,  y:  0.05, yaw: -1.40}
+  - {id: c_chair_b,      model: office_chair,      x: 9.78,  y: -0.30, yaw: 1.75}
+  - {id: c_plant,        model: plant,             x: 9.75,  y:  1.40, yaw: 0.0}
+  - {id: c_bin,          model: trash_bin,         x: 7.15,  y: -0.95, yaw: 0.0}
+  - {id: c_cart,         model: clinic_cart,       x: 7.85,  y: -2.05, yaw: 0.30}
+
+  # Behind the robot: the camera never sees these; the LiDAR and the GUI do
+  - {id: w_desk,         model: workstation,       x: -5.546, y: -2.50, yaw: 1.5708}
+  - {id: w_desk_chair,   model: office_chair,      x: -4.55,  y: -2.40, yaw: 1.35}
+  - {id: w_bookshelf,    model: bookshelf,         x: -5.705, y:  0.60, yaw: 1.5708}
+  - {id: w_cabinet,      model: metal_cabinet,     x: -5.656, y:  1.60, yaw: 1.5708}
+  - {id: sw_plant,       model: plant,             x: -5.45,  y: -4.45, yaw: 0.0}
+  - {id: sw_seat_a,      model: visitor_chair,     x: -4.60,  y: -4.475, yaw: 0.0}
+  - {id: sw_seat_b,      model: visitor_chair,     x: -3.82,  y: -4.475, yaw: 0.0}
+  - {id: nw_low_cabinet, model: low_cabinet,       x: -3.50,  y:  4.655, yaw: 0.0}
+  - {id: nw_cart,        model: clinic_cart,       x: -2.30,  y:  4.40,  yaw: -0.25}

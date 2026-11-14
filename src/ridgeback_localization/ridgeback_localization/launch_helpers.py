@@ -46,6 +46,7 @@ def pointcloud_measurement_node(
     base_frame,
     color_topic=None,
     pointcloud_topic=None,
+    front_offset_m=None,
 ):
     """The ``pointcloud`` row's producer, wired to the shared measurement topic.
 
@@ -75,6 +76,7 @@ def pointcloud_measurement_node(
             {
                 'color_topic': color_topic,
                 'pointcloud_topic': pointcloud_topic,
+                'front_offset_m': front_offset_m,
             },
         ),
         remappings=[('/tf', 'tf'), ('/tf_static', 'tf_static')],
@@ -112,6 +114,7 @@ def mask_measurement_node(
     color_topic=None,
     depth_max_meters=None,
     depth_match_debug=None,
+    front_offset_m=None,
 ):
     """The three mask rows' producer, wired to the shared measurement topic.
 
@@ -175,6 +178,7 @@ def mask_measurement_node(
                 'color_topic': color_topic,
                 'depth_max_meters': depth_max_meters,
                 'depth_match_debug': depth_match_debug,
+                'front_offset_m': front_offset_m,
             },
         ),
         remappings=[('/tf', 'tf'), ('/tf_static', 'tf_static')],
@@ -210,6 +214,7 @@ def estimate_viz_node(
     hud_layout=None,
     base_frame=None,
     condition=None,
+    front_offset_m=None,
 ):
     """The estimator rings and the distance panel that names them.
 
@@ -227,7 +232,8 @@ def estimate_viz_node(
         namespace=namespace,
         parameters=_measurement_parameters(
             {'use_sim_time': use_sim_time, 'estimators': estimators},
-            {'hud_layout': hud_layout, 'base_frame': base_frame},
+            {'hud_layout': hud_layout, 'base_frame': base_frame,
+             'front_offset_m': front_offset_m},
         ),
         remappings=[('/tf', 'tf'), ('/tf_static', 'tf_static')],
         output='screen',

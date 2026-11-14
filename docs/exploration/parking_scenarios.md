@@ -111,6 +111,15 @@ no dimension has been measured. Four distances describe a parked pose:
 4. clearance between any robot part and G1 or an obstacle, which the planner
    checks in the plane and the overlay above it.
 
+Parking plans and checks with Nav2's shared outline and the basket together
+(`parking_footprint`, their convex hull): since the group's mesh-shaped outline
+(rear edge at -0.476 m, angled rear ends) the basket's rear corners at (-0.48,
+±0.19) m reach up to 0.035 m beyond it. Nav2 and its collision monitor keep the
+group's outline; the parking planner, its route checks and the parking LiDAR check
+use the hull. In open space this widens the valid reach band from 0.526-0.540 m to
+0.491-0.540 m: the rear edge stops 0.291-0.340 m from G1's axis (0.308-0.323 m
+before), so 0.121-0.170 m from G1's legs as depth sees them.
+
 The task point is the centre of the thesis bin the provisional basket copies. It
 stays the interaction point, and the reach band stays 0.30-0.60 m, until the
 crate's position on the deck and G1's reach are measured.

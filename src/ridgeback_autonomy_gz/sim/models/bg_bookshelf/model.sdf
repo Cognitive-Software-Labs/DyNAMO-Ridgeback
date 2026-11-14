@@ -1,0 +1,113 @@
+<?xml version="1.0"?>
+<!-- Background prop: bookshelf with books, in-repo primitives. -->
+<sdf version="1.9">
+  <model name="bg_bookshelf">
+    <static>true</static>
+    <link name="link">
+      <visual name="back">
+        <pose>0 0.165 0.9 0 0 0</pose>
+        <geometry><box><size>0.9 0.02 1.8</size></box></geometry>
+        <material><ambient>0.55 0.42 0.3 1</ambient><diffuse>0.55 0.42 0.3 1</diffuse></material>
+      </visual>
+      <visual name="side_left">
+        <pose>-0.44 -0.01 0.9 0 0 0</pose>
+        <geometry><box><size>0.02 0.33 1.8</size></box></geometry>
+        <material><ambient>0.55 0.42 0.3 1</ambient><diffuse>0.55 0.42 0.3 1</diffuse></material>
+      </visual>
+      <visual name="side_right">
+        <pose>0.44 -0.01 0.9 0 0 0</pose>
+        <geometry><box><size>0.02 0.33 1.8</size></box></geometry>
+        <material><ambient>0.55 0.42 0.3 1</ambient><diffuse>0.55 0.42 0.3 1</diffuse></material>
+      </visual>
+      <visual name="plinth">
+        <pose>0 -0.01 0.04 0 0 0</pose>
+        <geometry><box><size>0.86 0.33 0.08</size></box></geometry>
+        <material><ambient>0.55 0.42 0.3 1</ambient><diffuse>0.55 0.42 0.3 1</diffuse></material>
+      </visual>
+      <visual name="shelf_0">
+        <pose>0 -0.01 0.43 0 0 0</pose>
+        <geometry><box><size>0.86 0.33 0.02</size></box></geometry>
+        <material><ambient>0.55 0.42 0.3 1</ambient><diffuse>0.55 0.42 0.3 1</diffuse></material>
+      </visual>
+      <visual name="shelf_1">
+        <pose>0 -0.01 0.79 0 0 0</pose>
+        <geometry><box><size>0.86 0.33 0.02</size></box></geometry>
+        <material><ambient>0.55 0.42 0.3 1</ambient><diffuse>0.55 0.42 0.3 1</diffuse></material>
+      </visual>
+      <visual name="shelf_2">
+        <pose>0 -0.01 1.15 0 0 0</pose>
+        <geometry><box><size>0.86 0.33 0.02</size></box></geometry>
+        <material><ambient>0.55 0.42 0.3 1</ambient><diffuse>0.55 0.42 0.3 1</diffuse></material>
+      </visual>
+      <visual name="shelf_3">
+        <pose>0 -0.01 1.51 0 0 0</pose>
+        <geometry><box><size>0.86 0.33 0.02</size></box></geometry>
+        <material><ambient>0.55 0.42 0.3 1</ambient><diffuse>0.55 0.42 0.3 1</diffuse></material>
+      </visual>
+      <visual name="top">
+        <pose>0 0 1.79 0 0 0</pose>
+        <geometry><box><size>0.9 0.35 0.02</size></box></geometry>
+        <material><ambient>0.55 0.42 0.3 1</ambient><diffuse>0.55 0.42 0.3 1</diffuse></material>
+      </visual>
+      <visual name="books_0">
+        <pose>-0.3 0.02 0.215 0 0 0</pose>
+        <geometry><box><size>0.2 0.24 0.27</size></box></geometry>
+        <material><ambient>0.55 0.18 0.16 1</ambient><diffuse>0.55 0.18 0.16 1</diffuse></material>
+      </visual>
+      <visual name="books_1">
+        <pose>-0.08 0.03 0.2 0 0 0</pose>
+        <geometry><box><size>0.2 0.22 0.24</size></box></geometry>
+        <material><ambient>0.16 0.27 0.48 1</ambient><diffuse>0.16 0.27 0.48 1</diffuse></material>
+      </visual>
+      <visual name="books_2">
+        <pose>0.22 0.015 0.22 0 0 0</pose>
+        <geometry><box><size>0.3 0.25 0.28</size></box></geometry>
+        <material><ambient>0.22 0.42 0.26 1</ambient><diffuse>0.22 0.42 0.26 1</diffuse></material>
+      </visual>
+      <visual name="books_3">
+        <pose>-0.32 0.03 0.565 0 0 0</pose>
+        <geometry><box><size>0.16 0.22 0.25</size></box></geometry>
+        <material><ambient>0.82 0.76 0.58 1</ambient><diffuse>0.82 0.76 0.58 1</diffuse></material>
+      </visual>
+      <visual name="books_4">
+        <pose>-0.05 0.02 0.55 0 0 0</pose>
+        <geometry><box><size>0.32 0.24 0.22</size></box></geometry>
+        <material><ambient>0.36 0.36 0.38 1</ambient><diffuse>0.36 0.36 0.38 1</diffuse></material>
+      </visual>
+      <visual name="books_5">
+        <pose>0.3 0.025 0.57 0 0 0</pose>
+        <geometry><box><size>0.18 0.23 0.26</size></box></geometry>
+        <material><ambient>0.62 0.48 0.2 1</ambient><diffuse>0.62 0.48 0.2 1</diffuse></material>
+      </visual>
+      <visual name="books_6">
+        <pose>-0.27 0.015 0.935 0 0 0</pose>
+        <geometry><box><size>0.28 0.25 0.27</size></box></geometry>
+        <material><ambient>0.75 0.75 0.72 1</ambient><diffuse>0.75 0.75 0.72 1</diffuse></material>
+      </visual>
+      <visual name="books_7">
+        <pose>0.12 0.03 0.9 0 0 0</pose>
+        <geometry><box><size>0.22 0.22 0.2</size></box></geometry>
+        <material><ambient>0.55 0.18 0.16 1</ambient><diffuse>0.55 0.18 0.16 1</diffuse></material>
+      </visual>
+      <visual name="books_8">
+        <pose>-0.34 0.03 1.275 0 0 0</pose>
+        <geometry><box><size>0.12 0.22 0.23</size></box></geometry>
+        <material><ambient>0.16 0.27 0.48 1</ambient><diffuse>0.16 0.27 0.48 1</diffuse></material>
+      </visual>
+      <visual name="books_9">
+        <pose>-0.12 0.02 1.29 0 0 0</pose>
+        <geometry><box><size>0.26 0.24 0.26</size></box></geometry>
+        <material><ambient>0.22 0.42 0.26 1</ambient><diffuse>0.22 0.42 0.26 1</diffuse></material>
+      </visual>
+      <visual name="books_10">
+        <pose>0.25 0.03 1.27 0 0 0</pose>
+        <geometry><box><size>0.24 0.22 0.22</size></box></geometry>
+        <material><ambient>0.82 0.76 0.58 1</ambient><diffuse>0.82 0.76 0.58 1</diffuse></material>
+      </visual>
+      <collision name="collision_body">
+        <pose>0 0 0.9 0 0 0</pose>
+        <geometry><box><size>0.9 0.35 1.8</size></box></geometry>
+      </collision>
+    </link>
+  </model>
+</sdf>

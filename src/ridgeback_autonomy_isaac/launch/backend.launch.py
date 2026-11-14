@@ -49,6 +49,8 @@ def generate_launch_description():
     camera_profile = LaunchConfiguration('camera_profile')
     depth_fidelity = LaunchConfiguration('depth_fidelity')
     sim_mode = LaunchConfiguration('sim_mode')
+    renderer = LaunchConfiguration('renderer')
+    anti_aliasing = LaunchConfiguration('anti_aliasing')
     sensor_hz = LaunchConfiguration('sensor_hz')
 
     isaac_python = os.environ.get(
@@ -123,6 +125,8 @@ def generate_launch_description():
              '--camera-profile', camera_profile,
              '--depth-fidelity', depth_fidelity,
              '--sim-mode', sim_mode,
+             '--renderer', renderer,
+             '--anti-aliasing', anti_aliasing,
              '--sensor-hz', sensor_hz,
              '--animate-g1', LaunchConfiguration('animate_g1')],
         name='isaac_runner',
@@ -165,6 +169,14 @@ def generate_launch_description():
         DeclareLaunchArgument('sim_mode', default_value='realtime',
                               description='realtime | deterministic '
                                           '(fixed-step contention-immune A/B)'),
+        DeclareLaunchArgument('renderer', default_value='RealTimePathTracing',
+                              choices=['RealTimePathTracing', 'RaytracedLighting',
+                                       'PathTracing'],
+                              description='RTX render mode of the camera images'),
+        DeclareLaunchArgument('anti_aliasing', default_value='3',
+                              choices=['0', '1', '2', '3', '4'],
+                              description='0 off, 1 TAA, 2 FXAA, 3 DLSS, 4 RTXAA; '
+                                          'temporal modes depend on frame history'),
         DeclareLaunchArgument('sensor_hz', default_value='40.0',
                               description='lidar rate = deterministic fixed dt'),
         DeclareLaunchArgument('animate_g1', default_value='false',

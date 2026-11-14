@@ -12,6 +12,12 @@ if [ -z "$CHANGED" ]; then
     exit 0
 fi
 
+# Explainer pages follow their sources (docs/project/documentation.md#explainer-pages).
+python3 "$REPO_ROOT/tools/check_explainer_sources.py" --root "$REPO_ROOT" >&2 || {
+    echo "[explainer hook] update the explainer pages above before committing" >&2
+    exit 1
+}
+
 # Documentation links, provenance and page shape (docs/project/documentation.md).
 if grep -qE '\.md$' <<<"$CHANGED"; then
     if python3 -c 'import markdown_it' 2>/dev/null; then

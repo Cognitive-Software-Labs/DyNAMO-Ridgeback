@@ -291,7 +291,7 @@ _DISPATCHER_ARGUMENT_NAMES = {
     },
     'isaac': {
         'setup_path', 'world', 'namespace', 'rtf', 'headless', 'livestream',
-        'odom_noise', 'noise_seed', 'camera', 'sim_mode', 'sensor_hz',
+        'odom_noise', 'noise_seed', 'camera', 'sim_mode', 'renderer', 'anti_aliasing', 'sensor_hz',
         'camera_profile', 'depth_fidelity',
     },
     'hardware': {'setup_path', 'namespace', 'start_platform'},
@@ -336,6 +336,7 @@ def test_simulation_dispatcher_forwards_exact_adapter_arguments(
          {'gz_gui': 'true', 'headless_rendering': 'false'}),
         ('isaac', 'g1_distance_calibration', 'ridgeback_autonomy_isaac',
          {'headless': 'true', 'rtf': '1.0', 'sim_mode': 'realtime',
+          'renderer': 'RealTimePathTracing', 'anti_aliasing': '3',
           'depth_fidelity': 'ideal'}),
     ],
 )
@@ -437,7 +438,8 @@ def _runner_parameters(context, nodes) -> dict:
          {'gz_gui': 'true', 'headless_rendering': 'false'}),
         ('isaac', 'ridgeback_autonomy_isaac', '/isaac_sim',
          {'depth_fidelity': 'ideal', 'headless': 'true', 'rtf': '1.0',
-          'sim_mode': 'realtime'}),
+          'sim_mode': 'realtime', 'renderer': 'RealTimePathTracing',
+          'anti_aliasing': '3'}),
     ],
 )
 def test_benchmark_runner_uses_the_selected_catalog_services_and_public_world(
@@ -898,10 +900,11 @@ def test_dependency_profiles_keep_gazebo_out_of_the_common_closure() -> None:
     assert gazebo['src/gz-sim']['version'] == '446a44335a45b704b4d36dabcc5508ee34eeb3d8'
     assert '[src/gz-sim]="patches/gz_sim_sensors_shutdown.patch"' in checker
     # ros_gz 1.0.24, the tag the installed binaries were built from, overlaid
-    # by its bridge alone.
+    # by its patched packages alone.
     assert gazebo['src/ros_gz']['version'] == '5912bfe7976a79d2cc9f373b2d40a8a3a3e33da2'
-    assert '[src/ros_gz]="patches/ros_gz_bridge_shutdown.patch"' in checker
-    assert '[src/ros_gz]="ros_gz_bridge ros_gz_image"' in checker
+    assert ('[src/ros_gz]="patches/ros_gz_bridge_shutdown.patch '
+            'patches/ros_gz_scene_state.patch"') in checker
+    assert '[src/ros_gz]="ros_gz_bridge ros_gz_image ros_gz_sim"' in checker
     assert 'core|gz|viz|all' in checker
 
 

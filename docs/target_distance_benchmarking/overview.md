@@ -73,6 +73,13 @@ shutdown with outstanding requests; that dependency investigation and remaining
 RViz/bridge qualification live in the
 [shutdown plan](../plans/BENCHMARKING_shutdown_lifecycle.md).
 
+## Saved hardware diagnostic
+
+The [hardware-bag bridge](hardware_bag_validation.md) reads saved MCAP on the
+workstation and shares inference across ten fixed estimator/mask/input paths.
+It preserves missing inputs, qualified references and resumable evidence;
+results remain unscored and establish no final accuracy or live throughput.
+
 ## Exploration evaluation
 
 `tools/benchmark/` is the instrumented **exploration** harness — a probe and a
@@ -98,6 +105,9 @@ camera-less robot profile for measuring frontier exploration. It is a separate w
   substrate
 - [scenario gallery](benchmark_scenarios_v2_gallery.html) — generated visual reference for
   the packaged scene set
+- [Gazebo](benchmark_background_gallery_gazebo.html) and
+  [Isaac](benchmark_background_gallery_isaac.html) placed-scene galleries — every
+  scene at its placement with the `lab` background, as each simulator renders it
 
 ## Archived evidence
 

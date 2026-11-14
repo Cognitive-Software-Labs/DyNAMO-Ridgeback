@@ -37,7 +37,28 @@ The run also names its simulator:
     and first spawn.
 - `parameters` repeats `backend` and `backend_settings`.
 - `summary.md` names the backend, the world (with its native name when it
-  differs) and the catalog.
+  differs), the catalog and the background.
+
+`run.background` is null for the bare room with the robot at the origin. With
+a background it records:
+- the name, whether props were spawned (`props_spawned`; false is the control
+  arm), the layout and drop-file paths and SHA-256, and the prop count;
+- `backdrop_gap_m`, `dx_step_m` and the drop rule constants;
+- every scene's placement: `dx_m`, the anchor (target index, backdrop prop
+  or `wall`, `gap_m`) and its drop list;
+- the one-off spawn time, and the robot pose found at the start of the run,
+  with whether it had to be moved home (`robot_home`);
+- for each trial: `dx_m` and the anchor, the props it dropped, removed and
+  restored, the remove, move and restore times, the robot's commanded and
+  measured pose with its errors, and the `state_check` (ok, differences,
+  `state_hash`, largest position and yaw error).
+
+The catalog provenance then lists the background resources too. Capture
+artifacts carry the background's name and hashes, and each trial its dropped
+props. Estimator CSV rows add `placement_dx_m`, which `spawn_world_x`
+includes. `summary.md` names the background as props run or control arm. The
+run folder gains a `bg-<name>` suffix, or `bg-<name>-bare` for the control
+arm; bare-room names are unchanged.
 
 CSV rows include trial/scene/instance and spawn truth; estimator/outcome/reason;
 estimate and absolute/relative error; usable events and captured frames; and
@@ -193,7 +214,12 @@ old name is reported.
   backend-only settings, and refusal of `hardware`;
 - `asset_catalog.py`: logical-name-to-resource catalogs and native worlds;
 - `scene_control.py`: the simulator-neutral `simulation_interfaces` client
-  (bounded calls, ownership of `bench_*` names, readiness, rollback);
+  (bounded calls, ownership of `bench_*` names, readiness, rollback, robot
+  moves and scene snapshots);
+- `background.py`: background layouts, the per-scene placement and drop rule,
+  and the generated drop file's run-time checks; `background_session.py`: the
+  run-scoped prop spawn, per-scene adjustment with the robot move, and
+  removal; `scene_state.py`: the pre-capture state check and its fingerprint;
 - `simulation.py`: pose normalization and ground-truth instances;
 - `target_distance_benchmark_runner_node.py`: ROS orchestration and lifecycle;
 - `sweep.py`, `target_benchmark_sweep.py`, `sweep_report.py`: sweep domain,

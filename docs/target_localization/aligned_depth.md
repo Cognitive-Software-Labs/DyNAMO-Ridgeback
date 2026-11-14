@@ -238,6 +238,17 @@ The mask node does branch, but on **acquisition**, never on depth semantics:
 each source declares an `input_kind` (`depth` | `color`), which decides only
 which stream the node buffers raw and hands back at the detection stamp.
 
+Each source also describes itself through `provenance()`: its name and
+`usable_max_m` (JSON `null` when none is declared), and for monocular the
+checkpoint id, its Hugging Face snapshot revision, the declared `max_depth` and
+the fraction the ceiling is derived with. Whenever the node republishes an
+aligned frame on `debug/target/mask/aligned_depth`, it first publishes that
+description, the node's working gate, and the frame's stamp and frame ID as JSON
+on `debug/target/mask/aligned_depth_source` (reliable `std_msgs/String`). The
+values are read in the worker that produced the frame, so they are the ceiling
+that frame was cleaned against. A recorder that freezes the depth stores them
+with it; a frame without such a record has no known range and is not frozen.
+
 - Selecting the source is a **config choice**, mirroring the other swap points
   (backend sim/real, mask front-end detect/segment, isolation recipe).
 - The benchmark treats the source as a matrix axis: every downstream

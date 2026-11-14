@@ -26,7 +26,8 @@ from ridgeback_autonomy.benchmarking.sweep import load_sweep, parse_sweep
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 ISAAC_SETTINGS = {
-    'headless': 'true', 'rtf': '1.0', 'sim_mode': 'realtime', 'depth_fidelity': 'ideal'}
+    'headless': 'true', 'rtf': '1.0', 'sim_mode': 'realtime',
+    'renderer': 'RealTimePathTracing', 'anti_aliasing': '3', 'depth_fidelity': 'ideal'}
 GZ_SETTINGS = {'gz_gui': 'true', 'headless_rendering': 'false'}
 
 

@@ -26,6 +26,7 @@ from ridgeback_common.messages import (
     polar_beam_booleans,
 )
 from ridgeback_common.stamps import stamp_key
+from ridgeback_common.ros_signals import init_owned, shielded, spin_until_interrupted
 from ridgeback_common.tf_utils import lookup_transform_components
 from ridgeback_interfaces.msg import PolarBeams, TargetMeasurements
 from ridgeback_localization.core.image_utils import (

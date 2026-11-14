@@ -42,6 +42,12 @@ install(PROGRAMS
 )
 
 install(PROGRAMS
+  ridgeback_autonomy/benchmarking/target_hardware_bag_validation.py
+  DESTINATION lib/${PROJECT_NAME}
+  RENAME target_hardware_bag_validation
+)
+
+install(PROGRAMS
   ridgeback_autonomy/benchmarking/target_replay_materialize_masks.py
   DESTINATION lib/${PROJECT_NAME}
   RENAME target_replay_materialize_masks
@@ -237,6 +243,9 @@ if(BUILD_TESTING)
   ament_add_pytest_test(test_benchmark_backends test/test_benchmark_backends.py)
   ament_add_pytest_test(test_scene_control test/test_scene_control.py)
   ament_add_pytest_test(test_asset_catalog test/test_asset_catalog.py)
+  ament_add_pytest_test(test_benchmark_background test/test_benchmark_background.py)
+  ament_add_pytest_test(test_background_session test/test_background_session.py)
+  ament_add_pytest_test(test_scene_state test/test_scene_state.py)
   ament_add_pytest_test(test_sdf2usd_parse test/test_sdf2usd_parse.py)
   ament_add_pytest_test(test_scenarios test/test_scenarios.py)
   ament_add_pytest_test(test_scene_audit test/test_scene_audit.py)
@@ -247,12 +256,14 @@ if(BUILD_TESTING)
   ament_add_pytest_test(test_recording test/test_recording.py)
   ament_add_pytest_test(test_replay test/test_replay.py)
   ament_add_pytest_test(test_layered_replay test/test_layered_replay.py)
+  ament_add_pytest_test(test_hardware_bag_validation test/test_hardware_bag_validation.py)
   ament_add_pytest_test(test_lidar_scan_assembler test/test_lidar_scan_assembler.py)
   ament_add_pytest_test(test_benchmark_configurator test/test_benchmark_configurator.py)
   ament_add_pytest_test(test_sweep test/test_sweep.py)
   ament_add_pytest_test(test_sweep_report test/test_sweep_report.py)
   ament_add_pytest_test(test_hud_node test/test_hud_node.py)
   ament_add_pytest_test(test_node_shutdown test/test_node_shutdown.py)
+  ament_add_pytest_test(test_overlay_shutdown test/test_overlay_shutdown.py)
   ament_add_pytest_test(test_ros_signals test/test_ros_signals.py)
   ament_add_pytest_test(test_scene_rollback_signals test/test_scene_rollback_signals.py)
   ament_add_pytest_test(test_localization_node_shutdown test/test_localization_node_shutdown.py)

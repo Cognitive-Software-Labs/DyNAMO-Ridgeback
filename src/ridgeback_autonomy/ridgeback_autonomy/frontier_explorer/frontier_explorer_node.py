@@ -291,8 +291,8 @@ class FrontierExplorerNode(Node):
         msg.data = status
         self._status_pub.publish(msg)
 
-    # Radius for merging failure tallies of the same drifting frontier goal
-    _ABORT_MATCH_RADIUS = 5
+    # Radius (cells) for merging failure tallies of the same drifting frontier goal
+    _ABORT_MATCH_RADIUS = 6
 
     def _count_goal_failure(self, goal):
         """Tally a navigation failure for goal, merging nearby entries.
@@ -612,9 +612,9 @@ class FrontierExplorerNode(Node):
         goal_msg.pose.pose.position.z = 0.0
 
         # Face along the approach, from the robot towards the goal, so the forward
-        # camera looks into the frontier being explored. With a fixed yaw the base
-        # often drove sideways or backwards and then turned on the spot at the goal.
-        # (From dev ede9bd1; the shared goal checker's heading tolerance is unchanged.)
+        # camera also looks into the frontier being explored. With a fixed yaw the
+        # base arrived and then had to turn on the spot, which walls beside a
+        # doorway block.
         if start_position is None:
             goal_msg.pose.pose.orientation.w = 1.0
         else:

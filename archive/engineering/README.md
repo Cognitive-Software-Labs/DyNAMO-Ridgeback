@@ -7,6 +7,8 @@ are excluded from ordinary repository search and the generated knowledge graph.
 
 ## Localization and perception
 
+- [OWLv2 threshold selection and live exploration observation](2026-11-01-owlv2-threshold-selection.md) — offline frame sampling, robot/person trade-off, remaining occlusion failures and qualitative live evidence behind the 0.30 default.
+
 - [Intel–Thor perception frame timing and depth-one deployment](2026-10-22-perception-frame-timing.md) — warm detector cost, matched-frame delivery, population limits, and queue-change verification.
 - [Package split simulator runtime qualification](2026-09-18-package-split-runtime.md)
 
@@ -22,6 +24,8 @@ are excluded from ordinary repository search and the generated knowledge graph.
 
 ## Benchmarking and execution
 
+- [Saved hardware-bag diagnostic and review](2026-11-05-hardware-bag-diagnostic.md) — completed 48-bag processing, detector misses, numerical-return limitations and the boundary between offline follow-up and re-recording.
+- [Qualification campaign stopped by systemd-oomd](2026-11-03-qualification-oom.md) — retained memory peaks, ten-minute host history, incomplete workload attribution and preserved partial results.
 - [Remote versus physical-seat validation](2026-09-07-seat-validation.md) — identical error on both displays; accepted as the execution-environment qualification.
 - [Scene recertification for the current camera](2026-10-29-scene-recertification.md) — scene_audit method, legacy cross-check, relabel/re-place decisions and asset seating.
 - [Gazebo and Isaac backend qualification](2026-10-26-benchmark-gazebo-isaac-qualification.md) — the first and accepted matched full runs, cross-simulator detector and ranking differences, reproducibility of each simulator, interrupted-stop cycles and installed-launch smokes.
@@ -33,6 +37,7 @@ are excluded from ordinary repository search and the generated knowledge graph.
 
 ## Simulation and operations
 
+- [Gazebo canonical-link state after scene additions](2026-11-02-gazebo-scene-state.md) — deterministic overwrite proof, local server-owned initialization/reset correction, state stress/order parity, raw pose differences and failed lifecycle gates.
 - [Gazebo Sensors shutdown races](2026-10-18-gazebo-sensors-shutdown.md) — waiter wakeup, observed same-instance concurrent joins, and separate diagnostic/qualification populations.
 - [ros_gz bridge ownership cycles and image_bridge teardown](2026-10-22-ros-gz-bridge-shutdown.md) — two bridge-node ownership cycles, the image_bridge in-flight callback race, and stock/partial/final crash populations.
 - [RViz Image display teardown abort](2026-10-22-rviz-image-display-teardown.md) — stale message-filter connection after unsubscribe, stock/patched signal populations, and the separate process-exit SIGSEGV still open.
@@ -60,6 +65,7 @@ are excluded from ordinary repository search and the generated knowledge graph.
 - [Intel DDS local-reader screening](2026-10-05-intel-dds-screening.md) — scan interruption after a local color reader under the original profile, brief discovery-only multicast comparison, and verified restoration.
 - [Static collision-envelope audit](2026-09-18-collision-envelope-audit.md) — description/USD/Nav2 comparison with top-down and side views.
 - [Navigation footprint and simulator-contact qualification](2026-09-22-navigation-footprint-qualification.md) — effective Nav2 containment plus three-boot Gazebo and Isaac wall-contact matrices.
+- [HCC arena doorway runs and the mesh-shaped robot outline](2026-10-30-hcc-arena-doorway-runs.md) — four Gazebo runs through 1.05 m doorways, collision-monitor and Smac Lattice failure modes, and the outline the mesh shape replaced.
 
 - [Intel–Thor DDS transport diagnosis](2026-09-18-intel-thor-dds-transport.md) — Wi-Fi duplication, receive-buffer drops, and Ethernet-only profile measurements.
 - [Intel–Thor middleware benchmark](2026-09-18-intel-thor-rmw-benchmark.md) — Fast DDS vs CycloneDDS vs mixed across the link, and the reader-side interface rule.

@@ -28,6 +28,8 @@ from rclpy.qos import QoSProfile, ReliabilityPolicy, DurabilityPolicy, HistoryPo
 from ridgeback_common import hud_style
 from rviz_2d_overlay_msgs.msg import OverlayText
 
+from ridgeback_common.ros_signals import init_owned, shielded, spin_until_interrupted
+
 
 LINE_BREAK = '<br/>'
 

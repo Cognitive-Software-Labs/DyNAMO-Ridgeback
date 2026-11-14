@@ -83,6 +83,12 @@ MONOCULAR_RETRY_COOLDOWN_S_DEFAULT = 30.0
 MONOCULAR_USABLE_RANGE_FRACTION = 0.9
 
 
+def finite_or_none(value: float) -> float | None:
+    """A declared ceiling as JSON can carry it: ``None`` means none declared."""
+
+    return float(value) if math.isfinite(value) else None
+
+
 def decode_depth_to_meters(msg: Image) -> np.ndarray:
     """Decode a depth Image message into float32 meters, invalid pixels kept
     as 0/NaN/inf per the aligned-depth-frame contract.
@@ -135,6 +141,15 @@ class StereoDepthSource:
         # one, and the node's own gate is the other way to bound the scene.
         self.usable_max_m = float(usable_max_m)
 
+    def provenance(self) -> dict:
+        """Which source this is and the ceiling it declares, for frozen evidence."""
+
+        return {
+            'depth_source': DEPTH_SOURCE_STEREOSCOPIC,
+            'usable_max_m': finite_or_none(self.usable_max_m),
+            'usable_max_policy': 'configured ceiling; none unless one is passed',
+        }
+
     def produce(self, msg: Image) -> tuple[np.ndarray, object] | None:
         try:
             depth_m = decode_depth_to_meters(msg)
@@ -185,6 +200,10 @@ class MonocularDepthSource:
         # that window anyway, and a placeholder here would only be a number
         # this module invented.
         self.usable_max_m = math.inf
+        # What the ceiling was derived from, recorded alongside it so frozen
+        # depth names the checkpoint that predicted it. Unknown until load.
+        self.declared_max_depth_m: float | None = None
+        self.model_revision: str | None = None
 
     @staticmethod
     def resolve_device() -> str:
@@ -261,7 +280,7 @@ class MonocularDepthSource:
         but does not declare its range.
         """
 
-        config = getattr(getattr(self._pipeline, 'model', None), 'config', None)
+        config = self._checkpoint_config()
         estimation_type = getattr(config, 'depth_estimation_type', None)
         if estimation_type is not None and str(estimation_type) != 'metric':
             raise ValueError(
@@ -278,6 +297,26 @@ class MonocularDepthSource:
                 'a checkpoint that states its range '
                 f'(e.g. "{DEPTH_ANYTHING_MODEL_ID_DEFAULT}")')
         return float(max_depth) * MONOCULAR_USABLE_RANGE_FRACTION
+
+    def _checkpoint_config(self):
+        return getattr(getattr(self._pipeline, 'model', None), 'config', None)
+
+    def provenance(self) -> dict:
+        """The loaded checkpoint and the ceiling derived from it, for frozen evidence.
+
+        Read off the loaded weights, never re-derived: a replay that froze this
+        depth must clean it against the ceiling the live measurement used.
+        """
+
+        return {
+            'depth_source': DEPTH_SOURCE_MONOCULAR,
+            'model_id': self.model_id,
+            'model_revision': self.model_revision,
+            'declared_max_depth_m': self.declared_max_depth_m,
+            'usable_range_fraction': MONOCULAR_USABLE_RANGE_FRACTION,
+            'usable_max_m': finite_or_none(self.usable_max_m),
+            'usable_max_policy': 'declared_max_depth_m * usable_range_fraction',
+        }
 
     def load(self) -> bool:
         if self._pipeline is not None:
@@ -301,6 +340,11 @@ class MonocularDepthSource:
             # of once at startup where it scrolls away.
             self._schedule_retry(str(exc))
             return False
+        config = self._checkpoint_config()
+        self.declared_max_depth_m = float(config.max_depth)
+        # Hugging Face records the snapshot it resolved; absent off the hub.
+        revision = getattr(config, '_commit_hash', None)
+        self.model_revision = None if revision is None else str(revision)
         self.logger.info(
             f'Depth-Anything model loaded; usable to {self.usable_max_m:.1f} m.')
         return True

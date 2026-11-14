@@ -7,10 +7,11 @@ import re
 
 import pytest
 from simulation_interfaces.msg import EntityFilters, EntityCategory, Result
-from simulation_interfaces.srv import SpawnEntity
+from simulation_interfaces.srv import SetEntityState, SpawnEntity
 
 from scene_provider import (
     InvalidResource,
+    RobotPlacement,
     RobotState,
     SceneEntities,
     SceneRequestError,
@@ -20,6 +21,7 @@ from scene_provider import (
     robot_entity_name,
     stamp_parts,
     validate_spawn_request,
+    validate_state_request,
     world_twist,
     yaw_quaternion,
 )
@@ -336,3 +338,68 @@ def test_stamps_split_sim_time_like_the_runner_clock() -> None:
 def test_robot_entity_name_matches_the_gazebo_convention() -> None:
     assert robot_entity_name('r100_0001') == ROBOT
     assert robot_entity_name('/r100_0001/') == ROBOT
+
+
+# ---- placing the robot ------------------------------------------------------
+
+def state_request(name=ROBOT, x=2.35, y=0.0, z=0.07617, yaw=0.0) -> SetEntityState.Request:
+    request = SetEntityState.Request()
+    request.entity = name
+    request.state.header.frame_id = 'world'
+    request.state.pose.position.x, request.state.pose.position.y = x, y
+    request.state.pose.position.z = z
+    request.state.pose.orientation.z = math.sin(0.5 * yaw)
+    request.state.pose.orientation.w = math.cos(0.5 * yaw)
+    return request
+
+
+def test_a_level_pose_at_rest_becomes_a_placement() -> None:
+    placement = validate_state_request(state_request(yaw=0.4))
+
+    assert placement == RobotPlacement(ROBOT, 2.35, 0.0, 0.07617, pytest.approx(0.4))
+
+
+@pytest.mark.parametrize('mutate, code', [
+    (lambda r: setattr(r.state.twist.linear, 'x', 0.1), Result.RESULT_OPERATION_FAILED),
+    (lambda r: setattr(r.state.twist.angular, 'z', 0.1), Result.RESULT_OPERATION_FAILED),
+    (lambda r: setattr(r.state.acceleration.linear, 'y', 0.1), Result.RESULT_OPERATION_FAILED),
+    (lambda r: setattr(r.state.pose.orientation, 'x', 0.05), SetEntityState.Response.INVALID_POSE),
+    (lambda r: setattr(r.state.header, 'frame_id', 'odom'), SetEntityState.Response.INVALID_POSE),
+    (lambda r: setattr(r.state.pose.orientation, 'w', 0.0), SetEntityState.Response.INVALID_POSE),
+    (lambda r: setattr(r.state.pose.position, 'x', math.nan), SetEntityState.Response.INVALID_POSE),
+])
+def test_motion_tilt_and_foreign_frames_are_refused(mutate, code) -> None:
+    request = state_request()
+    mutate(request)
+
+    with pytest.raises(SceneRequestError) as excinfo:
+        validate_state_request(request)
+
+    assert code_of(excinfo) == code
+
+
+def test_only_the_robot_is_placed_and_only_at_its_own_height(resource) -> None:
+    moves = []
+    entities = SceneEntities(FakeNativeScene(), ROBOT,
+                             move_robot=lambda *pose: moves.append(pose))
+    entities.spawn(plan('bench_g1', resource))
+
+    entities.place_robot(RobotPlacement(ROBOT, 2.35, 0.0, 0.07617, 0.0), frame())
+    assert moves == [(2.35, 0.0, 0.0)]
+    for placement, code in (
+            (RobotPlacement('bench_g1', 1.0, 0.0, 0.0, 0.0), Result.RESULT_OPERATION_FAILED),
+            (RobotPlacement('wall_north', 1.0, 0.0, 0.0, 0.0), Result.RESULT_NOT_FOUND),
+            (RobotPlacement(ROBOT, 1.0, 0.0, 0.2, 0.0), SetEntityState.Response.INVALID_POSE)):
+        with pytest.raises(SceneRequestError) as excinfo:
+            entities.place_robot(placement, frame())
+        assert code_of(excinfo) == code
+    assert moves == [(2.35, 0.0, 0.0)]
+
+
+def test_a_runner_without_a_mover_cannot_place_the_robot() -> None:
+    entities = SceneEntities(FakeNativeScene(), ROBOT)
+
+    assert not entities.moves_robot
+    with pytest.raises(SceneRequestError) as excinfo:
+        entities.place_robot(RobotPlacement(ROBOT, 1.0, 0.0, 0.07617, 0.0), frame())
+    assert code_of(excinfo) == Result.RESULT_FEATURE_UNSUPPORTED

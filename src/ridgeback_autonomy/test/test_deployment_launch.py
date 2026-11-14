@@ -28,6 +28,48 @@ def executables(nodes, context):
     return [(n.node_executable if isinstance(n.node_executable,str) else perform_substitutions(context,n.node_executable)) for n in nodes if isinstance(n,Node)]
 
 
+def front_offsets(nodes, context):
+    from launch_ros.utilities import evaluate_parameters
+    return {
+        executables([node], context)[0]: values['front_offset_m']
+        for node in nodes if isinstance(node, Node)
+        for values in evaluate_parameters(context, node._Node__parameters)
+        if 'front_offset_m' in values
+    }
+
+
+@pytest.mark.parametrize('backend, expected', [('hardware', .465), ('gz', .25), ('isaac', .25)])
+def test_front_reference_matches_between_producers_and_displays(backend, expected):
+    module = load('src/ridgeback_autonomy/launch/ridgeback_exploration.launch.py')
+    context = context_for(module, dict(
+        backend=backend, namespace='r100_0160', base_frame='base_link',
+        estimators='projective_ranging,euclidean_reconstruction,polar_profiling'))
+    offsets = front_offsets(module.build_target_localization_nodes(context), context)
+    assert offsets == {
+        'target_mask_measurement_node': expected,
+        'target_visualization_node': expected,
+    }
+
+
+@pytest.mark.parametrize('relative', [
+    'src/ridgeback_localization/launch/localization.launch.py',
+    'src/ridgeback_autonomy/launch/localization_observer.launch.py',
+    'src/ridgeback_autonomy/launch/ridgeback_exploration.launch.py',
+])
+def test_hardware_compute_and_observers_share_the_override(relative):
+    module = load(relative)
+    for override, expected in [({}, .465), ({'front_offset_m': '.41'}, .41)]:
+        context = context_for(module, dict(
+            backend='hardware', namespace='r100_0160', base_frame='base_link',
+            displays='true', **override))
+        nodes = (module.build_nodes(context) if hasattr(module, 'build_nodes')
+                 else module.build_target_localization_nodes(context))
+        offsets = front_offsets(nodes, context)
+        assert offsets['target_visualization_node'] == expected
+        if 'observer' not in relative:
+            assert offsets['target_mask_measurement_node'] == expected
+
+
 def test_external_mode_has_no_compute_or_health_process_and_needs_no_venv(monkeypatch):
     module=load('src/ridgeback_autonomy/launch/ridgeback_exploration.launch.py')
     monkeypatch.setenv('RIDGEBACK_PERCEPTION_VENV','/nonexistent')
@@ -229,7 +271,7 @@ def rviz_layout_argument(module, overrides, tmp_path, monkeypatch):
 
 def test_hardware_rviz_has_no_goal_tool_and_simulation_keeps_it(tmp_path, monkeypatch):
     module = load('src/ridgeback_autonomy/launch/ridgeback_exploration.launch.py')
-    hardware = rviz_layout_argument(module, dict(backend='hardware', base_frame='base_link'), tmp_path, monkeypatch)
+    hardware = rviz_layout_argument(module, dict(backend='hardware', namespace='r100_0160', base_frame='base_link'), tmp_path, monkeypatch)
     simulation = rviz_layout_argument(module, dict(backend='gz'), tmp_path, monkeypatch)
     assert 'rviz_default_plugins/SetGoal' not in Path(hardware).read_text()
     assert simulation.endswith('exploration.rviz')
@@ -255,7 +297,7 @@ def test_hardware_rviz_process_is_niced_and_thread_limited(tmp_path, monkeypatch
                         return prefix, env
         raise AssertionError('no rviz2 node')
 
-    prefix, env = rviz_process(dict(backend='hardware', base_frame='base_link'))
+    prefix, env = rviz_process(dict(backend='hardware', namespace='r100_0160', base_frame='base_link'))
     assert prefix.startswith('nice -n 19') and env == {'LP_NUM_THREADS': '2'}
     assert rviz_process(dict(backend='gz')) == ('', {})
 

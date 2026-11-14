@@ -69,11 +69,26 @@ def build_profile(base, namespace, general_tree, through_tree, parking_overlay):
     return {namespace.strip('/'): params}
 
 
-def goal_checker_reason(values, xy=0.08, yaw=0.12):
+def shared_goal_checker(nav2_params_path=None):
+    """(xy, yaw) tolerances of the shared general goal checker in nav2_params.yaml."""
+    if nav2_params_path is None:
+        from ament_index_python.packages import get_package_share_directory
+        nav2_params_path = Path(get_package_share_directory('ridgeback_autonomy')) / 'config' / 'nav2_params.yaml'
+    import yaml
+    checker = yaml.safe_load(Path(nav2_params_path).read_text())[
+        'controller_server']['ros__parameters']['general_goal_checker']
+    return float(checker['xy_goal_tolerance']), float(checker['yaw_goal_tolerance'])
+
+
+def goal_checker_reason(values, xy=0.08, yaw=0.12, general=None):
+    """Why the controller's goal checkers are not the parking profile, or None: the shared
+    general checker exactly as configured (``general``: its (xy, yaw), by default read from
+    the package's nav2_params.yaml) and the separate tight parking checker."""
+    general_xy, general_yaw = shared_goal_checker() if general is None else general
     required = {'goal_checker_plugins': ['general_goal_checker', 'parking_goal_checker'],
         'general_goal_checker.plugin': 'nav2_controller::SimpleGoalChecker',
-        'general_goal_checker.xy_goal_tolerance': 0.40,
-        'general_goal_checker.yaw_goal_tolerance': 0.40,
+        'general_goal_checker.xy_goal_tolerance': general_xy,
+        'general_goal_checker.yaw_goal_tolerance': general_yaw,
         'general_goal_checker.stateful': True,
         'parking_goal_checker.plugin': 'nav2_controller::SimpleGoalChecker',
         'parking_goal_checker.xy_goal_tolerance': xy,

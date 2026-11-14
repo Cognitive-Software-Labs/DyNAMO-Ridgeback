@@ -75,7 +75,7 @@ defaults:
   detector: owlv2
   detection_model: google/owlv2-base-patch16-ensemble
   target_labels: humanoid robot
-  detection_threshold: 0.55
+  detection_threshold: 0.30
   detector_fps: 10.0
 
 configs:
@@ -101,7 +101,8 @@ The environment cannot change mid-sweep, so these keys may be set only in
 - `detector`, `detection_model`, `target_labels`, `detection_threshold`,
   `detector_fps` and `detector_debug`;
 - the backend-only settings: `gz_gui` and `headless_rendering` for Gazebo;
-  `headless`, `rtf`, `sim_mode` and `depth_fidelity` for Isaac.
+  `headless`, `rtf`, `sim_mode`, `renderer`, `anti_aliasing` and `depth_fidelity`
+  for Isaac.
 
 A setting of the other backend is refused, and `backend: hardware` is refused
 outright. `benchmarking/sweep.py` and `localization_launch.py` hold the
@@ -135,6 +136,12 @@ stereoscopic/monocular matrix. Run it only from a clean, committed checkout; its
 [BENCHMARKING — Combined-model throughput](../plans/BENCHMARKING_model_throughput.md)
 owns its decision gates and interpretation; the seat sweep qualified the
 [execution environments](running_benchmarks.md#qualified-execution-environments).
+
+The [unattended qualification helper](unattended_qualification.md) prepares the
+fixed 16-run Gazebo/Isaac campaign and can supervise it as a local user service,
+with capture-readiness checks, strict result checks, deadlines and automatic
+reports. Preparation does not launch a simulation; recorder integration and its
+short readiness checks must pass before full qualification runs begin.
 
 ## Archived evidence
 

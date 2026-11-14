@@ -130,6 +130,13 @@ BENCHMARK_BACKENDS: Mapping[str, BenchmarkBackend] = {
             'sim_mode': BackendSetting(
                 default='realtime', choices=('realtime', 'deterministic'),
                 description='Isaac Sim stepping: realtime or fixed-step deterministic'),
+            'renderer': BackendSetting(
+                default='RealTimePathTracing',
+                choices=('RealTimePathTracing', 'RaytracedLighting', 'PathTracing'),
+                description='Isaac Sim RTX render mode for the camera images'),
+            'anti_aliasing': BackendSetting(
+                default='3', choices=('0', '1', '2', '3', '4'),
+                description='Isaac Sim anti-aliasing: 0 off, 1 TAA, 2 FXAA, 3 DLSS, 4 RTXAA'),
             'depth_fidelity': BackendSetting(
                 default=DEFAULT_DEPTH_FIDELITY, choices=DEPTH_FIDELITY_CHOICES,
                 description='Isaac Sim depth: ideal renderer depth or D455-like stereo'),

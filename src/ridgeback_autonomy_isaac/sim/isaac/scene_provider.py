@@ -15,8 +15,9 @@ without letting a ROS callback touch USD or PhysX:
 
 Entities are addressed by public names held in a registry. Only entities this
 provider spawned can be deleted, and each maps to its own prim under one scope,
-so a request can never name an arbitrary prim. The robot is a read-only entity
-whose state is the rig's exact ground truth.
+so a request can never name an arbitrary prim. The robot's state is the rig's
+exact ground truth; it is never spawned or deleted, but a runner that hands
+over a mover lets clients place it, level and at rest, through the rig.
 
 Nothing here imports Kit or pxr: the USD operations live in ``usd_scene.py``
 and arrive through the :class:`NativeScene` protocol.
@@ -40,6 +41,7 @@ from simulation_interfaces.srv import (
     GetEntities,
     GetEntitiesStates,
     GetSimulatorFeatures,
+    SetEntityState,
     SpawnEntity,
 )
 
@@ -54,6 +56,8 @@ ADVERTISED_FEATURES = (
     SimulatorFeatures.DELETING,
     SimulatorFeatures.ENTITY_STATE_GETTING,
 )
+# Advertised too when the runner lets clients move the robot.
+ROBOT_MOVE_FEATURE = SimulatorFeatures.ENTITY_STATE_SETTING
 SPAWN_FORMATS = ('usd',)
 USD_SUFFIXES = frozenset({'.usd', '.usda', '.usdc', '.usdz'})
 
@@ -65,6 +69,10 @@ SPAWNED_ENTITY_SCOPE = '/scene_entities'
 # an explicit answer instead of timing out on an unknown outcome.
 REQUEST_TIMEOUT_SEC = 5.0
 QUEUE_CAPACITY = 8
+# The rig moves only in the plane: a requested height, roll or pitch further
+# than this from the robot's own is refused rather than silently dropped.
+STATE_TOLERANCE_M = 0.005
+STATE_TOLERANCE_RAD = 0.002
 
 # Public names double as prim names, so they follow USD identifier rules.
 _ENTITY_NAME = re.compile(r'[A-Za-z_][A-Za-z0-9_]*')
@@ -353,6 +361,51 @@ def validate_spawn_request(request: Any) -> SpawnPlan:
     )
 
 
+@dataclass(frozen=True)
+class RobotPlacement:
+    name: str
+    x: float
+    y: float
+    z: float
+    yaw: float
+
+
+def validate_state_request(request: Any) -> RobotPlacement:
+    """A level, at-rest world-frame pose from a ``SetEntityState`` request."""
+
+    state = request.state
+    header_frame = state.header.frame_id
+    if header_frame not in ('', WORLD_FRAME_ID):
+        raise SceneRequestError(
+            SetEntityState.Response.INVALID_POSE,
+            f'state must be in frame "{WORLD_FRAME_ID}", got "{header_frame}"')
+    pose = state.pose
+    position = (pose.position.x, pose.position.y, pose.position.z)
+    qx, qy, qz, qw = (pose.orientation.x, pose.orientation.y,
+                      pose.orientation.z, pose.orientation.w)
+    if not all(math.isfinite(v) for v in (*position, qx, qy, qz, qw)):
+        raise SceneRequestError(SetEntityState.Response.INVALID_POSE, 'pose is not finite')
+    norm = math.sqrt(qx * qx + qy * qy + qz * qz + qw * qw)
+    if norm < 1e-9:
+        raise SceneRequestError(
+            SetEntityState.Response.INVALID_POSE, 'orientation is a zero quaternion')
+    qx, qy, qz, qw = qx / norm, qy / norm, qz / norm, qw / norm
+    motion = (state.twist.linear, state.twist.angular,
+              state.acceleration.linear, state.acceleration.angular)
+    if any(v.x or v.y or v.z for v in motion):
+        raise SceneRequestError(
+            Result.RESULT_OPERATION_FAILED,
+            'the robot can only be placed at rest; twist and acceleration must be zero')
+    roll = math.atan2(2.0 * (qw * qx + qy * qz), 1.0 - 2.0 * (qx * qx + qy * qy))
+    pitch = math.asin(max(-1.0, min(1.0, 2.0 * (qw * qy - qz * qx))))
+    if abs(roll) > STATE_TOLERANCE_RAD or abs(pitch) > STATE_TOLERANCE_RAD:
+        raise SceneRequestError(
+            SetEntityState.Response.INVALID_POSE,
+            f'the robot stays level; roll {roll:.4f} and pitch {pitch:.4f} rad requested')
+    yaw = math.atan2(2.0 * (qw * qz + qx * qy), 1.0 - 2.0 * (qy * qy + qz * qz))
+    return RobotPlacement(request.entity, *(float(v) for v in position), yaw)
+
+
 def compile_entity_filter(filters: Any) -> re.Pattern[str] | None:
     """The name filter, or None for all entities; other filters are unsupported."""
 
@@ -388,15 +441,22 @@ class SceneEntities:
     """
 
     def __init__(self, native: NativeScene, robot_name: str,
-                 scope: str = SPAWNED_ENTITY_SCOPE) -> None:
+                 scope: str = SPAWNED_ENTITY_SCOPE,
+                 move_robot: Callable[[float, float, float], None] | None = None) -> None:
         self._native = native
         self._robot_name = robot_name
         self._scope = scope.rstrip('/')
         self._spawned: dict[str, str] = {}
+        # Puts the rig at (x, y, yaw) at rest; None leaves the robot fixed.
+        self._move_robot = move_robot
 
     @property
     def robot_name(self) -> str:
         return self._robot_name
+
+    @property
+    def moves_robot(self) -> bool:
+        return self._move_robot is not None
 
     def names(self) -> list[str]:
         return [self._robot_name, *self._spawned]
@@ -443,6 +503,24 @@ class SceneEntities:
                 Result.RESULT_OPERATION_FAILED,
                 f'entity "{name}" is still present after removal')
         del self._spawned[name]
+
+    def place_robot(self, placement: RobotPlacement, frame: SimFrame) -> None:
+        if placement.name != self._robot_name:
+            if placement.name in self._spawned:
+                raise SceneRequestError(
+                    Result.RESULT_OPERATION_FAILED,
+                    f'entity "{placement.name}" is static; only the robot can be moved')
+            raise SceneRequestError(
+                Result.RESULT_NOT_FOUND, f'entity "{placement.name}" does not exist')
+        if self._move_robot is None:
+            raise SceneRequestError(
+                Result.RESULT_FEATURE_UNSUPPORTED, 'this runner does not move the robot')
+        if abs(placement.z - frame.robot.z) > STATE_TOLERANCE_M:
+            raise SceneRequestError(
+                SetEntityState.Response.INVALID_POSE,
+                f'the robot keeps its height {frame.robot.z:.4f} m; '
+                f'{placement.z:.4f} m requested')
+        self._move_robot(placement.x, placement.y, placement.yaw)
 
     def select(self, name_filter: re.Pattern[str] | None) -> list[str]:
         return [name for name in self.names()
@@ -514,6 +592,7 @@ class SceneControlService:
             (DeleteEntity, 'delete_entity', self._on_delete),
             (GetEntities, 'get_entities', self._on_entities),
             (GetEntitiesStates, 'get_entities_states', self._on_states),
+            (SetEntityState, 'set_entity_state', self._on_set_state),
         ):
             self.node.create_service(srv_type, f'~/{suffix}', callback)
         self._executor = SingleThreadedExecutor()
@@ -552,11 +631,13 @@ class SceneControlService:
     # ---- callbacks (executor thread) ---------------------------------------
 
     def _on_features(self, request, response):
-        response.features.features = list(ADVERTISED_FEATURES)
+        response.features.features = [
+            *ADVERTISED_FEATURES, *((ROBOT_MOVE_FEATURE,) if self._entities.moves_robot else ())]
         response.features.spawn_formats = list(SPAWN_FORMATS)
         response.features.custom_info = (
             'Static USD entities on the Isaac stage; names are USD identifiers '
-            'and only spawned entities can be deleted.')
+            'and only spawned entities can be deleted. Only the robot can be '
+            'moved, level and at rest.')
         return response
 
     def _answer(self, response, work: Callable[[], Any],
@@ -607,3 +688,10 @@ class SceneControlService:
             response.entities = [pose.name for pose in poses]
             response.states = [_entity_state(pose, sim_time) for pose in poses]
         return self._answer(response, work, apply)
+
+    def _on_set_state(self, request, response):
+        def work():
+            placement = validate_state_request(request)
+            return self._queue.call(
+                lambda frame: self._entities.place_robot(placement, frame))
+        return self._answer(response, work, lambda _outcome: None)

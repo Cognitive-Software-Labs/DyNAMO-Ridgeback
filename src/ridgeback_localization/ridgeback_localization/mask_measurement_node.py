@@ -49,6 +49,7 @@ Deliberately independent of the pointcloud estimator
 from __future__ import annotations
 
 import importlib
+import json
 import threading
 import time
 import traceback
@@ -63,6 +64,7 @@ from rclpy.node import Node
 from rclpy.qos import qos_profile_sensor_data
 from rclpy.time import Time
 from sensor_msgs.msg import CameraInfo, Image, LaserScan
+from std_msgs.msg import String
 from tf2_ros import Buffer, TransformException, TransformListener
 from visualization_msgs.msg import MarkerArray
 
@@ -94,6 +96,7 @@ from ridgeback_localization.core.depth_sources import (
     DEPTH_SOURCE_STEREOSCOPIC,
     build_depth_source,
     encode_depth_message,
+    finite_or_none,
 )
 from ridgeback_localization.core.image_utils import decode_color_to_rgb
 from ridgeback_localization.core.intrinsics import intrinsics_from_camera_info
@@ -138,6 +141,7 @@ from ridgeback_localization.core.vehicle_frame import (
 )
 from ridgeback_localization.contracts import (
     ALIGNED_DEPTH_DEBUG_TOPIC,
+    ALIGNED_DEPTH_SOURCE_DEBUG_TOPIC,
     MASK_DEBUG_TOPIC,
     MASK_MEASUREMENTS_TOPIC,
     POLAR_BEAMS_TOPIC,
@@ -283,6 +287,8 @@ class TargetMaskMeasurementNode(Node):
             'segmentation_min_iou', SEGMENTATION_MIN_PREDICTED_IOU_DEFAULT)
         self.declare_parameter('mask_debug_topic', MASK_DEBUG_TOPIC)
         self.declare_parameter('aligned_depth_debug_topic', ALIGNED_DEPTH_DEBUG_TOPIC)
+        self.declare_parameter(
+            'aligned_depth_source_topic', ALIGNED_DEPTH_SOURCE_DEBUG_TOPIC)
         # Periodic accounting of depth-input delivery and bounded worker-stage
         # timing. Off by default: it is an investigation aid, not pipeline work.
         self.declare_parameter('depth_match_debug', False)
@@ -506,11 +512,21 @@ class TargetMaskMeasurementNode(Node):
         # no depth path selected, so the overlay's aligned panel is dark rather
         # than fed by a topic nothing writes.
         self.aligned_depth_debug_pub = None
+        # Its companion: the source and usable ceiling behind each published
+        # frame, so a recorder can freeze the depth with the range it may be
+        # read to. Reliable, unlike the image, because it is small and a lost
+        # one leaves its frame unusable rather than merely unseen.
+        self.aligned_depth_source_pub = None
         if self.needs_depth:
             self.aligned_depth_debug_pub = self.create_publisher(
                 Image,
                 str(self.get_parameter('aligned_depth_debug_topic').value),
                 qos_profile_sensor_data,
+            )
+            self.aligned_depth_source_pub = self.create_publisher(
+                String,
+                str(self.get_parameter('aligned_depth_source_topic').value),
+                10,
             )
 
         # Which beams polar profiling reduced, and the box they were drawn from,
@@ -1160,9 +1176,35 @@ class TargetMaskMeasurementNode(Node):
         if (depth_m is None or self.aligned_depth_debug_pub is None
                 or self.stop_event.is_set()):
             return
+        # Before the frame, so a recorder never holds a frame whose source is
+        # still in flight for longer than delivery takes.
+        self.publish_aligned_depth_source(header)
         if self.aligned_depth_debug_pub.get_subscription_count() <= 0:
             return
         self.aligned_depth_debug_pub.publish(encode_depth_message(depth_m, header))
+
+    def publish_aligned_depth_source(self, header) -> None:
+        """Publish which source produced the frame at ``header`` and its ceiling.
+
+        Read off the source at the moment the frame exists, in the worker that
+        produced it, so the ceiling is the one this batch is cleaned against
+        (``effective_depth_max``). A source with nothing to declare (the test
+        stubs) publishes nothing rather than a guessed description.
+        """
+
+        publisher = self.aligned_depth_source_pub
+        if publisher is None or publisher.get_subscription_count() <= 0:
+            return
+        provenance = getattr(self.depth_source, 'provenance', None)
+        if not callable(provenance):
+            return
+        sec, nanosec = stamp_key(header.stamp)
+        publisher.publish(String(data=json.dumps({
+            'stamp_ns': sec * 1_000_000_000 + nanosec,
+            'frame_id': str(header.frame_id),
+            'working_gate_m': finite_or_none(self.depth_max_gate_m),
+            **provenance(),
+        }, sort_keys=True)))
 
     def camera_extrinsic_for_batch(self, detections_msg: TargetDetections):
         """Camera-optical -> base ``(rotation, translation)`` from TF, or ``None``.

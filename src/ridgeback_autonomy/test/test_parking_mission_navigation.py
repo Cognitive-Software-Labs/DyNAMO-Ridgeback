@@ -2,6 +2,7 @@
 
 import json
 import math
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -14,6 +15,7 @@ from rclpy.task import Future
 
 from ridgeback_autonomy.mission.mission_manager_node import MissionState
 from ridgeback_autonomy.mission.parking_geometry import preparking_pose
+from ridgeback_autonomy.mission.parking_nav2_profile import shared_goal_checker
 from test_mission_manager import manager_factory  # noqa: F401 (fixture)
 from test_parking_feasibility import Client, finish, running
 
@@ -118,8 +120,9 @@ def test_full_mission_parks_waits_and_returns_to_start(manager_factory, monkeypa
     m.test_ros_ns += 200_000_000
     m.tick()
     assert m.state == MissionState.RETURNING_TO_START
-    assert answer(params) == {'general_goal_checker.xy_goal_tolerance': 0.40,
-                              'general_goal_checker.yaw_goal_tolerance': 0.40}
+    xy, yaw = shared_goal_checker(Path(__file__).resolve().parents[1] / 'config' / 'nav2_params.yaml')
+    assert answer(params) == {'general_goal_checker.xy_goal_tolerance': xy,
+                              'general_goal_checker.yaw_goal_tolerance': yaw}
     assert navigation_result(nav) == pytest.approx((1.0, 2.0, 0.25))   # saved start pose
     assert m.state == MissionState.MISSION_COMPLETE
     assert m.last_issue is None

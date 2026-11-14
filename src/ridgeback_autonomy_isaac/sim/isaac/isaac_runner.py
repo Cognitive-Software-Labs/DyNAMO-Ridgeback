@@ -39,6 +39,29 @@ from ridgeback_common.camera_profiles import (
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 
+def release_cpu0_pins() -> list[int]:
+    """Let this process's threads pinned to CPU 0 alone run on any allowed CPU.
+
+    Kit's perfmonitor plugin pins its sampling thread to CPU 0. On a shared
+    host where another process saturates CPU 0, that thread barely runs, and
+    the process cannot finish exiting until it does: shutdown then outlasts
+    the launch's SIGINT and SIGTERM windows and ends in SIGKILL. Returns the
+    thread ids released.
+    """
+    allowed = os.sched_getaffinity(0)
+    if allowed == {0}:
+        return []
+    released = []
+    for tid in sorted(int(name) for name in os.listdir("/proc/self/task")):
+        try:
+            if os.sched_getaffinity(tid) == {0}:
+                os.sched_setaffinity(tid, allowed)
+                released.append(tid)
+        except OSError:  # the thread exited meanwhile
+            pass
+    return released
+
+
 def parse_args():
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--world", default="initial_test_world")
@@ -57,6 +80,16 @@ def parse_args():
                          "contention-immune byte-identical sensor data — "
                          "reproducible A/B benchmarks (rtf:=0 to run flat out, "
                          "rtf:=1 headless:=false to watch).")
+    ap.add_argument("--renderer", default="RealTimePathTracing",
+                    choices=["RealTimePathTracing", "RaytracedLighting",
+                             "PathTracing"],
+                    help="RTX render mode. RealTimePathTracing (Isaac's default) "
+                         "samples stochastically and reuses earlier frames, so "
+                         "identical scenes render differently between sessions.")
+    ap.add_argument("--anti-aliasing", type=int, default=3,
+                    choices=[0, 1, 2, 3, 4],
+                    help="0 off, 1 TAA, 2 FXAA, 3 DLSS (Isaac's default), 4 RTXAA. "
+                         "TAA and DLSS jitter and accumulate across frames.")
     ap.add_argument("--sensor-hz", type=float, default=40.0,
                     help="lidar sweep rate; in deterministic mode this is the "
                          "fixed sim-dt (1/sensor_hz) advanced per frame, so "
@@ -115,7 +148,12 @@ def main():
     headless = args.headless == "true"
 
     from isaacsim import SimulationApp
-    app_cfg = {"headless": headless}
+    app_cfg = {"headless": headless, "renderer": args.renderer,
+               "anti_aliasing": args.anti_aliasing}
+    if args.renderer == "PathTracing":
+        # Fixed samples per frame, no AI denoiser: converged rather than
+        # reconstructed pixels.
+        app_cfg["denoiser"] = False
     if not headless:
         # Windowed on a software-X display (e.g. VNC): a vsync-locked
         # present loop can stall this manually-driven update loop (the
@@ -345,13 +383,18 @@ def run(app, args) -> int:
         print(f"animating {len(g1_anim)} g1 figure(s)", flush=True)
 
     # standard simulation_interfaces scene control (benchmark targets and
-    # occluders): requests queue on their own executor thread and run below,
-    # once per update, so no ROS callback ever edits the stage
+    # occluders, and placing the robot): requests queue on their own executor
+    # thread and run below, once per update, so no ROS callback ever edits the
+    # stage. A placement goes through the same rig reset as sim/reset.
     scene_control = SceneControlService(SceneEntities(
-        UsdScene(stage), robot_name=robot_entity_name(args.namespace)))
+        UsdScene(stage), robot_name=robot_entity_name(args.namespace),
+        move_robot=rig.set_planar_pose))
     print(f"scene control services under {scene_control.service_namespace}",
           flush=True)
 
+    released = release_cpu0_pins()
+    if released:
+        print(f"released {len(released)} thread(s) pinned to CPU 0", flush=True)
     print("RUNNER READY", flush=True)
 
     stop = {"flag": False}

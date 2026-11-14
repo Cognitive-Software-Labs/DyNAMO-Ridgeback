@@ -9,6 +9,7 @@ from ridgeback_common.detector_config import (
     TARGET_LABELS_DEFAULT,
 )
 from ridgeback_localization.environment import compute_environment
+from ridgeback_localization.core.vehicle_frame import HARDWARE_FRONT_OFFSET_M
 from ridgeback_localization.estimator_registry import (
     parse_estimators, uses_mask_estimators, uses_pointcloud_estimators,
     selected_mask_estimators, selected_pointcloud_estimators,
@@ -26,6 +27,7 @@ def build_nodes(context):
     estimators = parse_estimators(value('estimators'))
     detector_settings = detector_launch_parameters(context)
     common = dict(namespace=namespace, use_sim_time=clock)
+    front_offset = float(value('front_offset_m'))
     # Deployed workers restart after a crash (2026-10-16: a killed detector stayed
     # dead until a manual relaunch); health reports the new worker epoch.
     nodes = [Node(package='ridgeback_localization', executable='target_detector_node',
@@ -37,19 +39,22 @@ def build_nodes(context):
             enabled_estimators=','.join(selected_mask_estimators(estimators)),
             color_topic=value('color_topic'), depth_topic=value('depth_topic'),
             camera_info_topic=value('camera_info_topic'), scan_topic=value('scan_topic'),
-            depth_source=value('depth_source'), mask_gate=value('mask_gate')))
+            depth_source=value('depth_source'), mask_gate=value('mask_gate'),
+            front_offset_m=front_offset))
     if uses_pointcloud_estimators(estimators):
         if not value('pointcloud_topic'): raise ValueError('pointcloud requires an observed organized pointcloud_topic')
         nodes.append(pointcloud_measurement_node(**common, respawn=True, base_frame=base,
             enabled_estimators=','.join(selected_pointcloud_estimators(estimators)),
-            color_topic=value('color_topic'), pointcloud_topic=value('pointcloud_topic')))
+            color_topic=value('color_topic'), pointcloud_topic=value('pointcloud_topic'),
+            front_offset_m=front_offset))
     health_params = {name:value(name) for name in ('color_topic','depth_topic','camera_info_topic',
         'scan_topic','pointcloud_topic','depth_source','mask_gate','estimators','target_labels')}
     health_params.update({name:float(value(name)) for name in ('startup_timeout','input_timeout','progress_timeout','source_age')})
     nodes.append(Node(package='ridgeback_localization', executable='localization_health', namespace=namespace,
         parameters=[dict(use_sim_time=clock, mode='local', **health_params)], output='screen'))
     if value('displays').lower() == 'true':
-        nodes.extend([estimate_viz_node(**common, estimators=','.join(estimators), base_frame=base),
+        nodes.extend([estimate_viz_node(**common, estimators=','.join(estimators), base_frame=base,
+                front_offset_m=front_offset),
             overlay_node(**common, estimators=','.join(estimators), color_topic=value('color_topic'),
                 depth_source=value('depth_source'), mask_gate=value('mask_gate'))])
     return nodes
@@ -58,6 +63,7 @@ def build_nodes(context):
 def generate_launch_description():
     camera = resolve_camera_inputs(REALSENSE_BACKEND)
     defaults = dict(namespace='r100_0001', use_sim_time='false',
+        front_offset_m=str(HARDWARE_FRONT_OFFSET_M),
         color_topic=camera.color_image_topic, camera_info_topic=camera.color_camera_info_topic,
         depth_topic=camera.aligned_depth_topic, scan_topic='sensors/lidar2d_0/scan',
         pointcloud_topic='', estimators='projective_ranging,euclidean_reconstruction',

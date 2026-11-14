@@ -139,6 +139,7 @@ def build_trial_result(
                 'instance_index': ground_truth.index,
                 'spawn_world_x': ground_truth.world_x,
                 'spawn_world_y': ground_truth.world_y,
+                'placement_dx_m': trial.get('placement_dx_m', 0.0),
                 'spawn_yaw_rad': scene.robots[ground_truth.index].yaw,
                 'true_forward_m': ground_truth.forward_m,
                 'true_lateral_m': ground_truth.lateral_m,

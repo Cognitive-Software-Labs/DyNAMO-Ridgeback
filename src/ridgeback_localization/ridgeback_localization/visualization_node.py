@@ -22,6 +22,8 @@ from rviz_2d_overlay_msgs.msg import OverlayText
 from tf2_ros import Buffer, TransformException, TransformListener
 from visualization_msgs.msg import MarkerArray
 
+from ridgeback_common.ros_signals import init_owned, shielded, spin_until_interrupted
+from ridgeback_localization.core.vehicle_frame import ROBOT_FRONT_OFFSET_M
 from ridgeback_interfaces.msg import TargetMeasurements
 from ridgeback_localization.contracts import (
     ESTIMATE_MARKERS_TOPIC,
@@ -81,6 +83,7 @@ class TargetVisualizationNode(Node):
         )
 
         self.declare_parameter('base_frame', default_base_frame)
+        self.declare_parameter('front_offset_m', ROBOT_FRONT_OFFSET_M)
         self.declare_parameter('world_frame', 'map')
         self.declare_parameter('marker_lifetime_sec', MARKER_LIFETIME_SEC)
         self.declare_parameter('max_observation_age_sec', MAX_OBSERVATION_AGE_S)
@@ -91,6 +94,7 @@ class TargetVisualizationNode(Node):
         self.declare_parameter('hud_layout', HUD_LAYOUT_ROWS)
 
         self.base_frame = self.get_parameter('base_frame').value or default_base_frame
+        self.front_offset_m = float(self.get_parameter('front_offset_m').value)
         self.world_frame = self.get_parameter('world_frame').value
         self.marker_lifetime = self.get_parameter('marker_lifetime_sec').value
         self.max_observation_age = float(
@@ -204,6 +208,7 @@ class TargetVisualizationNode(Node):
                         marker_time,
                         actual_frame,
                         self.marker_lifetime,
+                        front_offset_m=self.front_offset_m,
                     )
             if not placed:
                 append_delete_markers(markers, estimator)

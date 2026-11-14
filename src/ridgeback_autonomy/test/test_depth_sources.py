@@ -370,6 +370,32 @@ def test_monocular_usable_max_derives_from_checkpoint_max_depth(monkeypatch) -> 
     assert source.usable_max_m == pytest.approx(20 * MONOCULAR_USABLE_RANGE_FRACTION)
 
 
+def test_monocular_provenance_names_the_loaded_checkpoint_and_its_ceiling(
+        monkeypatch) -> None:
+    # What a recorder freezes beside the depth: the ceiling the node cleans
+    # against, and what it was derived from, read off the loaded weights.
+    config = _FakeConfig('metric', 20)
+    config._commit_hash = 'snapshot-sha'
+    source = _loaded_source(config, monkeypatch)
+
+    assert source.provenance()['usable_max_m'] is None
+    assert source.load() is True
+    provenance = source.provenance()
+
+    assert provenance['depth_source'] == 'monocular'
+    assert provenance['model_id'] == 'model'
+    assert provenance['model_revision'] == 'snapshot-sha'
+    assert provenance['declared_max_depth_m'] == 20.0
+    assert provenance['usable_range_fraction'] == MONOCULAR_USABLE_RANGE_FRACTION
+    assert provenance['usable_max_m'] == source.usable_max_m
+
+
+def test_stereo_provenance_declares_no_ceiling_unless_configured() -> None:
+    assert StereoDepthSource(_NullLogger()).provenance()['usable_max_m'] is None
+    assert StereoDepthSource(
+        _NullLogger(), usable_max_m=6.0).provenance()['usable_max_m'] == 6.0
+
+
 def test_monocular_usable_max_tracks_a_different_checkpoint(monkeypatch) -> None:
     # The Outdoor checkpoint ships max_depth=80; nothing should be hardcoded to
     # the Indoor figure.

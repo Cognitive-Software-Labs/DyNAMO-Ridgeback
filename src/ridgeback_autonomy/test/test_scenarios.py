@@ -148,3 +148,18 @@ def test_shipped_full_scenario_is_the_certified_randomized_set() -> None:
     # Probe scenes repeat, to measure the within-pose noise floor.
     assert {scene.id for scene in scenes if scene.repeats_override} == {
         'single_facing_01', 'objpartial_01', 'far_mid_01'}
+
+
+def test_scene_ids_pick_scenes_in_the_given_order() -> None:
+    from ridgeback_autonomy.benchmarking.scenarios import parse_scene_ids, select_scenes
+
+    scenes = parse_scenarios({'scenes': [
+        {'id': name, 'robots': [{'x': 2.0, 'y': 0.0}]} for name in ('a', 'b', 'c')]})
+
+    assert parse_scene_ids(' c, a ,,') == ('c', 'a')
+    assert [scene.id for scene in select_scenes(scenes, ('c', 'a'))] == ['c', 'a']
+    assert select_scenes(scenes, ()) == scenes
+    with pytest.raises(ValueError, match='lacks: d'):
+        select_scenes(scenes, ('a', 'd'))
+    with pytest.raises(ValueError, match='more than once'):
+        select_scenes(scenes, ('a', 'a'))

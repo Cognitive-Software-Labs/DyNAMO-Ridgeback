@@ -36,6 +36,10 @@ from ridgeback_autonomy.benchmarking.backends import (
 )
 from ridgeback_autonomy.benchmarking.paths import default_output_directory
 from ridgeback_autonomy.benchmarking.replay import REPLAY_CAPTURE_BATCHES_DEFAULT
+from ridgeback_autonomy.benchmarking.sampled_capture import (
+    SENSOR_CAPTURE_MODE_QUOTA,
+    SENSOR_CAPTURE_MODES,
+)
 from ridgeback_localization.estimator_registry import (
     parse_estimators,
     selected_mask_estimators,
@@ -45,6 +49,7 @@ from ridgeback_localization.estimator_registry import (
 )
 from ridgeback_autonomy.localization_launch import (
     ALIGNED_DEPTH_DEBUG_TOPIC,
+    ALIGNED_DEPTH_SOURCE_DEBUG_TOPIC,
     CONFIG_LAUNCH_ARGUMENT_NAMES,
     MASK_MEASUREMENTS_TOPIC,
     POINTCLOUD_MEASUREMENTS_TOPIC,
@@ -220,6 +225,9 @@ def build_benchmark_nodes(context, *args, environment: BenchmarkEnvironment, **k
             'scene_control_service_namespace': (
                 environment.backend.scene_control_service_namespace),
             'scenario': LaunchConfiguration('scenario'),
+            'background': LaunchConfiguration('background'),
+            'background_props': LaunchConfiguration('background_props'),
+            'scene_ids': LaunchConfiguration('scene_ids'),
             'repeats': repeats,
             'output_dir': output_dir,
             'run_dir_name': LaunchConfiguration('run_dir_name'),
@@ -230,8 +238,10 @@ def build_benchmark_nodes(context, *args, environment: BenchmarkEnvironment, **k
             'capture_batches': LaunchConfiguration('capture_batches'),
             'capture_drain_sec': LaunchConfiguration('capture_drain_sec'),
             'capture_timeout_sec': LaunchConfiguration('capture_timeout_sec'),
+            'sensor_capture_mode': LaunchConfiguration('sensor_capture_mode'),
             'raw_detections_topic': RAW_DETECTIONS_TOPIC,
             'aligned_depth_debug_topic': ALIGNED_DEPTH_DEBUG_TOPIC,
+            'aligned_depth_source_topic': ALIGNED_DEPTH_SOURCE_DEBUG_TOPIC,
             'camera_info_topic': camera_inputs.color_camera_info_topic,
             'camera_profile': LaunchConfiguration('camera_profile'),
             # The same scan the mask node measures from, so a sensor capture
@@ -374,6 +384,12 @@ def generate_launch_description():
             'sim_mode', default_value=isaac['sim_mode'].default,
             description=isaac['sim_mode'].description),
         DeclareLaunchArgument(
+            'renderer', default_value=isaac['renderer'].default,
+            description=isaac['renderer'].description),
+        DeclareLaunchArgument(
+            'anti_aliasing', default_value=isaac['anti_aliasing'].default,
+            description=isaac['anti_aliasing'].description),
+        DeclareLaunchArgument(
             'depth_fidelity', default_value=isaac['depth_fidelity'].default,
             description=isaac['depth_fidelity'].description),
         DeclareLaunchArgument('namespace', default_value='r100_0001'),
@@ -401,6 +417,27 @@ def generate_launch_description():
             default_value='',
             description='Scenario YAML; empty uses benchmark_scenarios_full.yaml',
         ),
+        DeclareLaunchArgument(
+            'background',
+            default_value='',
+            description=(
+                'Packaged background layout (lab): each scene is placed by its dx '
+                'and furnished; empty keeps the robot at the origin in the bare room'),
+        ),
+        DeclareLaunchArgument(
+            'background_props',
+            default_value='true',
+            description=(
+                'Spawn the background props; false is the control arm, placed '
+                'identically in the bare room'),
+        ),
+        DeclareLaunchArgument(
+            'scene_ids',
+            default_value='',
+            description=(
+                'Comma-separated scene ids to run, in that order; empty runs '
+                'every scene in file order'),
+        ),
         DeclareLaunchArgument('repeats', default_value='5'),
         DeclareLaunchArgument('output_dir', default_value=benchmark_output_dir),
         DeclareLaunchArgument('run_dir_name', default_value=''),
@@ -425,6 +462,13 @@ def generate_launch_description():
         DeclareLaunchArgument(
             'capture_timeout_sec', default_value='30.0',
             description='Hard stall bound for one replay-capture trial',
+        ),
+        DeclareLaunchArgument(
+            'sensor_capture_mode', default_value=SENSOR_CAPTURE_MODE_QUOTA,
+            choices=list(SENSOR_CAPTURE_MODES),
+            description=(
+                'quota ends the window at capture_batches; sampled_window keeps '
+                'capture_sec and stores only its first capture_batches batches'),
         ),
         DeclareLaunchArgument(
             'depth_topic', default_value=SIMULATION_CAMERA_INPUTS.aligned_depth_topic),

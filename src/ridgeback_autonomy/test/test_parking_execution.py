@@ -500,8 +500,10 @@ def test_staged_goal_checker_does_not_change_shared_frontier_configuration():
     shared = yaml.safe_load((config/'nav2_params.yaml').read_text())['controller_server']['ros__parameters']
     staged = yaml.safe_load((config/'parking_goal_checker.yaml').read_text())['controller_server']['ros__parameters']
     assert shared['goal_checker_plugins'] == ['general_goal_checker']
+    # The group's shared checker (dev ede9bd1: any heading for exploration goals); every
+    # parking leg and observation turn sets its own tight checker instead.
     assert shared['general_goal_checker']['xy_goal_tolerance'] == .4
-    assert shared['general_goal_checker']['yaw_goal_tolerance'] == .4
+    assert shared['general_goal_checker']['yaw_goal_tolerance'] == 3.15
     assert staged['parking_goal_checker']['xy_goal_tolerance'] == .08
     assert staged['parking_goal_checker']['yaw_goal_tolerance'] == .12
     assert staged['parking_goal_checker']['stateful'] is False

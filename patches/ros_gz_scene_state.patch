@@ -1,0 +1,1002 @@
+diff --git a/ros_gz_sim/CMakeLists.txt b/ros_gz_sim/CMakeLists.txt
+index bd750e8..89cfc67 100644
+--- a/ros_gz_sim/CMakeLists.txt
++++ b/ros_gz_sim/CMakeLists.txt
+@@ -76,6 +76,7 @@ target_link_libraries(delete_entity ${PROJECT_NAME}_delete_entity
+ target_include_directories(delete_entity PUBLIC ${CLI11_INCLUDE_DIRS})
+
+ set(gz_simulation_interfaces_sources
++  src/gz_simulation_interfaces/canonical_link_state.cpp
+   src/gz_simulation_interfaces/gazebo_proxy.cpp
+   src/gz_simulation_interfaces/gz_entity_filters.cpp
+   src/gz_simulation_interfaces/gz_simulation_interfaces.cpp
+@@ -259,6 +260,13 @@ if(BUILD_TESTING)
+   find_package(launch_testing_ament_cmake REQUIRED)
+   ament_find_gtest()
+
++  ament_add_gtest(test_gazebo_proxy test/test_gazebo_proxy.cpp)
++  ament_add_gtest(test_canonical_link_state test/test_canonical_link_state.cpp)
++  foreach(test_target test_gazebo_proxy test_canonical_link_state)
++    target_include_directories(${test_target} PRIVATE src/gz_simulation_interfaces)
++    target_link_libraries(${test_target} gzserver_component)
++  endforeach()
++
+   ament_add_gtest_executable(test_create test/test_create.cpp)
+   ament_add_gtest_executable(test_remove test/test_remove.cpp)
+   ament_add_gtest_executable(test_spawn_entity test/test_spawn_entity.cpp)
+@@ -322,6 +330,7 @@ if(BUILD_TESTING)
+   add_launch_test(test/test_create_node.launch.py TIMEOUT 200)
+   add_launch_test(test/test_remove_node.launch.py TIMEOUT 200)
+   add_launch_test(test/test_gz_simulation_interfaces.launch.py TIMEOUT 300)
++  add_launch_test(test/test_scene_state.launch.py TIMEOUT 120)
+ endif()
+
+ ament_package()
+diff --git a/ros_gz_sim/src/gz_simulation_interfaces/canonical_link_state.cpp b/ros_gz_sim/src/gz_simulation_interfaces/canonical_link_state.cpp
+new file mode 100644
+index 0000000..a8f7657
+--- /dev/null
++++ b/ros_gz_sim/src/gz_simulation_interfaces/canonical_link_state.cpp
+@@ -0,0 +1,111 @@
++// Copyright 2026 Open Source Robotics Foundation, Inc.
++//
++// Licensed under the Apache License, Version 2.0 (the "License");
++// you may not use this file except in compliance with the License.
++// You may obtain a copy of the License at
++//
++//     http://www.apache.org/licenses/LICENSE-2.0
++//
++// Unless required by applicable law or agreed to in writing, software
++// distributed under the License is distributed on an "AS IS" BASIS,
++// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++// See the License for the specific language governing permissions and
++// limitations under the License.
++
++#include "canonical_link_state.hpp"
++
++#include <limits>
++
++#include <gz/sim/Util.hh>
++#include <gz/sim/components/AngularVelocity.hh>
++#include <gz/sim/components/CanonicalLink.hh>
++#include <gz/sim/components/LinearVelocity.hh>
++#include <gz/sim/components/Pose.hh>
++#include <gz/sim/components/World.hh>
++
++namespace ros_gz_sim
++{
++namespace gz_simulation_interfaces
++{
++namespace components = gz::sim::components;
++
++void CanonicalLinkState::PreUpdate(
++  const gz::sim::UpdateInfo &, gz::sim::EntityComponentManager & ecm)
++{
++  const auto world = ecm.EntityByComponents(components::World());
++  if (world != gz::sim::kNullEntity) {
++    if (ecm.SetComponentData<ResetGeneration>(world, this->reset_generation_)) {
++      ecm.SetChanged(world, ResetGeneration::typeId, gz::sim::ComponentState::OneTimeChange);
++    }
++  }
++  // Physics fills requested velocity fields during Update, before SceneBroadcaster
++  // reads them in PostUpdate. Until then they are unavailable, not invented zeros.
++  const auto nan = std::numeric_limits<double>::quiet_NaN();
++  const gz::math::Vector3d unavailable(nan, nan, nan);
++  // A genuine SCOPE_ALL reset restores initial poses and zero velocities in
++  // Physics::Reset, even while paused. A paused stationary link need not receive
++  // another physics pose update, so keep that valid reset state available.
++  const auto initial_velocity = this->reset_pending_ ? gz::math::Vector3d::Zero : unavailable;
++  ecm.Each<components::CanonicalLink>(
++    [&](const gz::sim::Entity & link, const components::CanonicalLink *) {
++      if (this->reset_pending_ || !ecm.Component<components::WorldPose>(link)) {
++        this->initialized_links_.insert(link);
++        ecm.CreateComponent(link, components::WorldPose(gz::sim::worldPose(link, ecm)));
++      }
++      if (this->reset_pending_ || !ecm.Component<components::WorldLinearVelocity>(link)) {
++        this->initialized_links_.insert(link);
++        ecm.CreateComponent(link, components::WorldLinearVelocity(initial_velocity));
++      }
++      if (this->reset_pending_ || !ecm.Component<components::WorldAngularVelocity>(link)) {
++        this->initialized_links_.insert(link);
++        ecm.CreateComponent(link, components::WorldAngularVelocity(initial_velocity));
++      }
++      if (this->reset_pending_ || !ecm.Component<CanonicalLinkStateReady>(link)) {
++        ecm.CreateComponent(link, CanonicalLinkStateReady(false));
++      }
++      return true;
++    });
++  this->reset_pending_ = false;
++}
++
++void CanonicalLinkState::Update(
++  const gz::sim::UpdateInfo &, gz::sim::EntityComponentManager & ecm)
++{
++  // Registered after Physics: publish availability only after physics has filled
++  // the requested fields, before the broadcaster's parallel PostUpdate readers.
++  ecm.Each<components::CanonicalLink, components::WorldPose,
++    components::WorldLinearVelocity, components::WorldAngularVelocity>(
++    [&](const gz::sim::Entity & link, const components::CanonicalLink *,
++    const components::WorldPose * pose, const components::WorldLinearVelocity * linear,
++    const components::WorldAngularVelocity * angular) {
++      if (ecm.SetComponentData<CanonicalLinkStateReady>(
++          link, pose->Data().IsFinite() && linear->Data().IsFinite() && angular->Data().IsFinite()))
++      {
++        ecm.SetChanged(link, CanonicalLinkStateReady::typeId,
++            gz::sim::ComponentState::OneTimeChange);
++      }
++      // Physics can mark a freshly requested WorldPose NoChange when its seed
++      // already equals the true pose. Force its first publication: the mirror
++      // can still contain a pre-reset value for the same entity and component.
++      if (this->initialized_links_.count(link)) {
++        for (auto type : {components::WorldPose::typeId, components::WorldLinearVelocity::typeId,
++          components::WorldAngularVelocity::typeId, CanonicalLinkStateReady::typeId})
++        {
++          ecm.SetChanged(link, type, gz::sim::ComponentState::OneTimeChange);
++        }
++      }
++      return true;
++    });
++  this->initialized_links_.clear();
++}
++
++void CanonicalLinkState::Reset(
++  const gz::sim::UpdateInfo &, gz::sim::EntityComponentManager &)
++{
++  // SceneBroadcaster may have already run Reset. Publish this generation in the
++  // next PreUpdate, so its state message includes the initialization as well.
++  ++this->reset_generation_;
++  this->reset_pending_ = true;
++}
++}  // namespace gz_simulation_interfaces
++}  // namespace ros_gz_sim
+diff --git a/ros_gz_sim/src/gz_simulation_interfaces/canonical_link_state.hpp b/ros_gz_sim/src/gz_simulation_interfaces/canonical_link_state.hpp
+new file mode 100644
+index 0000000..55aa80f
+--- /dev/null
++++ b/ros_gz_sim/src/gz_simulation_interfaces/canonical_link_state.hpp
+@@ -0,0 +1,61 @@
++// Copyright 2026 Open Source Robotics Foundation, Inc.
++//
++// Licensed under the Apache License, Version 2.0 (the "License");
++// you may not use this file except in compliance with the License.
++// You may obtain a copy of the License at
++//
++//     http://www.apache.org/licenses/LICENSE-2.0
++//
++// Unless required by applicable law or agreed to in writing, software
++// distributed under the License is distributed on an "AS IS" BASIS,
++// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++// See the License for the specific language governing permissions and
++// limitations under the License.
++
++#ifndef GZ_SIMULATION_INTERFACES__CANONICAL_LINK_STATE_HPP_
++#define GZ_SIMULATION_INTERFACES__CANONICAL_LINK_STATE_HPP_
++
++#include <cstdint>
++#include <limits>
++#include <unordered_set>
++
++#include <gz/sim/System.hh>
++#include <gz/sim/components/Component.hh>
++#include <gz/sim/components/Factory.hh>
++
++namespace ros_gz_sim
++{
++namespace gz_simulation_interfaces
++{
++// Serialized with the world state, so reset completion cannot be confused with a
++// scene addition or overtake the corresponding reset state on another topic.
++using ResetGeneration = gz::sim::components::Component<uint64_t, class ResetGenerationTag>;
++GZ_SIM_REGISTER_COMPONENT("ros_gz_sim.ResetGeneration", ResetGeneration)
++
++using CanonicalLinkStateReady =
++  gz::sim::components::Component<bool, class CanonicalLinkStateReadyTag>;
++GZ_SIM_REGISTER_COMPONENT("ros_gz_sim.CanonicalLinkStateReady", CanonicalLinkStateReady)
++
++/// Request physics reporting on the simulation thread. Never write the mirrored
++/// ECM back to the server: even a missing cached field may already exist there.
++class CanonicalLinkState : public gz::sim::System,
++  public gz::sim::ISystemPreUpdate, public gz::sim::ISystemUpdate,
++  public gz::sim::ISystemReset, public gz::sim::ISystemConfigurePriority
++{
++public:
++  gz::sim::System::PriorityType ConfigurePriority() override
++  {
++    return std::numeric_limits<gz::sim::System::PriorityType>::max();
++  }
++  void PreUpdate(const gz::sim::UpdateInfo &, gz::sim::EntityComponentManager & ecm) override;
++  void Update(const gz::sim::UpdateInfo &, gz::sim::EntityComponentManager & ecm) override;
++  void Reset(const gz::sim::UpdateInfo &, gz::sim::EntityComponentManager & ecm) override;
++
++private:
++  uint64_t reset_generation_{0};
++  bool reset_pending_{false};
++  std::unordered_set<gz::sim::Entity> initialized_links_;
++};
++}  // namespace gz_simulation_interfaces
++}  // namespace ros_gz_sim
++#endif  // GZ_SIMULATION_INTERFACES__CANONICAL_LINK_STATE_HPP_
+diff --git a/ros_gz_sim/src/gz_simulation_interfaces/gazebo_proxy.cpp b/ros_gz_sim/src/gz_simulation_interfaces/gazebo_proxy.cpp
+index 54cc452..4b6d1b4 100644
+--- a/ros_gz_sim/src/gz_simulation_interfaces/gazebo_proxy.cpp
++++ b/ros_gz_sim/src/gz_simulation_interfaces/gazebo_proxy.cpp
+@@ -14,29 +14,23 @@
+
+ #include "gazebo_proxy.hpp"
+
+-#include <gz/msgs/boolean.pb.h>
+ #include <gz/msgs/details/world_stats.pb.h>
+-#include <gz/msgs/world_control_state.pb.h>
+ #include <gz/msgs/world_stats.pb.h>
+-#include <gz/msgs/scene.pb.h>
+
+ #include <chrono>
+ #include <functional>
+-#include <future>
+ #include <memory>
+ #include <mutex>
+ #include <stdexcept>
+ #include <string>
+ #include <thread>
+-#include <unordered_set>
+ #include <vector>
+
+-#include <gz/sim/components/AngularVelocity.hh>
+-#include <gz/sim/components/CanonicalLink.hh>
+-#include <gz/sim/components/LinearVelocity.hh>
+-#include <gz/sim/components/Pose.hh>
++#include <gz/sim/components/World.hh>
+ #include <rclcpp/logging.hpp>
+
++#include "canonical_link_state.hpp"
++
+ namespace ros_gz_sim
+ {
+ namespace gz_simulation_interfaces
+@@ -79,26 +73,6 @@ GazeboProxy::GazeboProxy(const std::string world_name, std::shared_ptr<rclcpp::N
+
+       // Listen to the "state" topic to get periodic updates.
+       this->SubscribeToGzTopic(this->PrefixTopic("state"), &GazeboProxy::UpdateStateFromMsg, this);
+-      // Listen to the "scene/info" to detect a reset
+-      // TODO(azeey): This is a hack. We currently don't have a nice way of determining when
+-      // simulation has been reset if it's currently paused. Checking if time has been rewound or
+-      // the number of iterations was reset back to zero doesn't work if the simulation was started
+-      // in the paused state and hasn't been played before it was reset. The SceneBroadacaster
+-      // publishes on the scene/info topic every time it's reset. So we'll use that as our signal
+-      // until we come up with a better way to communicate this from the server.
+-      std::function<void(const gz::msgs::Scene &)> resetHandler = [this](const auto &) {
+-          {
+-            std::lock_guard<std::mutex> lk(this->reset_detected_mutex_);
+-            this->reset_detected_ = true;
+-            this->reset_detected_cv_.notify_all();
+-          }
+-          // Use std::async since InitializeAllCanonicalLinks eventually makes a service call, which
+-          // we don't want to do from this callback thread.
+-          this->initialize_canonical_links_ =
+-            std::async(std::launch::async, [this] {this->InitializeAllCanonicalLinks();});
+-        };
+-
+-      this->SubscribeToGzTopic(this->PrefixTopic("scene/info"), resetHandler);
+     }
+
+     std::function<void(const gz::msgs::WorldStatistics &)> updateStats =
+@@ -113,13 +87,6 @@ GazeboProxy::GazeboProxy(const std::string world_name, std::shared_ptr<rclcpp::N
+     // Listen to the stats topic to get more frequently updates world statistics.
+     this->SubscribeToGzTopic(this->PrefixTopic("stats"), updateStats);
+   }
+-
+-  // Before creating the services, we need to add the `[Angular/Linear]Velocity` components to all
+-  // the entities available. Currently, we're treating entities are models, but Gazebo doesn't
+-  // update velocity components of models. Therefore, we have to set the component on the canonical
+-  // link and compute the velocity of the model entity manually here.
+-  // TODO(azeey): Compute model velocities on the Gazebo server.
+-  this->InitializeAllCanonicalLinks();
+ }
+
+ std::string GazeboProxy::PrefixTopic(const char * topic) const
+@@ -181,12 +148,6 @@ bool GazeboProxy::WaitForUpdatedState(const std::chrono::milliseconds & timeout)
+   if (!state_intialized_) {
+     return false;
+   }
+-  if (this->initialize_canonical_links_.valid()) {
+-    // Wait if canonical links need to be initialized. This should only happen on reset.
+-    this->initialize_canonical_links_.wait_for(timeout);
+-  }
+-  // TODO(azeey): Technically we should subtract the amount of time the `wait_for` above used up
+-  // from the timeout when we use it for the second `wait_for` below.
+   std::unique_lock lk(this->state_sync_mutex_);
+   this->state_updated_ = false;
+   return this->state_cv_.wait_for(lk, timeout, [this] {return this->state_updated_;});
+@@ -224,16 +185,18 @@ bool GazeboProxy::AssertUpdatedWorldStats(simulation_interfaces::msg::Result & r
+   return true;
+ }
+
+-bool GazeboProxy::WaitForResetDetected()
++uint64_t GazeboProxy::ResetSequence() const
+ {
+-  std::unique_lock lk(this->reset_detected_mutex_);
+-  this->reset_detected_ = false;
+-  if(!this->reset_detected_cv_.wait_for(
+-    lk, std::chrono::milliseconds(kGzServiceTimeoutMs), [this] {return this->reset_detected_;}))
+-  {
+-    return false;
+-  }
+-  return this->reset_detected_;
++  std::lock_guard<std::mutex> lk(this->state_sync_mutex_);
++  return this->reset_generation_;
++}
++
++bool GazeboProxy::WaitForResetDetected(uint64_t previous)
++{
++  std::unique_lock lk(this->state_sync_mutex_);
++  return this->state_cv_.wait_for(
++    lk, std::chrono::milliseconds(kGzServiceTimeoutMs),
++    [this, previous] {return this->reset_generation_ > previous;});
+ }
+
+ bool GazeboProxy::InitializeGazeboConnection()
+@@ -287,7 +250,11 @@ void GazeboProxy::UpdateStateFromMsg(const gz::msgs::SerializedStepMap & msg)
+     std::lock_guard<std::mutex> lk(this->state_sync_mutex_);
+     this->ecm_.SetState(msg.state());
+
+-    this->HandleNewEntities();
++    const auto world = this->ecm_.EntityByComponents(components::World());
++    const auto generation = this->ecm_.Component<ResetGeneration>(world);
++    if (generation) {
++      this->reset_generation_ = generation->Data();
++    }
+     this->ecm_.ClearRemovedComponents();
+     this->ecm_.ClearNewlyCreatedEntities();
+     this->ecm_.ProcessRemoveEntityRequests();
+@@ -295,59 +262,5 @@ void GazeboProxy::UpdateStateFromMsg(const gz::msgs::SerializedStepMap & msg)
+   }
+   this->state_cv_.notify_all();
+ }
+-void GazeboProxy::HandleNewEntities()
+-{
+-  std::unordered_set<gz::sim::Entity> canonicalLinkEntities;
+-  this->ecm_.EachNew<components::CanonicalLink>(
+-    [&canonicalLinkEntities](const gz::sim::Entity & entity, const components::CanonicalLink *) {
+-      canonicalLinkEntities.insert(entity);
+-      return true;
+-    });
+-
+-  if (canonicalLinkEntities.empty()) {
+-    return;
+-  }
+-
+-  this->InitializeCanonicalLinks(canonicalLinkEntities);
+-}
+-
+-void GazeboProxy::InitializeAllCanonicalLinks()
+-{
+-  RCLCPP_INFO(this->ros_node_->get_logger(), "InitializeCanonicalLinks");
+-  std::vector<gz::sim::Entity> c_links;
+-  {
+-    std::lock_guard<std::mutex> lk(this->state_sync_mutex_);
+-    c_links = this->ecm_.EntitiesByComponents(components::CanonicalLink());
+-  }
+-  this->InitializeCanonicalLinks({c_links.begin(), c_links.end()});
+-}
+-
+-void GazeboProxy::InitializeCanonicalLinks(
+-  const std::unordered_set<gz::sim::Entity> & canonicalLinkEntities)
+-{
+-  // TODO(azeey) Computing velocities at every timestep might have a performance impact
+-  for (const auto & link : canonicalLinkEntities) {
+-    this->ecm_.CreateComponent(link, components::WorldPose());
+-    this->ecm_.CreateComponent(link, components::WorldLinearVelocity());
+-    this->ecm_.CreateComponent(link, components::WorldAngularVelocity());
+-  }
+-
+-  gz::msgs::WorldControlState control_msg;
+-  control_msg.mutable_state()->CopyFrom(this->ecm_.State(
+-    canonicalLinkEntities, {components::WorldPose::typeId, components::WorldLinearVelocity::typeId,
+-        components::WorldAngularVelocity::typeId}));
+-
+-  bool result{false};
+-  gz::msgs::Boolean controlReply;
+-  this->gz_node_->Request(
+-    this->PrefixTopic("control/state"), control_msg, GazeboProxy::kGzServiceTimeoutMs, controlReply,
+-    result);
+-  if (!result || !controlReply.data()) {
+-    RCLCPP_ERROR_THROTTLE(
+-      this->ros_node_->get_logger(), *this->ros_node_->get_clock(), 1000,
+-      "Simulation interface encountered an error while handling newly created entities");
+-    return;
+-  }
+-}
+ }  // namespace gz_simulation_interfaces
+ }  // namespace ros_gz_sim
+diff --git a/ros_gz_sim/src/gz_simulation_interfaces/gazebo_proxy.hpp b/ros_gz_sim/src/gz_simulation_interfaces/gazebo_proxy.hpp
+index 6cb64f4..af5256d 100644
+--- a/ros_gz_sim/src/gz_simulation_interfaces/gazebo_proxy.hpp
++++ b/ros_gz_sim/src/gz_simulation_interfaces/gazebo_proxy.hpp
+@@ -126,7 +126,10 @@ public:
+
+   /// \brief Wait until simulation reset is detected
+   /// \return True if reset was detected.
+-  bool WaitForResetDetected();
++  bool WaitForResetDetected(uint64_t previous);
++
++  /// \brief Read reset sequence before sending a reset request.
++  uint64_t ResetSequence() const;
+
+   /// \brief Amount of time to wait for a Gazebo service to become available.
+   static constexpr unsigned int kGzServiceTimeoutMs{5000};
+@@ -162,18 +165,6 @@ private:
+   /// \param[in] msg SerializedStepMap message
+   void UpdateStateFromMsg(const gz::msgs::SerializedStepMap & msg);
+
+-  /// \brief Handle newly created entities
+-  /// For example, this is responsible for creating necessary ECM Components on newly created
+-  /// entities, so that the Physics system can populate them.
+-  void HandleNewEntities();
+-
+-  /// \brief Initialize all canonical link entities by creating necessary ECM components on them.
+-  void InitializeAllCanonicalLinks();
+-
+-  /// \brief Initialize canonical link entities by creating necessary ECM components on them.
+-  /// \param[in] canonicalLinkEntities A set of canonical links to initialize.
+-  void InitializeCanonicalLinks(const std::unordered_set<gz::sim::Entity> & canonicalLinkEntities);
+-
+   /// \brief Subscribe to a Gazebo topic and store the subscription handler so that topics are
+   /// automatically unsubscribed during destruction.
+   /// \tparam[in] Args Arguments to be passed to gz::transport::Node::CreateSubscriber
+@@ -227,17 +218,8 @@ private:
+   /// \brief Records whether the state has been initialized when this class was first instantiated.
+   bool state_intialized_{false};
+
+-  /// \brief Holds the future returned by a std::async call made when a sim reset occurs.
+-  std::future<void> initialize_canonical_links_;
+-
+-  /// \brief Whether simulation reset was detected
+-  bool reset_detected_{false};
+-
+-  /// \brief Mutex to synchronize access to reset_detected_
+-  mutable std::mutex reset_detected_mutex_;
+-
+-  /// \brief Conditional variable used for waiting on reset detected.
+-  std::condition_variable reset_detected_cv_;
++  /// \brief Last server reset generation; guarded by state_sync_mutex_.
++  uint64_t reset_generation_{0};
+
+   /// \brief gz-transport subscription handles
+   /// \TODO(azeey): Using a std::map here instead of a std::vector due to a bug in gz-transport
+diff --git a/ros_gz_sim/src/gz_simulation_interfaces/services/get_entity_state.cpp b/ros_gz_sim/src/gz_simulation_interfaces/services/get_entity_state.cpp
+index 257561c..92e9001 100644
+--- a/ros_gz_sim/src/gz_simulation_interfaces/services/get_entity_state.cpp
++++ b/ros_gz_sim/src/gz_simulation_interfaces/services/get_entity_state.cpp
+@@ -32,6 +32,7 @@
+ #include <gz/sim/components/Pose.hh>
+
+ #include "../gazebo_proxy.hpp"
++#include "../canonical_link_state.hpp"
+ #include "../utils.hpp"
+ #include "simulation_interfaces/srv/get_entity_state.hpp"
+
+@@ -106,6 +107,11 @@ simulation_interfaces::msg::Result GetEntityState::FromEcm(
+     result.error_message = "Could not find canonical link";
+     return result;
+   }
++  if (!ecm.ComponentData<CanonicalLinkStateReady>(canonicalLinkEntity).value_or(false)) {
++    result.result = Result::RESULT_OPERATION_FAILED;
++    result.error_message = "Canonical link world state is not available yet";
++    return result;
++  }
+   gz::sim::Link canonicalLink(canonicalLinkEntity);
+   // See https://drake.mit.edu/doxygen_cxx/group__multibody__quantities.html for notations
+   std::optional<gz::math::Pose3d> X_WL = canonicalLink.WorldPose(ecm);
+@@ -113,7 +119,7 @@ simulation_interfaces::msg::Result GetEntityState::FromEcm(
+   std::optional<gz::math::Vector3d> v_WM = canonicalLink.WorldLinearVelocity(ecm, X_LM.Pos());
+   std::optional<gz::math::Vector3d> w_WL = canonicalLink.WorldAngularVelocity(ecm);
+
+-  if (X_WL && v_WM && w_WL) {
++  if (X_WL && v_WM && w_WL && X_WL->IsFinite() && v_WM->IsFinite() && w_WL->IsFinite()) {
+     // TODO(azeey) Add comments
+     // Find the pose of the model based on the pose of the pose of the canonical link.
+     // X_ML: pose of the canonical link w.r.t the model
+@@ -126,7 +132,7 @@ simulation_interfaces::msg::Result GetEntityState::FromEcm(
+   } else {
+     result.result = simulation_interfaces::msg::Result::RESULT_OPERATION_FAILED;
+     // TODO(azeey) Fix error message
+-    result.error_message = "WorldPose component not set on entity";
++    result.error_message = "Canonical link world state is not available yet";
+   }
+   return result;
+ }
+diff --git a/ros_gz_sim/src/gz_simulation_interfaces/services/reset_simulation.cpp b/ros_gz_sim/src/gz_simulation_interfaces/services/reset_simulation.cpp
+index 2879f7c..bbdc0a4 100644
+--- a/ros_gz_sim/src/gz_simulation_interfaces/services/reset_simulation.cpp
++++ b/ros_gz_sim/src/gz_simulation_interfaces/services/reset_simulation.cpp
+@@ -45,11 +45,6 @@ ResetSimulation::ResetSimulation(
+   }
+   this->services_handle_ = ros_node->create_service<ResetSimulationSrv>(
+     "reset_simulation", [this, control_service](RequestPtr request, ResponsePtr response) {
+-      auto reset_detected_future = std::async(std::launch::async, [this]
+-      {
+-        return this->gz_proxy_->WaitForResetDetected();
+-      });
+-
+       using Result = simulation_interfaces::msg::Result;
+       if (
+         request->scope != ResetSimulationSrv::Request::SCOPE_DEFAULT &&
+@@ -61,6 +56,7 @@ ResetSimulation::ResetSimulation(
+         return;
+       }
+
++      const auto reset_sequence = this->gz_proxy_->ResetSequence();
+       gz::msgs::WorldControl gz_request;
+       gz_request.set_pause(this->gz_proxy_->Paused());
+       gz_request.mutable_reset()->set_all(true);
+@@ -83,7 +79,9 @@ ResetSimulation::ResetSimulation(
+       // Since the "control" service is asynchronous, getting results from the service doesn't mean
+       // the request has taken effect. Therefore, we wait here until the desired state is reached or
+       // a timeout occurs.
+-      if (!reset_detected_future.get()) {
++      if (response->result.result == Result::RESULT_OK &&
++      !this->gz_proxy_->WaitForResetDetected(reset_sequence))
++      {
+         response->result.result = Result::RESULT_OPERATION_FAILED;
+         response->result.error_message = "Timed out while trying to reset simulation";
+       }
+diff --git a/ros_gz_sim/src/gzserver.cpp b/ros_gz_sim/src/gzserver.cpp
+index 7c6b3aa..8254c36 100644
+--- a/ros_gz_sim/src/gzserver.cpp
++++ b/ros_gz_sim/src/gzserver.cpp
+@@ -28,6 +28,7 @@
+ #include <rclcpp_components/register_node_macro.hpp>
+
+ #include "ros_gz_sim/gz_simulation_interfaces.hpp"
++#include "gz_simulation_interfaces/canonical_link_state.hpp"
+
+ namespace ros_gz_sim
+ {
+@@ -80,6 +81,7 @@ void GzServer::OnStart()
+   auto server = std::make_unique<gz::sim::Server>(server_config);
+   // TODO(azeey) Think about whether it makes sense to RunOnce paused here or wait for some
+   // critical services from Gazebo to become available before starting the ROS services
++  server->AddSystem(std::make_shared<gz_simulation_interfaces::CanonicalLinkState>());
+   server->RunOnce(true);
+   // TODO(azeey) Allow disabling simulation interfaces
+
+diff --git a/ros_gz_sim/test/test_canonical_link_state.cpp b/ros_gz_sim/test/test_canonical_link_state.cpp
+new file mode 100644
+index 0000000..27951d5
+--- /dev/null
++++ b/ros_gz_sim/test/test_canonical_link_state.cpp
+@@ -0,0 +1,91 @@
++// Copyright 2026 Open Source Robotics Foundation, Inc.
++//
++// Licensed under the Apache License, Version 2.0 (the "License");
++// you may not use this file except in compliance with the License.
++// You may obtain a copy of the License at
++//
++//     http://www.apache.org/licenses/LICENSE-2.0
++//
++// Unless required by applicable law or agreed to in writing, software
++// distributed under the License is distributed on an "AS IS" BASIS,
++// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++// See the License for the specific language governing permissions and
++// limitations under the License.
++
++#include <gtest/gtest.h>
++#include <gz/sim/Util.hh>
++#include <gz/sim/components/AngularVelocity.hh>
++#include <gz/sim/components/CanonicalLink.hh>
++#include <gz/sim/components/LinearVelocity.hh>
++#include <gz/sim/components/ParentEntity.hh>
++#include <gz/sim/components/Pose.hh>
++#include <gz/sim/components/World.hh>
++#include "canonical_link_state.hpp"
++
++namespace ros_gz_sim
++{
++namespace gz_simulation_interfaces
++{
++namespace components = gz::sim::components;
++
++TEST(CanonicalLinkState, PreservesExistingFieldsAcrossRepeatedInitialization)
++{
++  gz::sim::EntityComponentManager ecm;
++  auto world = ecm.CreateEntity();
++  ecm.CreateComponent(world, components::World());
++  auto model = ecm.CreateEntity();
++  ecm.CreateComponent(model, components::Pose({2, 1, 3, 0, 0, 0.6}));
++  ecm.CreateComponent(model, components::ParentEntity(world));
++  auto link = ecm.CreateEntity();
++  ecm.CreateComponent(link, components::CanonicalLink());
++  ecm.CreateComponent(link, components::Pose({0.3, -0.2, 0.1, 0, 0, 0.2}));
++  ecm.CreateComponent(link, components::ParentEntity(model));
++  const auto pose = gz::sim::worldPose(link, ecm);
++  const gz::math::Vector3d velocity(0.4, -0.2, 0.1), angular(0, 0, 0.3);
++  ecm.CreateComponent(link, components::WorldPose(pose));
++  ecm.CreateComponent(link, components::WorldLinearVelocity(velocity));
++  ecm.CreateComponent(link, components::WorldAngularVelocity(angular));
++  CanonicalLinkState system;
++  for (int i = 0; i < 20; ++i) {
++    auto unrelated = ecm.CreateEntity();
++    ecm.CreateComponent(unrelated, components::CanonicalLink());
++    system.PreUpdate({}, ecm);
++    EXPECT_EQ(pose, ecm.ComponentData<components::WorldPose>(link));
++    EXPECT_EQ(velocity, ecm.ComponentData<components::WorldLinearVelocity>(link));
++    EXPECT_EQ(angular, ecm.ComponentData<components::WorldAngularVelocity>(link));
++  }
++}
++
++TEST(CanonicalLinkState, MissingFieldsWaitForPhysicsAndResetIsDistinct)
++{
++  gz::sim::EntityComponentManager ecm;
++  auto world = ecm.CreateEntity();
++  ecm.CreateComponent(world, components::World());
++  auto link = ecm.CreateEntity();
++  ecm.CreateComponent(link, components::CanonicalLink());
++  ecm.CreateComponent(link, components::Pose({2, 1, 3, 0, 0, 0.6}));
++  CanonicalLinkState system;
++  system.PreUpdate({}, ecm);
++  EXPECT_EQ(0u, ecm.ComponentData<ResetGeneration>(world));
++  EXPECT_EQ(gz::sim::worldPose(link, ecm), ecm.ComponentData<components::WorldPose>(link));
++  EXPECT_FALSE(ecm.ComponentData<components::WorldLinearVelocity>(link)->IsFinite());
++  EXPECT_FALSE(ecm.ComponentData<components::WorldAngularVelocity>(link)->IsFinite());
++  ecm.SetAllComponentsUnchanged();
++  ecm.SetComponentData<components::WorldLinearVelocity>(link, gz::math::Vector3d::Zero);
++  ecm.SetComponentData<components::WorldAngularVelocity>(link, gz::math::Vector3d::Zero);
++  ecm.SetChanged(link, components::WorldPose::typeId, gz::sim::ComponentState::NoChange);
++  system.Update({}, ecm);
++  EXPECT_TRUE(ecm.ComponentData<CanonicalLinkStateReady>(link).value());
++  EXPECT_EQ(gz::sim::ComponentState::OneTimeChange,
++    ecm.ComponentState(link, components::WorldPose::typeId));
++  system.Reset({}, ecm);
++  system.PreUpdate({}, ecm);
++  EXPECT_EQ(1u, ecm.ComponentData<ResetGeneration>(world));
++  system.PreUpdate({}, ecm);
++  EXPECT_EQ(1u, ecm.ComponentData<ResetGeneration>(world));
++  system.Reset({}, ecm);
++  system.PreUpdate({}, ecm);
++  EXPECT_EQ(2u, ecm.ComponentData<ResetGeneration>(world));
++}
++}  // namespace gz_simulation_interfaces
++}  // namespace ros_gz_sim
+diff --git a/ros_gz_sim/test/test_gazebo_proxy.cpp b/ros_gz_sim/test/test_gazebo_proxy.cpp
+new file mode 100644
+index 0000000..d4588d1
+--- /dev/null
++++ b/ros_gz_sim/test/test_gazebo_proxy.cpp
+@@ -0,0 +1,73 @@
++// Copyright 2026 Open Source Robotics Foundation, Inc.
++//
++// Licensed under the Apache License, Version 2.0 (the "License");
++// you may not use this file except in compliance with the License.
++// You may obtain a copy of the License at
++//
++//     http://www.apache.org/licenses/LICENSE-2.0
++//
++// Unless required by applicable law or agreed to in writing, software
++// distributed under the License is distributed on an "AS IS" BASIS,
++// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++// See the License for the specific language governing permissions and
++// limitations under the License.
++
++#include <gtest/gtest.h>
++#include <gz/msgs/boolean.pb.h>
++#include <gz/msgs/world_control_state.pb.h>
++
++#include <memory>
++#include <string>
++#include <gz/sim/components/AngularVelocity.hh>
++#include <gz/sim/components/CanonicalLink.hh>
++#include <gz/sim/components/LinearVelocity.hh>
++#include <gz/sim/components/Pose.hh>
++#include <gz/transport/Node.hh>
++#include <rclcpp/rclcpp.hpp>
++#include "gazebo_proxy.hpp"
++
++namespace ros_gz_sim
++{
++namespace gz_simulation_interfaces
++{
++namespace components = gz::sim::components;
++
++TEST(GazeboProxyState, InitializationPreservesRealWorldState)
++{
++  int argc = 0;
++  rclcpp::init(argc, nullptr);
++  gz::sim::EntityComponentManager native;
++  auto link = native.CreateEntity();
++  const gz::math::Pose3d pose(2.3, 1.2, 0.7, 0, 0, 0.8);
++  const gz::math::Vector3d linear(0.4, -0.2, 0.1), angular(0, 0, 0.3);
++  native.CreateComponent(link, components::CanonicalLink());
++  native.CreateComponent(link, components::WorldPose(pose));
++  native.CreateComponent(link, components::WorldLinearVelocity(linear));
++  native.CreateComponent(link, components::WorldAngularVelocity(angular));
++  gz::transport::Node transport;
++  std::function<bool(gz::msgs::StringMsg_V &)> worlds = [](auto & reply) {
++      reply.add_data("proxy_regression"); return true;
++    };
++  std::function<bool(gz::msgs::SerializedStepMap &)> state = [&](auto & reply) {
++      native.State(*reply.mutable_state()); return true;
++    };
++  int writes = 0;
++  std::function<bool(const gz::msgs::WorldControlState &, gz::msgs::Boolean &)> control =
++    [&](const auto &, auto & reply) {++writes; reply.set_data(true); return true;};
++  ASSERT_TRUE(transport.Advertise("/gazebo/worlds", worlds));
++  ASSERT_TRUE(transport.Advertise("/world/proxy_regression/state", state));
++  ASSERT_TRUE(transport.Advertise("/world/proxy_regression/control/state", control));
++  {
++    auto node = std::make_shared<rclcpp::Node>("proxy_regression");
++    GazeboProxy proxy("proxy_regression", node);
++    proxy.WithEcm([&](auto & ecm) {
++        EXPECT_EQ(pose, ecm.template ComponentData<components::WorldPose>(link));
++        EXPECT_EQ(linear, ecm.template ComponentData<components::WorldLinearVelocity>(link));
++        EXPECT_EQ(angular, ecm.template ComponentData<components::WorldAngularVelocity>(link));
++      });
++    EXPECT_EQ(0, writes) << "The reporting cache must never write state back to simulation";
++  }
++  rclcpp::shutdown();
++}
++}  // namespace gz_simulation_interfaces
++}  // namespace ros_gz_sim
+diff --git a/ros_gz_sim/test/test_scene_state.launch.py b/ros_gz_sim/test/test_scene_state.launch.py
+new file mode 100644
+index 0000000..a115f06
+--- /dev/null
++++ b/ros_gz_sim/test/test_scene_state.launch.py
+@@ -0,0 +1,258 @@
++# Copyright 2026 Open Source Robotics Foundation, Inc.
++#
++# Licensed under the Apache License, Version 2.0 (the "License");
++# you may not use this file except in compliance with the License.
++# You may obtain a copy of the License at
++#
++#     http://www.apache.org/licenses/LICENSE-2.0
++#
++# Unless required by applicable law or agreed to in writing, software
++# distributed under the License is distributed on an "AS IS" BASIS,
++# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++# See the License for the specific language governing permissions and
++# limitations under the License.
++
++"""Exercise state reporting through scene additions using independent native poses."""
++
++from collections import deque
++import json
++import math
++import os
++import threading
++import time
++import unittest
++
++from gz.msgs10.pose_v_pb2 import Pose_V
++from gz.transport13 import Node as GzNode
++from launch import LaunchDescription
++from launch.actions import SetEnvironmentVariable
++from launch_ros.actions import Node
++import launch_testing
++import launch_testing.actions
++import launch_testing.asserts
++import rclpy
++from simulation_interfaces import srv as si
++from simulation_interfaces.msg import Result, SimulationState
++
++
++WORLD = 'scene_state_regression'
++SDF = """<sdf version="1.9"><world name="scene_state_regression">
++<gravity>0 0 0</gravity>
++<plugin filename="gz-sim-physics-system" name="gz::sim::systems::Physics"/>
++<plugin filename="gz-sim-user-commands-system" name="gz::sim::systems::UserCommands"/>
++<plugin filename="gz-sim-scene-broadcaster-system"
++ name="gz::sim::systems::SceneBroadcaster"/>
++<model name="offset_model"><pose>0 0 3 0 0 0</pose>
++<link name="body"><pose>0.3 -0.2 0.1 0 0 0.2</pose>
++<inertial><mass>1</mass><inertia><ixx>1</ixx><iyy>1</iyy><izz>1</izz></inertia></inertial>
++<visual name="box"><geometry><box><size>0.2 0.2 0.2</size></box></geometry></visual>
++</link></model>
++<model name="moving_model"><pose>0 5 3 0 0 0</pose>
++<link name="body"><pose>0.3 -0.2 0.1 0 0 0</pose>
++<inertial><mass>1</mass><inertia><ixx>1</ixx><iyy>1</iyy><izz>1</izz></inertia></inertial>
++<visual name="box"><geometry><box><size>0.2 0.2 0.2</size></box></geometry></visual>
++</link><plugin filename="gz-sim-velocity-control-system"
++ name="gz::sim::systems::VelocityControl"><initial_linear>0.4 0 0</initial_linear></plugin>
++</model></world></sdf>"""
++
++
++def generate_test_description():
++    server = Node(package='ros_gz_sim', executable='gzserver', output='screen',
++                  parameters=[{'world_sdf_string': SDF}])
++    return LaunchDescription([
++        SetEnvironmentVariable('GZ_IP', '127.0.0.1'), server,
++        launch_testing.actions.ReadyToTest(),
++    ]), {'server': server}
++
++
++class TestSceneState(unittest.TestCase):
++    @classmethod
++    def setUpClass(cls):
++        rclpy.init()
++        cls.node = rclpy.create_node('scene_state_regression')
++        cls.gz = GzNode()
++        cls.lock = threading.Lock()
++        cls.native = None
++        cls.samples = []
++        cls.moving_history = deque(maxlen=100)
++
++        def poses(msg):
++            for p in msg.pose:
++                if p.name == 'offset_model':
++                    stamp = msg.header.stamp.sec + msg.header.stamp.nsec * 1e-9
++                    with cls.lock:
++                        cls.native = (time.monotonic(), stamp, p)
++                elif p.name == 'moving_model':
++                    stamp = msg.header.stamp.sec + msg.header.stamp.nsec * 1e-9
++                    with cls.lock:
++                        cls.moving_history.append((time.monotonic(), stamp, p.position.x))
++
++        cls.pose_callback = poses
++        assert cls.gz.subscribe(Pose_V, f'/world/{WORLD}/pose/info', poses)
++        cls.clients = {}
++
++    @classmethod
++    def tearDownClass(cls):
++        cls.gz.unsubscribe(f'/world/{WORLD}/pose/info')
++        cls.node.destroy_node()
++        rclpy.shutdown()
++
++    def call(self, service_name, **kwargs):
++        types = {'get_entity_state': si.GetEntityState, 'set_entity_state': si.SetEntityState,
++                 'get_entities_states': si.GetEntitiesStates,
++                 'spawn_entity': si.SpawnEntity, 'delete_entity': si.DeleteEntity,
++                 'reset_simulation': si.ResetSimulation,
++                 'set_simulation_state': si.SetSimulationState,
++                 'get_simulation_state': si.GetSimulationState}
++        name = service_name
++        if name not in self.clients:
++            self.clients[name] = self.node.create_client(types[name], f'/gzserver/{name}')
++        client = self.clients[name]
++        self.assertTrue(client.wait_for_service(timeout_sec=20))
++        request = types[name].Request()
++        for key, value in kwargs.items():
++            setattr(request, key, value)
++        f = client.call_async(request)
++        rclpy.spin_until_future_complete(self.node, f, timeout_sec=12)
++        self.assertTrue(f.done(), f'{name} timed out')
++        result = f.result()
++        self.assertEqual(result.result.result, Result.RESULT_OK, result.result.error_message)
++        return result
++
++    def wait_native(self, expected, after=0.0):
++        deadline = time.monotonic() + 5.0
++        while time.monotonic() < deadline:
++            with self.lock:
++                native = self.native
++            if (native is not None and native[0] > after and
++                    abs(native[2].position.x - expected[0]) < 1e-5 and
++                    abs(native[2].position.y - expected[1]) < 1e-5):
++                return
++            rclpy.spin_once(self.node, timeout_sec=0.01)
++        self.fail('native pose did not reach the expected position')
++
++    def observe(self, duration=1.0, expected=(2.0, 1.0, 0.6)):
++        deadline = time.monotonic() + duration
++        count = 0
++        while time.monotonic() < deadline:
++            state = self.call('get_entity_state', entity='offset_model').state
++            bulk_req = si.GetEntitiesStates.Request()
++            bulk_req.filters.filter = '^offset_model$'
++            bulk = self.call('get_entities_states', filters=bulk_req.filters)
++            self.assertEqual(list(bulk.entities), ['offset_model'])
++            with self.lock:
++                native = self.native
++            self.assertIsNotNone(native)
++            age = time.monotonic() - native[0]
++            self.assertLess(age, 0.5, 'stale independent native pose')
++            if os.environ.get('SCENE_STATE_SAMPLES'):
++                with open(os.environ['SCENE_STATE_SAMPLES'], 'a') as out:
++                    out.write(json.dumps({
++                        'wall': time.monotonic(), 'native_stamp': native[1],
++                        'native_age': age, 'native_x': native[2].position.x,
++                        'singular_x': state.pose.position.x,
++                        'bulk_x': bulk.states[0].pose.position.x}) + '\n')
++            for actual in (state, bulk.states[0]):
++                self.assertAlmostEqual(actual.pose.position.x, native[2].position.x, delta=1e-5)
++                self.assertAlmostEqual(actual.pose.position.y, native[2].position.y, delta=1e-5)
++                self.assertAlmostEqual(
++                    actual.pose.orientation.z, native[2].orientation.z, delta=1e-5)
++                self.assertAlmostEqual(actual.pose.position.x, expected[0], delta=1e-5)
++                self.assertAlmostEqual(actual.pose.position.y, expected[1], delta=1e-5)
++                self.assertAlmostEqual(
++                    actual.pose.orientation.z, math.sin(expected[2] / 2), delta=1e-5)
++            self.samples.append(
++                (native[1], age, state.pose.position.x, bulk.states[0].pose.position.x))
++            count += 1
++        self.assertGreater(count, 1)
++
++    def test_01_scene_additions_preserve_stationary_state(self):
++        request = si.SetEntityState.Request()
++        request.state.pose.position.x = 2.0
++        request.state.pose.position.y = 1.0
++        request.state.pose.position.z = 3.0
++        request.state.pose.orientation.z = math.sin(0.3)
++        request.state.pose.orientation.w = math.cos(0.3)
++        self.call('set_entity_state', entity='offset_model', state=request.state)
++        deadline = time.monotonic() + 5
++        while True:
++            state = self.call('get_entity_state', entity='offset_model').state
++            if abs(state.pose.position.x - 2.0) < 1e-5:
++                break
++            self.assertLess(time.monotonic(), deadline, 'move never reached measured pose')
++        self.observe()
++        for i in range(4):
++            request = si.SpawnEntity.Request()
++            request.name = f'unrelated_{i}'
++            request.resource_string = """<sdf version="1.9"><model name="unrelated">
++                <static>true</static><link name="link"><visual name="v">
++                <geometry><box><size>0.1 0.1 0.1</size></box></geometry>
++                </visual></link></model></sdf>"""
++            request.initial_pose.pose.position.x = 10.0
++            request.initial_pose.pose.orientation.w = 1.0
++            self.call('spawn_entity', name=request.name, resource_string=request.resource_string,
++                      initial_pose=request.initial_pose)
++            self.observe(1.5)
++            self.call('delete_entity', entity=request.name)
++            self.observe()
++        print(f'STATE_REGRESSION {len(self.samples)} native-checked pairs')
++
++    def test_02_supported_resets_playing_and_paused(self):
++        for mode in (SimulationState.STATE_PLAYING, SimulationState.STATE_PAUSED):
++            state = si.SetSimulationState.Request().state
++            state.state = mode
++            self.call('set_simulation_state', state=state)
++            for scope in (si.ResetSimulation.Request.SCOPE_DEFAULT,
++                          si.ResetSimulation.Request.SCOPE_ALL):
++                start = time.monotonic()
++                self.call('reset_simulation', scope=scope)
++                print(f'RESET_CASE mode={mode} scope={scope} wall={time.monotonic() - start}')
++                self.assertLess(time.monotonic() - start, 7.0)
++                # Stats arrive on a separate stream. Both paused states preserve
++                # pause; STOPPED is reported once the reset iteration zero arrives.
++                actual_mode = self.call('get_simulation_state').state.state
++                if mode == SimulationState.STATE_PAUSED:
++                    self.assertIn(actual_mode, (SimulationState.STATE_PAUSED,
++                                                SimulationState.STATE_STOPPED))
++                else:
++                    self.assertEqual(actual_mode, mode)
++                self.wait_native((0.0, 0.0), after=start)
++                self.observe(expected=(0.0, 0.0, 0.0))
++        state.state = SimulationState.STATE_PLAYING
++        self.call('set_simulation_state', state=state)
++
++    def test_03_moving_velocity_survives_additions(self):
++        state = si.SetSimulationState.Request().state
++        state.state = SimulationState.STATE_PLAYING
++        self.call('set_simulation_state', state=state)
++        for i in range(3):
++            request = si.SpawnEntity.Request()
++            request.initial_pose.pose.orientation.w = 1.0
++            name = f'moving_prop_{i}'
++            self.call('spawn_entity', name=name, resource_string="""
++                <sdf version="1.9"><model name="prop"><static>true</static>
++                <link name="body"/></model></sdf>""", initial_pose=request.initial_pose)
++            for _ in range(20):
++                one = self.call('get_entity_state', entity='moving_model').state
++                request = si.GetEntitiesStates.Request()
++                request.filters.filter = '^moving_model$'
++                bulk = self.call('get_entities_states', filters=request.filters)
++                self.assertEqual(list(bulk.entities), ['moving_model'])
++                with self.lock:
++                    history = list(self.moving_history)
++                self.assertGreater(len(history), 2)
++                first, last = history[0], history[-1]
++                self.assertLess(time.monotonic() - last[0], 0.5)
++                native_velocity = (last[2] - first[2]) / (last[1] - first[1])
++                self.assertAlmostEqual(native_velocity, 0.4, delta=1e-4)
++                for state in (one, bulk.states[0]):
++                    self.assertAlmostEqual(state.twist.linear.x, native_velocity, delta=1e-4)
++                    self.assertAlmostEqual(state.twist.linear.y, 0.0, delta=1e-4)
++                    self.assertAlmostEqual(state.pose.position.x, last[2], delta=0.03)
++            self.call('delete_entity', entity=name)
++
++
++@launch_testing.post_shutdown_test()
++class TestShutdown(unittest.TestCase):
++    def test_exit(self, proc_info, server):
++        launch_testing.asserts.assertExitCodes(proc_info, process=server)

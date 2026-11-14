@@ -8,6 +8,13 @@ environments; thin backend packages own simulator- or hardware-specific
 bringup. The shipped simulation benchmark uses a Unitree G1 as its target model;
 the ROS interfaces and localization package are target-generic.
 
+[![Animated top-down map: the robot reveals rooms with its lidar, drives to the edges of unknown space and spots the target](docs/exploration/assets/exploration.gif)](docs/exploration/assets/explainer.html)
+
+*Frontier exploration, simulated with the explorer's goal rules (an illustration,
+not recorded robot data). Interactive version and plain-language overview:
+[visual explainer](docs/exploration/assets/explainer.html); open it in a
+browser from a clone.*
+
 This README owns installation, public commands and operator workflows. It is a
 router: detailed references and physical runbooks live in the pages it links.
 
@@ -16,7 +23,7 @@ router: detailed references and physical runbooks live in the pages it links.
 | Area | Pages |
 |------|-------|
 | Start here | [Documentation index](docs/index.md) · [project context](docs/project/PROJECT_CONTEXT.md) · [documentation ownership](docs/project/documentation.md) · [conventions](docs/project/conventions.md) · `AGENTS.md` / `CLAUDE.md` (thin agent entrypoints) |
-| Exploration | [Architecture](docs/exploration/architecture.md) · [launch arguments](docs/exploration/launch_arguments.md) · [evaluation](docs/exploration/evaluation.md) (coverage and navigation outcomes) · [parking demonstration](docs/exploration/parking_demo.md) |
+| Exploration | [Architecture](docs/exploration/architecture.md) · [launch arguments](docs/exploration/launch_arguments.md) · [evaluation](docs/exploration/evaluation.md) (coverage and navigation outcomes) · [parking demonstration](docs/exploration/parking_demo.md) · [visual explainer](docs/exploration/assets/explainer.html) |
 | Target localization | [Pipeline](docs/target_localization/target_localization_pipeline.md) · [camera stack](docs/target_localization/camera_stack.md) · [distributed deployment](docs/target_localization/distributed_deployment.md) |
 | Benchmarking | [Overview](docs/target_distance_benchmarking/overview.md) · [running benchmarks](docs/target_distance_benchmarking/running_benchmarks.md) · [launch arguments](docs/target_distance_benchmarking/launch_arguments.md) · [sweeps](docs/target_distance_benchmarking/sweeps.md) · [outputs](docs/target_distance_benchmarking/outputs.md) · [replay profiles](docs/target_distance_benchmarking/profiles.md) · [configurator](docs/target_distance_benchmarking/configurator.md) |
 | Robot model | [Geometry](docs/robot/geometry.md) (mounts, dimensioned model, validation limits) · [collision model](docs/robot/collision_model.md) (physical envelope, navigation footprint) |
@@ -78,7 +85,7 @@ source /opt/ros/jazzy/setup.bash
 cd /path/to/DyNAMO-Ridgeback
 vcs import < dependencies/core.repos   # common source dependencies, all deployments
 # Gazebo hosts only: Clearpath simulation, the patched gz-sim8 source, and
-# ros_gz (only its patched bridge packages are built)
+# ros_gz (only its patched bridge, image, and simulation packages are built)
 vcs import < dependencies/gz.repos
 # Hosts that run RViz (both simulators launch it by default): the patched RViz
 # default plugins; `--profile all` below expects this checkout
@@ -131,7 +138,7 @@ OMNI_KIT_ACCEPT_EULA=YES isaac_venv/bin/python3 tools/isaac/smoke_test.py
 ```
 
 The first install is roughly 30–50 GB. Stock Isaac worlds need NVIDIA's asset
-root; the repo-local `initial_test_world` does not. Canonical `isaac_venv` points
+root; the repo-local `initial_test_world` and `robocup_hcc_arena` do not. Canonical `isaac_venv` points
 to 6.1; [Isaac rollback](docs/isaac/rollback.md) covers the retained 6.0.1 environment.
 
 ### 5. (Optional) Install the repository Git hooks
@@ -194,13 +201,12 @@ bash build_and_start_expl.sh office backend:=isaac headless:=true
 
 ## Public workflows
 
-The human workflows are exploration with target localization, simulation
-parking, target-distance benchmarking, and manual mapping. The seven top-level launch files:
+The human workflows are exploration with target localization, simulation parking, target-distance benchmarking, and manual mapping. The seven top-level launch files:
 
 | Launch file | Role |
 |-------------|------|
 | `ridgeback_exploration.launch.py` | [Exploration](#exploration) on Gazebo, Isaac or hardware |
-| `ridgeback_mission.launch.py` | [Parking demonstration](#parking-demonstration) on Gazebo or Isaac, started by `start_parking_demo.sh` |
+| `ridgeback_mission.launch.py` | [Parking demonstration](docs/exploration/parking_demo.md) on Gazebo or Isaac, started by `start_parking_demo.sh` ([scenarios](docs/exploration/autonomous_parking_scenarios.html), [results](docs/exploration/autonomous_parking_results.html)) |
 | `target_distance_benchmark.launch.py` | One [benchmark](#benchmarks) run |
 | `manual_mapping.launch.py` | [Manual mapping](#manual-mapping) |
 | `localization_observer.launch.py` | Intel result observer for [distributed localization](#distributed-localization) |
@@ -237,9 +243,9 @@ ros2 launch ridgeback_autonomy ridgeback_exploration.launch.py estimators:=point
 ros2 launch ridgeback_autonomy ridgeback_exploration.launch.py \
   backend:=hardware autonomous_motion_enabled:=false base_frame:="${BASE_FRAME:?Set the observed base TF frame}"
 # Quick-start wrappers forward launch arguments untouched, e.g. an explicit detector baseline
-bash start_exploration.sh initial_test_world detector:=owlv2 \
+bash start_exploration.sh initial_test_world target_localization_enabled:=true detector:=owlv2 \
   detection_model:=google/owlv2-base-patch16-ensemble \
-  target_labels:="humanoid robot" detection_threshold:=0.55 detector_fps:=10.0
+  target_labels:="humanoid robot" detection_threshold:=0.30 detector_fps:=10.0
 ```
 
 `localization_mode:=external` consumes an already-running detector and rejects
@@ -252,24 +258,14 @@ validate the command chain, stop behaviour and speed limits with the
 the [qualification plan](docs/plans/PHYSICAL_remaining_qualification.md) holds
 every physical gate's status.
 
-## Parking demonstration
-
-`start_parking_demo.sh` runs the parking mission beside a G1 in one simulator on
-isolated CycloneDDS domain 83. `--plan-only` keeps the robot stationary; without
-it the robot explores, parks and returns, which is not yet qualified. Modes, the
-spawned scenes and startup gates are in the [parking reference](docs/exploration/parking_demo.md); scenes and results are on the [scenario](docs/exploration/autonomous_parking_scenarios.html) and [results](docs/exploration/autonomous_parking_results.html) pages.
-
-```bash
-bash start_parking_demo.sh gz --plan-only      # then, after Ctrl-C: isaac --plan-only
-```
-
 ## Manual mapping
 
 `manual_mapping.launch.py` brings up Gazebo, `slam_toolbox`, RViz and
 Clearpath's interactive-marker teleop with `twist_mux`, without Nav2 or frontier
 goals, so an operator drives the robot through the space. It activates the
 inactive `platform_velocity_controller` once the controller manager is ready.
-Arguments: `world` (`initial_test_world`, `depot` or `coworking_space`),
+Arguments: `world` (`initial_test_world`, `robocup_hcc_arena`, `depot` or
+`coworking_space`),
 `mapping_rviz` (default `true`), `namespace`, `use_sim_time`, `setup_path`.
 
 ```bash
@@ -303,7 +299,7 @@ ros2 launch ridgeback_autonomy target_distance_benchmark.launch.py backend:=isaa
 # The same production baseline, with the detector settings explicit
 ros2 launch ridgeback_autonomy target_distance_benchmark.launch.py \
   detector:=owlv2 detection_model:=google/owlv2-base-patch16-ensemble \
-  target_labels:="humanoid robot" detection_threshold:=0.55 detector_fps:=10.0
+  target_labels:="humanoid robot" detection_threshold:=0.30 detector_fps:=10.0
 # Point cloud only; then point cloud + the mask reference row
 ros2 launch ridgeback_autonomy target_distance_benchmark.launch.py estimators:=pointcloud
 ros2 launch ridgeback_autonomy target_distance_benchmark.launch.py estimators:=pointcloud,projective_ranging
@@ -368,7 +364,9 @@ Offline replay re-evaluates frozen live captures: the
 sweeps box-gated stereoscopic `projective_ranging` parameters, and the
 [layered workflow](docs/target_distance_benchmarking/profiles.md#layered-workflow)
 compares or reruns masks. Replay does not replace live runs for detector,
-transport, throughput, latency, model or integration questions.
+transport, throughput, latency, model or integration questions. The
+[hardware-bag bridge](docs/target_distance_benchmarking/hardware_bag_validation.md)
+processes saved hardware sessions offline.
 
 ## Distributed localization
 
@@ -396,8 +394,10 @@ Thor's venv follows the header of `requirements-perception-thor.txt`
 ([Thor inference environment](docs/target_localization/distributed_deployment.md#thor-inference-environment));
 with ROS sourced, `~/venvs/dynamo-perception/bin/python3 tools/intel_thor/check_perception_env`
 fails unless the models' operations run on the GPU. Apply `tools/intel_thor/thor_lan_route`
-first, or Thor never receives static TF. OWLv2 scores a person below the default
-`detection_threshold` of 0.55 on `r100_0160`; set it explicitly and record it.
+first, or Thor never receives static TF. The shared humanoid-robot confidence
+default is `0.30`; for another target or experiment set `target_labels:=` and
+`detection_threshold:=` explicitly and record both. Existing
+`/etc/default/dynamo-localization` values override repository defaults.
 Launch with `RIDGEBACK_PERCEPTION_VENV=~/venvs/dynamo-perception` (plus
 `RIDGEBACK_MODEL_DOWNLOADS=1` on a new host) and the observed topics and base frame:
 
@@ -409,18 +409,18 @@ Launch with `RIDGEBACK_PERCEPTION_VENV=~/venvs/dynamo-perception` (plus
 : "${DEPTH_TOPIC:?Set the observed aligned depth-to-color topic}"
 : "${CAMERA_INFO_TOPIC:?Set the observed color CameraInfo topic}"
 ros2 launch ridgeback_localization localization.launch.py \
-  namespace:="$ROBOT_NAMESPACE" use_sim_time:=false base_frame:="$BASE_FRAME" \
+  namespace:="$ROBOT_NAMESPACE" use_sim_time:=false base_frame:="$BASE_FRAME" front_offset_m:=0.465 \
   color_topic:="$COLOR_TOPIC" depth_topic:="$DEPTH_TOPIC" camera_info_topic:="$CAMERA_INFO_TOPIC" \
   estimators:=projective_ranging,euclidean_reconstruction \
   detector:=owlv2 detection_model:=google/owlv2-base-patch16-ensemble \
-  target_labels:="humanoid robot" detection_threshold:=0.55 detector_fps:=10.0 \
+  target_labels:="humanoid robot" detection_threshold:=0.30 detector_fps:=10.0 \
   displays:=false
 ```
 
 To start localization at every Thor boot (after Thor's PTP clock services), run
 `sudo tools/intel_thor/localization_service apply` from the Thor checkout that
 holds the build; it refuses while a hand-started launch runs. Edit settings
-(checkout, labels, threshold, mask and depth modes) in `/etc/default/dynamo-localization`,
+(checkout, labels, threshold, mask and depth modes, `FRONT_OFFSET_M`) in `/etc/default/dynamo-localization`,
 then `sudo systemctl restart dynamo-localization`. `status` compares the unit
 with its template; `remove` keeps the settings unless `--purge` is given.
 
@@ -438,7 +438,7 @@ source artifacts/colcon/intel-install/local_setup.bash
 : "${BASE_FRAME:?Set the observed base TF frame ID}"
 : "${COLOR_TOPIC:?Set the observed color image topic}"
 ros2 launch ridgeback_autonomy localization_observer.launch.py \
-  namespace:="$ROBOT_NAMESPACE" use_sim_time:=false base_frame:="$BASE_FRAME" \
+  namespace:="$ROBOT_NAMESPACE" use_sim_time:=false base_frame:="$BASE_FRAME" front_offset_m:=0.465 \
   color_topic:="$COLOR_TOPIC" estimators:=projective_ranging,euclidean_reconstruction
 ```
 
@@ -590,6 +590,7 @@ procedure are tracked in the
 
 ## Archived evidence
 
+- [Saved hardware-bag diagnostic and review](archive/engineering/2026-11-05-hardware-bag-diagnostic.md)
 - [6.1 migration evidence](archive/engineering/2026-09-13-isaac-6.1-migration.md)
 - [investigation history](archive/engineering/exact_stamp_depth_availability.md)
 - [projective parameter sensitivity](archive/engineering/projective_parameter_sensitivity.md)

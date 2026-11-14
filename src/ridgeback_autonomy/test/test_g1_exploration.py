@@ -1,6 +1,7 @@
 """G1-centred mapping with the shared explorer before parking planning."""
 
 import math
+from pathlib import Path
 
 import pytest
 from action_msgs.msg import GoalStatus
@@ -342,10 +343,13 @@ def returning(manager_factory):
 
 
 def restored(m):
+    """The last goal-checker call put back the shared checker of nav2_params.yaml."""
+    from ridgeback_autonomy.mission.parking_nav2_profile import shared_goal_checker
+    xy, yaw = shared_goal_checker(Path(__file__).resolve().parents[1] / 'config' / 'nav2_params.yaml')
     request, _ = m._goal_checker_set_client.calls[-1]
     return {p.name: p.value.double_value for p in request.parameters} == {
-        'general_goal_checker.xy_goal_tolerance': 0.40,
-        'general_goal_checker.yaw_goal_tolerance': 0.40}
+        'general_goal_checker.xy_goal_tolerance': xy,
+        'general_goal_checker.yaw_goal_tolerance': yaw}
 
 
 def test_precise_return_restores_the_shared_checker_and_relocalizes_after_a_verified_stop(

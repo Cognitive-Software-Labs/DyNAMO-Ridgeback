@@ -95,3 +95,40 @@ def is_reach_distance_valid(
     reach_max_m: float,
 ) -> bool:
     return reach_min_m <= distance_m <= reach_max_m
+
+
+# The provisional basket's plan outline in the base frame: the corners of its five
+# boxes in src/ridgeback_common/urdf/camera_support.urdf.xacro (rear wall to x = -0.48,
+# side walls to y = +-0.19; test_parking_geometry checks them against the xacro).
+BASKET_CORNERS_BASE = ((-0.48, 0.17), (-0.46, 0.19), (-0.10, 0.19), (-0.08, 0.17),
+                       (-0.08, -0.17), (-0.10, -0.19), (-0.46, -0.19), (-0.48, -0.17))
+
+
+def convex_hull(points):
+    """Counter-clockwise convex hull of 2D points (monotone chain)."""
+    pts = sorted(set((float(x), float(y)) for x, y in points))
+    if len(pts) <= 2:
+        return pts
+
+    def cross(o, a, b):
+        return (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0])
+    lower, upper = [], []
+    for p in pts:
+        while len(lower) >= 2 and cross(lower[-2], lower[-1], p) <= 0:
+            lower.pop()
+        lower.append(p)
+    for p in reversed(pts):
+        while len(upper) >= 2 and cross(upper[-2], upper[-1], p) <= 0:
+            upper.pop()
+        upper.append(p)
+    return lower[:-1] + upper[:-1]
+
+
+def parking_footprint(nav2_footprint, attachments=BASKET_CORNERS_BASE):
+    """The outline parking plans and checks with: Nav2's body outline and the basket.
+
+    Nav2's shared outline is the robot body only; the basket's rear corners reach up to
+    0.035 m beyond its angled rear ends. The hull keeps every planned pose and route
+    check, and the parking LiDAR check, around the whole robot.
+    """
+    return tuple(convex_hull(list(nav2_footprint) + list(attachments)))

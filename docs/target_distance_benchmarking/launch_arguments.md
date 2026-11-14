@@ -79,6 +79,8 @@ in its `defaults` ([sweeps](sweeps.md#sweep-file-format)).
 | `headless` | `true` | Isaac only: run Isaac Sim without its viewport window |
 | `rtf` | `1.0` | Isaac only: real-time factor; `0` is unthrottled |
 | `sim_mode` | `realtime` | Isaac only: `realtime` or fixed-step `deterministic` stepping |
+| `renderer` | `RealTimePathTracing` | Isaac only: RTX render mode of the camera images: `RealTimePathTracing`, `RaytracedLighting`, or `PathTracing` |
+| `anti_aliasing` | `3` | Isaac only: `0` off, `1` TAA, `2` FXAA, `3` DLSS, `4` RTXAA; temporal modes depend on frame history |
 | `depth_fidelity` | `ideal` | Isaac only: `ideal` renderer depth or D455-like `d455` stereo depth; see [camera depth](../isaac/camera-depth.md) |
 | `exploration_rviz` | `true` | Launch the persistent benchmark RViz window |
 
@@ -92,7 +94,7 @@ These settings are startup-only, and a sweep may set them only in `defaults`.
 | `detector` | `owlv2` | Detector implementation; only `owlv2` is registered |
 | `detection_model` | `google/owlv2-base-patch16-ensemble` | Checkpoint identifier, distinct from `detector` |
 | `target_labels` | `humanoid robot` | Comma-separated detection queries |
-| `detection_threshold` | `0.55` | Finite confidence floor in `(0, 1]` |
+| `detection_threshold` | `0.30` | Finite confidence floor in `(0, 1]` |
 | `detector_fps` | `10.0` | Upper bound on the detection rate every measurement row inherits ([cadence defaults](../target_localization/detection.md#detector-cadence-defaults)) |
 | `detector_debug` | `false` | Detector evidence logging: achieved cadence, superseded frames, and bounded cold/warm percentiles for the throttle wait, decode, inference, parse, publish and CUDA synchronization |
 
@@ -149,6 +151,9 @@ and [polar profiling](../target_localization/polar_profiling.md).
 | Argument | Default | Meaning |
 |---|---|---|
 | `scenario` | empty | Scenario YAML; empty uses the packaged full scenario set |
+| `background` | empty | Packaged background layout that furnishes the room, spawned once per run: `lab`. Each scene is shifted along x by its generated placement `dx`, with the robot moved there and the scene's state checked before capture, so results are not comparable with origin-placed runs. Empty runs the bare room with the robot at the origin. Refused for a scenario file the layout's generated drop file does not cover; see [benchmark semantics](semantics.md#background-props) |
+| `background_props` | `true` | With a `background`: spawn its props. `false` is the control arm, the same placements, moves and state checks in the bare room |
+| `scene_ids` | empty | Comma-separated scene ids of the scenario file to run, in that order; empty runs every scene in file order |
 | `repeats` | `5` | Positive-trial repeats per spawn pose; a scene may override it ([semantics](semantics.md#scenario-and-comparison-discipline)) |
 | `settle_sec` | `2.0` | Delay after spawning the target before sampling |
 | `capture_sec` | `10.0` | Sampling window for collecting usable detections |
@@ -169,3 +174,4 @@ format freezes and the capture workflows.
 | `capture_batches` | `5` | Raw detector batches captured per trial when either replay output is set; empty batches count. Five is the validated legacy capture default ([profiles](profiles.md#capture-quota)) |
 | `capture_drain_sec` | `2.0` | Maximum post-quota drain for matching exact depth, camera context and live measurements. Capture ends early when every selected stamp is complete, and keeps missing matches when the bound expires |
 | `capture_timeout_sec` | `30.0` | Hard wall-time bound for obtaining the raw-batch quota; a stall guard, not the normal capture duration |
+| `sensor_capture_mode` | `quota` | `quota` ends a sensor-capture window at `capture_batches`. `sampled_window` keeps the live window at `capture_sec`, stores only its first `capture_batches` raw batches, drains them for at most `capture_drain_sec` afterwards, and writes their live results to `sampled_reference/`. Only `sampled_window` accepts `depth_source:=monocular`; requires `sensor_capture_dir` |

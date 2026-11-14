@@ -81,3 +81,40 @@ def test_reach_boundaries_and_path_length() -> None:
 )
 def test_normalize_angle(angle_rad, expected_rad) -> None:
     assert normalize_angle(angle_rad) == pytest.approx(expected_rad, abs=1e-12)
+
+
+def test_the_parking_footprint_covers_the_basket_the_robot_description_builds():
+    """Nav2's shared outline is the robot body; the provisional basket's rear corners
+    reach beyond its angled rear ends, so planning uses the hull of both."""
+    import ast
+    import re
+    from pathlib import Path
+
+    import yaml
+
+    from ridgeback_autonomy.mission.parking_geometry import BASKET_CORNERS_BASE, parking_footprint
+    from ridgeback_autonomy.mission.parking_planner import points_to_polygon_distance
+
+    root = Path(__file__).resolve().parents[2]
+    xacro = (root / 'ridgeback_common' / 'urdf' / 'camera_support.urdf.xacro').read_text()
+    basket_x = float(re.search(r'name="basket_x" value="([-\d.]+)"', xacro).group(1))
+    corners = set()
+    for box in re.finditer(r'<xacro:ridgeback_support_box name="basket_\w+"\s+x="([^"]+)" y="([^"]+)"'
+                           r' z="[^"]+" sx="([\d.]+)" sy="([\d.]+)"', xacro):
+        x = eval(box.group(1).replace('${', '').replace('}', ''), {'basket_x': basket_x})
+        y, sx, sy = float(box.group(2)), float(box.group(3)), float(box.group(4))
+        corners |= {(round(x + dx * sx / 2, 3), round(y + dy * sy / 2, 3))
+                    for dx in (-1, 1) for dy in (-1, 1)}
+    assert len(corners) == 20
+    hull = [(round(x, 3), round(y, 3)) for x, y in __import__(
+        'ridgeback_autonomy.mission.parking_geometry', fromlist=['convex_hull']).convex_hull(corners)]
+    assert set(hull) == {(round(x, 3), round(y, 3)) for x, y in BASKET_CORNERS_BASE}
+    nav2 = yaml.safe_load((root / 'ridgeback_autonomy' / 'config' / 'nav2_params.yaml').read_text())
+    outline = [tuple(p) for p in ast.literal_eval(str(
+        nav2['global_costmap']['global_costmap']['ros__parameters']['footprint']))]
+    footprint = parking_footprint(outline)
+    xs, ys = zip(*corners)
+    # Every basket corner and every Nav2 vertex lies inside or on the planning outline.
+    inside = points_to_polygon_distance(list(xs) + [p[0] for p in outline],
+                                        list(ys) + [p[1] for p in outline], footprint)
+    assert max(inside) <= 1e-9

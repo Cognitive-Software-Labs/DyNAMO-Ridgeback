@@ -263,6 +263,21 @@ def _measurement_event(
     )
 
 
+def replay_sensor_event(
+    event: dict,
+    outcomes,
+    arguments: dict[str, str],
+    selected: tuple[str, ...],
+) -> ReplayMeasurementEvent:
+    """Measure one frozen event offline, detections in the raw batch's order.
+
+    The per-event step of ``evaluate_sensor_trial``, exposed so a replay can be
+    compared with the live result of the same batch before any trial reduction.
+    """
+
+    return _measurement_event(event, outcomes, arguments, selected)
+
+
 def evaluate_sensor_trial(
     trial: dict,
     events: list[dict],

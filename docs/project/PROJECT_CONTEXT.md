@@ -42,7 +42,8 @@ building blocks unless a technical reference says otherwise.
 - `src/ridgeback_autonomy_hardware/` — attach-first Clearpath hardware adapter
 - `dependencies/` — split `vcstool` manifests: common source dependencies, the
   optional Gazebo source dependencies (including the partial `ros_gz` overlay
-  that builds only the patched bridge packages), and the optional RViz overlay
+  that builds only the patched bridge, image, and simulation packages), and the
+  optional RViz overlay
 - `clearpath/robot.yaml` — canonical robot and sensor declaration
 - `patches/` — maintained changes to dependencies imported through the
   manifests under `dependencies/`;

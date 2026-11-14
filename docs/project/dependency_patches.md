@@ -16,6 +16,7 @@ verification procedure that applies to all of them is owned by
 | `urg_node_reconnect_recovery.patch` | `src/urg_node` | Closes the failed socket and ignores SIGPIPE so the driver reconnects after a reset session | A Hokuyo stays locked out until the sensor service restarts; see [troubleshooting](../troubleshooting.md#hokuyo-drivers-stuck-reconnecting) |
 | `gz_sim_sensors_shutdown.patch` | `src/gz-sim` | [Below](#gazebo-sensors-shutdown-patch) | |
 | `ros_gz_bridge_shutdown.patch` | `src/ros_gz` | [Below](#ros_gz-shutdown-patch) | |
+| `ros_gz_scene_state.patch` | `src/ros_gz`, on top of the shutdown patch | [Below](#ros_gz-scene-state-patch) | |
 | `rviz_shutdown.patch` | `src/rviz` | [Below](#rviz-shutdown-ownership-patch) | |
 
 ## Gazebo Sensors shutdown patch
@@ -164,7 +165,7 @@ preserved overlay and evidence until the rollback is accepted.
 The Gazebo profile also imports ros_gz **1.0.24**, upstream tag `1.0.24`, commit
 `5912bfe7976a79d2cc9f373b2d40a8a3a3e33da2`, matching the installed
 `ros-jazzy-ros-gz-*` 1.0.24 binaries. It is a partial overlay: only
-`ros_gz_bridge` and `ros_gz_image` are built; every other ros_gz package keeps
+`ros_gz_bridge`, `ros_gz_image`, and `ros_gz_sim` are built; every other ros_gz package keeps
 resolving to `/opt/ros/jazzy`.
 
 ### Defect
@@ -254,6 +255,100 @@ To roll back without discarding work, stop only owned launches, move
 named location outside the workspace, restore this change's manifest, mapping,
 ignore, and documentation edits as one reviewed set, rebuild, and start a fresh
 shell. Do not reset a dirty nested checkout.
+
+## ros_gz scene-state patch
+
+`patches/ros_gz_scene_state.patch` is stacked after the bridge/image shutdown
+patch at the same ros_gz 1.0.24 pin. It adds `ros_gz_sim` to `BUILD_ONLY`; all
+other package exclusions stay managed by the checker. When migrating an existing
+checkout, verify that `ros_gz_sim/COLCON_IGNORE` is an empty, untracked regular
+file, remove only that marker, then run `tools/check_dependencies --apply
+--profile all`. The checker deliberately does not delete markers for newly kept
+packages.
+
+### State ownership and reset completion
+
+Upstream treats every `scene/info` message as a reset, although SceneBroadcaster
+also emits it for scene additions. Its canonical-link initializer overwrites
+`WorldPose`, `WorldLinearVelocity`, and `WorldAngularVelocity` with defaults in
+the mirrored ECM, then writes them to the server with `control/state`. Physics
+may leave those reporting fields unchanged on a stationary link until the next
+motion. A nonzero canonical-link offset also makes an identity world-link pose
+an incorrect model pose.
+
+The patch registers an in-memory Gazebo system before the first server update.
+Its PreUpdate requests only missing canonical-link world fields in the server
+ECM, using the current pose hierarchy for position and unavailable velocities
+until Physics supplies them. Its Update runs after Physics and marks finite
+fields available before SceneBroadcaster reads them. It explicitly marks the
+first world-field snapshot changed, because Physics may otherwise mark an
+already-correct seeded pose unchanged and omit it from the reset delta. Both state services share
+the guarded conversion and return an operation failure while fields are
+unavailable. Existing pose and velocity fields are never replayed from the cache.
+All component creation occurs on the simulation thread; mirrored ECM reads and
+updates retain `state_sync_mutex_`, with no initializer future or blocking
+transport request under that lock.
+
+A server-owned reset generation is serialized with world state. Reset increments
+the generation; the next PreUpdate reseeds from the reset pose hierarchy and
+the zero velocities established by Physics reset, then publishes the generation
+along with that state,
+including while paused. `ResetSimulation` records the prior generation before
+sending the request and waits for a newer generation in the mirrored ECM.
+Ordinary scene additions cannot complete that wait. Supported scopes remain
+DEFAULT and ALL; unsupported scopes and failed requests do not start a reset
+wait. This does not redesign `SetEntityState`'s persistent velocity commands.
+
+Official upstream [Jazzy PR #1007](https://github.com/gazebosim/ros_gz/pull/1007),
+commit `c895cafe4436662109860b4fbc58bbfca53e83bd`, fixes ECM locking but retains
+the destructive initializer. [PR #950](https://github.com/gazebosim/ros_gz/pull/950)
+is a draft reset change requiring a separate Gazebo backend fix. Neither is a
+complete compatible correction for this defect; this patch is local.
+
+### Build and verify loading
+
+```bash
+source /opt/ros/jazzy/setup.bash
+source install/setup.bash
+export ROS_LOG_DIR="$PWD/artifacts/gz-scene-state/ros"
+mkdir -p "$ROS_LOG_DIR"
+tools/check_dependencies --profile all
+CMAKE_BUILD_PARALLEL_LEVEL=4 tools/gpu-run colcon build --symlink-install \
+  --packages-select ros_gz_sim --allow-overriding ros_gz_sim \
+  --cmake-args -DBUILD_TESTING=ON -DCMAKE_BUILD_TYPE=RelWithDebInfo
+```
+
+Use a fresh sourced shell for tests and live launches, an available isolated ROS
+domain at most 232, a unique `GZ_PARTITION`, and the packaged CycloneDDS profile.
+Run `tools/gpu-run colcon test --packages-select ros_gz_sim` and inspect
+`colcon test-result --verbose`. The patch contains a deterministic real-proxy
+regression, real-component initialization tests, and a native-pose launch test
+with offset canonical links, additions/deletions, and running/paused resets.
+
+Package lookup alone does not prove loading. Record `ros2 pkg prefix ros_gz_sim`,
+the executable, `/proc/<owned-gzserver-pid>/maps`, and SHA-256 of
+`libgzserver_component.so`. It must load from `install/ros_gz_sim` or its linked
+`build/ros_gz_sim` object. Also verify the existing bridge/image libraries and
+Gazebo Sensors plugin still load from their overlays, using the checks above.
+Keep raw poses, timestamps, native sample ages, exact commands, source/patch
+hashes, and dirty-tree inputs under a new `artifacts/benchmarks/` directory.
+
+### Roll back only the scene-state overlay
+
+Stop only owned launches. Preserve the complete nested diff and this patch,
+then reverse only `ros_gz_scene_state.patch` after `git apply -R --check`.
+Remove intent-to-add index entries only for the new files removed by that
+reverse operation; preserve the pre-existing bridge/image diff. Restore the
+checker to the earlier one-patch mapping and `BUILD_ONLY` value
+`ros_gz_bridge ros_gz_image`, then let `--apply` recreate the empty
+`ros_gz_sim/COLCON_IGNORE`. Do not reset or remove the dependency checkout.
+
+Move only this task's `build/ros_gz_sim` and `install/ros_gz_sim` aside, rebuild
+workspace setup using the restored dependency configuration, and start a fresh
+shell. Verify the server executable and loaded component resolve to packaged
+`/opt/ros/jazzy`, while bridge/image and Sensors shutdown fixes still resolve to
+their intended overlays. Prove reverse/reapply and exact-diff behavior in a
+clean full disposable checkout before changing the live installation.
 
 ## RViz shutdown ownership patch
 
@@ -405,6 +500,7 @@ and restore this change's test, contract and documentation edits as one set.
 
 ## Archived evidence
 
+- [Gazebo canonical-link state after scene additions and incomplete lifecycle acceptance](../../archive/engineering/2026-11-02-gazebo-scene-state.md)
 - [UST-10LX Gazebo LiDAR parity and Isaac noise measurement](../../archive/engineering/2026-10-25-gazebo-ust10lx-lidar.md)
 - [Gazebo Sensors shutdown races and qualification](../../archive/engineering/2026-10-18-gazebo-sensors-shutdown.md)
 - [ros_gz bridge ownership cycles and image_bridge teardown](../../archive/engineering/2026-10-22-ros-gz-bridge-shutdown.md)

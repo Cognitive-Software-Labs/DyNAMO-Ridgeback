@@ -41,3 +41,11 @@ def test_front_offset_round_trips() -> None:
     lateral_m, forward_m = remove_vehicle_front_offset(lateral_m, forward_m)
     assert math.isclose(lateral_m, -1.11, rel_tol=1e-12)
     assert math.isclose(forward_m, 5.02, rel_tol=1e-12)
+
+
+def test_hardware_front_reference_round_trip_keeps_base_point():
+    lateral, forward = apply_vehicle_front_offset(-.6, 2.0, front_offset_m=.465)
+    assert math.isclose(forward, 1.535)
+    lateral, forward = remove_vehicle_front_offset(lateral, forward, front_offset_m=.465)
+    assert math.isclose(lateral, -.6)
+    assert math.isclose(forward, 2.0)

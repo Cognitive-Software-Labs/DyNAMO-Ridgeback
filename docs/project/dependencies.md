@@ -179,7 +179,7 @@ The maintained mappings are:
 | `src/slam_toolbox` | `patches/slam_toolbox_tf_namespace.patch` |
 | `src/urg_node` | `patches/urg_node_reconnect_recovery.patch` |
 | `src/gz-sim` | `patches/gz_sim_sensors_shutdown.patch` |
-| `src/ros_gz` | `patches/ros_gz_bridge_shutdown.patch` |
+| `src/ros_gz` | `patches/ros_gz_bridge_shutdown.patch`, `patches/ros_gz_scene_state.patch` |
 | `src/rviz` | `patches/rviz_shutdown.patch` |
 
 Update all affected manifest pins and patch files in the same root commit.
@@ -262,5 +262,6 @@ Patch-specific defects, build and loading proof, and rollback are in
 
 - [Gazebo Sensors shutdown](dependency_patches.md#gazebo-sensors-shutdown-patch)
 - [ros_gz shutdown](dependency_patches.md#ros_gz-shutdown-patch)
+- [ros_gz scene state](dependency_patches.md#ros_gz-scene-state-patch)
 - [RViz shutdown ownership](dependency_patches.md#rviz-shutdown-ownership-patch)
 - [UST-10LX Gazebo LiDAR](dependency_patches.md#ust-10lx-gazebo-lidar-patch)

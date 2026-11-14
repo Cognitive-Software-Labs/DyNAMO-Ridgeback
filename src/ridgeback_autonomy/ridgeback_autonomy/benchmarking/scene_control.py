@@ -9,7 +9,9 @@ The client owns the parts of the contract the standard leaves to the caller:
 bounded calls, normalized result codes, one coherent state snapshot per truth
 calculation, readiness after spawn, verified absence after delete, reverse
 rollback, and the ownership rule that confines every mutation to
-benchmark-named entities.
+benchmark-named entities. The one exception is the sensor robot, which a
+client configured with its entity name may move -- only to a pose, never with
+a velocity -- so a scene can be placed anywhere along the room.
 
 Services appearing is not readiness. A provider may answer its services while
 the simulation has not yet stepped -- a renderer compiling shaders, say -- and
@@ -37,12 +39,14 @@ from simulation_interfaces.srv import (
     GetEntities,
     GetEntitiesStates,
     GetSimulatorFeatures,
+    SetEntityState,
     SpawnEntity,
 )
 
 from ridgeback_autonomy.benchmarking.asset_catalog import CatalogResource
 from ridgeback_autonomy.benchmarking.simulation import normalize_pose
 from ridgeback_common.ros_signals import shielded, signals_held, spin_step
+from ridgeback_localization.core.vehicle_frame import yaw_from_quaternion
 
 
 # Every entity the benchmark creates carries this prefix, and the client
@@ -71,6 +75,11 @@ ROLLBACK_INTERRUPT_BUDGET_SEC = 4.0
 # waiting for it. A live provider answers in a simulation step or two.
 ROLLBACK_INTERRUPT_CALL_SEC = 2.0
 
+# How far a measured pose may sit from the commanded one, in the plane and in
+# yaw, before the robot or an entity counts as somewhere else.
+POSE_TOLERANCE_M = 0.005
+YAW_TOLERANCE_RAD = 0.002
+
 # Service name suffixes under the provider's namespace, as the standard names
 # them.
 SERVICE_TYPES = {
@@ -79,7 +88,10 @@ SERVICE_TYPES = {
     'delete_entity': DeleteEntity,
     'get_entities': GetEntities,
     'get_entities_states': GetEntitiesStates,
+    'set_entity_state': SetEntityState,
 }
+# Needed only by a client that moves the robot.
+ROBOT_MOVE_SERVICES = frozenset({'set_entity_state'})
 
 # Every operation on the simulated scene. Only feature discovery, which reads
 # no simulation state, may be answered before the simulation clock advances.
@@ -269,6 +281,45 @@ class SpawnSpec:
 
 
 @dataclass(frozen=True)
+class RobotMove:
+    """One commanded robot move and where the robot was measured after it."""
+
+    commanded: tuple[float, float, float]
+    measured: tuple[float, float, float, float]
+    position_error_m: float
+    yaw_error_rad: float
+    stamp_ns: int
+    duration_sec: float
+
+    def as_record(self) -> dict[str, Any]:
+        x, y, yaw = self.commanded
+        mx, my, mz, myaw = self.measured
+        return {
+            'commanded': {'x': x, 'y': y, 'yaw': yaw},
+            'measured': {'x': mx, 'y': my, 'z': mz, 'yaw': myaw},
+            'position_error_m': self.position_error_m,
+            'yaw_error_rad': self.yaw_error_rad,
+            'stamp_ns': self.stamp_ns,
+            'duration_sec': self.duration_sec,
+        }
+
+
+def planar_pose(pose: Mapping[str, Any]) -> tuple[float, float, float, float]:
+    """x, y, z and yaw of a normalized pose."""
+
+    position, orientation = pose['position'], pose['orientation']
+    return (
+        position['x'], position['y'], position['z'],
+        yaw_from_quaternion(
+            orientation['x'], orientation['y'], orientation['z'], orientation['w']),
+    )
+
+
+def yaw_difference(first: float, second: float) -> float:
+    return abs((first - second + math.pi) % (2.0 * math.pi) - math.pi)
+
+
+@dataclass(frozen=True)
 class SceneSnapshot:
     """Poses of selected entities taken from one simulator update.
 
@@ -379,8 +430,15 @@ class SceneControlClient:
         clock: Callable[[], float] = time.monotonic,
         simulation_clock: SimulationClockObserver | None = None,
         wall_clock: Callable[[], float] = time.time,
+        robot_entity: str | None = None,
     ) -> None:
-        missing = sorted(set(SERVICE_TYPES) - set(clients))
+        # Without a robot entity the client never moves anything it did not
+        # spawn, and needs neither the state-setting service nor its feature.
+        self._robot_entity = robot_entity or None
+        self._required_services = tuple(
+            suffix for suffix in SERVICE_TYPES
+            if self._robot_entity or suffix not in ROBOT_MOVE_SERVICES)
+        missing = sorted(set(self._required_services) - set(clients))
         if missing:
             raise ValueError(f'Scene-control clients missing for: {", ".join(missing)}')
         self._clients = dict(clients)
@@ -407,6 +465,10 @@ class SceneControlClient:
     @property
     def capabilities(self) -> SimulatorCapabilities | None:
         return self._capabilities
+
+    @property
+    def robot_entity(self) -> str | None:
+        return self._robot_entity
 
     def readiness_timeline(self) -> dict[str, Any]:
         """When the services appeared, the clock advanced, and the first spawn left.
@@ -443,7 +505,8 @@ class SceneControlClient:
 
         deadline = self._clock() + timeout_sec
         missing = []
-        for suffix, client in self._clients.items():
+        for suffix in self._required_services:
+            client = self._clients[suffix]
             remaining = max(0.0, deadline - self._clock())
             if not client.wait_for_service(timeout_sec=remaining):
                 missing.append(self._service_names[suffix])
@@ -490,7 +553,10 @@ class SceneControlClient:
         self,
         resource_formats: Iterable[str] = (),
     ) -> SimulatorCapabilities:
-        """Gate a run on spawning, deletion, state support, and resource formats."""
+        """Gate a run on spawning, deletion, state support, and resource formats.
+
+        A client that moves the robot also needs state setting.
+        """
 
         response = self._call(
             'get_simulator_features',
@@ -503,8 +569,11 @@ class SceneControlClient:
             spawn_formats=tuple(str(fmt).strip().lower() for fmt in features.spawn_formats),
             custom_info=str(features.custom_info),
         )
+        required = dict(REQUIRED_FEATURES)
+        if self._robot_entity:
+            required[SimulatorFeatures.ENTITY_STATE_SETTING] = 'ENTITY_STATE_SETTING'
         missing = [
-            label for feature, label in REQUIRED_FEATURES.items()
+            label for feature, label in required.items()
             if feature not in capabilities.features
         ]
         missing.extend(
@@ -677,15 +746,25 @@ class SceneControlClient:
                 '; '.join(str(failure) for failure in failures),
             )
 
-    def get_scene_snapshot(self, names: Iterable[str]) -> SceneSnapshot:
-        """Poses of ``names`` from a single ``GetEntitiesStates`` response."""
+    def get_scene_snapshot(
+        self,
+        names: Iterable[str],
+        *,
+        include_prefix: str | None = None,
+        deadline: float | None = None,
+    ) -> SceneSnapshot:
+        """Poses of ``names`` from a single ``GetEntitiesStates`` response.
+
+        ``include_prefix`` adds every entity whose name starts with it, so a
+        caller can see exactly which of them exist in the same update.
+        """
 
         operation = 'read entity states'
         wanted = list(dict.fromkeys(names))
         # Unfiltered, so the selection never depends on a provider's
         # regular-expression dialect; ``wanted`` is picked out locally.
         request = GetEntitiesStates.Request()
-        response = self._call('get_entities_states', request, operation)
+        response = self._call('get_entities_states', request, operation, deadline=deadline)
         _check_result(response.result, operation)
         entities = [str(name) for name in response.entities]
         if len(entities) != len(response.states):
@@ -702,6 +781,10 @@ class SceneControlClient:
             )
 
         states = dict(zip(entities, response.states))
+        if include_prefix:
+            wanted.extend(sorted(
+                name for name in entities
+                if name.startswith(include_prefix) and name not in wanted))
         missing = [name for name in wanted if name not in states]
         if missing:
             raise SceneControlError(
@@ -767,6 +850,131 @@ class SceneControlClient:
                         entity=', '.join(wanted),
                     ) from exc
             self._pause(self._retry_sleep_sec)
+
+    def set_robot_pose(
+        self,
+        name: str,
+        x: float,
+        y: float,
+        z: float,
+        yaw: float,
+        *,
+        deadline: float | None = None,
+    ) -> None:
+        """Put the robot at a world-frame pose at rest, in one simulation step.
+
+        Only the robot entity this client was configured with may be moved;
+        every other name is refused, benchmark entities included, since they
+        are placed by spawning. The twist and acceleration sent are always
+        zero, so the robot arrives standing still.
+        """
+
+        operation = 'set robot pose'
+        if not self._robot_entity or name != self._robot_entity:
+            raise SceneControlError(
+                SceneControlFailure.UNOWNED_ENTITY,
+                operation,
+                'only the configured robot entity may be moved'
+                + (f' ("{self._robot_entity}")' if self._robot_entity else
+                   '; this client has none'),
+                entity=name,
+            )
+        self._require_advancing_clock(operation, name)
+        request = SetEntityState.Request()
+        request.entity = name
+        request.state.header.frame_id = self._world_frame
+        request.state.pose.position.x = float(x)
+        request.state.pose.position.y = float(y)
+        request.state.pose.position.z = float(z)
+        (
+            request.state.pose.orientation.x,
+            request.state.pose.orientation.y,
+            request.state.pose.orientation.z,
+            request.state.pose.orientation.w,
+        ) = _quaternion_from_yaw(float(yaw))
+        for vector in (request.state.twist.linear, request.state.twist.angular,
+                       request.state.acceleration.linear, request.state.acceleration.angular):
+            vector.x = vector.y = vector.z = 0.0
+        response = self._call('set_entity_state', request, operation, name, deadline=deadline)
+        _check_result(response.result, operation, name)
+
+    def wait_for_robot_pose(
+        self,
+        x: float,
+        y: float,
+        yaw: float,
+        *,
+        after_stamp_ns: int,
+        timeout_sec: float | None = None,
+        deadline: float | None = None,
+        position_tolerance_m: float = POSE_TOLERANCE_M,
+        yaw_tolerance_rad: float = YAW_TOLERANCE_RAD,
+    ) -> SceneSnapshot:
+        """Poll snapshots until one from after ``after_stamp_ns`` shows the robot there.
+
+        Simulation time orders the evidence: a snapshot stamped no later than
+        the command's cannot show the command's effect, whatever pose it holds.
+        """
+
+        name = self._robot_entity
+        if not name:
+            raise ValueError('This scene-control client has no robot entity.')
+        if deadline is None:
+            deadline = self._clock() + (
+                self._ready_timeout_sec if timeout_sec is None else timeout_sec)
+        budget = max(0.0, deadline - self._clock())
+        last = 'no snapshot after the command yet'
+        while True:
+            snapshot = self.get_scene_snapshot([name], deadline=deadline)
+            if snapshot.stamp_ns > after_stamp_ns:
+                mx, my, _mz, myaw = planar_pose(snapshot.poses[name])
+                error = math.hypot(mx - x, my - y)
+                yaw_error = yaw_difference(myaw, yaw)
+                if error <= position_tolerance_m and yaw_error <= yaw_tolerance_rad:
+                    return snapshot
+                last = (f'at ({mx:.4f}, {my:.4f}, yaw {myaw:.4f}), {error:.4f} m and '
+                        f'{yaw_error:.4f} rad from the command')
+            if self._clock() >= deadline:
+                raise SceneControlError(
+                    SceneControlFailure.INCORRECT_STATE,
+                    'wait for robot pose',
+                    f'not at ({x:.4f}, {y:.4f}, yaw {yaw:.4f}) within {budget:.1f} s: {last}',
+                    entity=name,
+                )
+            self._pause(min(self._retry_sleep_sec, max(0.0, deadline - self._clock())))
+
+    def move_robot(
+        self,
+        x: float,
+        y: float,
+        yaw: float,
+        *,
+        timeout_sec: float | None = None,
+    ) -> RobotMove:
+        """Move the robot to (x, y, yaw) at its current height and wait until it is there.
+
+        ``timeout_sec`` bounds the whole move, every call included.
+        """
+
+        name = self._robot_entity
+        if not name:
+            raise ValueError('This scene-control client has no robot entity.')
+        started = self._clock()
+        deadline = started + (self._ready_timeout_sec if timeout_sec is None else timeout_sec)
+        before = self.get_scene_snapshot([name], deadline=deadline)
+        _x, _y, z, _yaw = planar_pose(before.poses[name])
+        self.set_robot_pose(name, x, y, z, yaw, deadline=deadline)
+        snapshot = self.wait_for_robot_pose(
+            x, y, yaw, after_stamp_ns=before.stamp_ns, deadline=deadline)
+        measured = planar_pose(snapshot.poses[name])
+        return RobotMove(
+            commanded=(float(x), float(y), float(yaw)),
+            measured=measured,
+            position_error_m=math.hypot(measured[0] - x, measured[1] - y),
+            yaw_error_rad=yaw_difference(measured[3], yaw),
+            stamp_ns=snapshot.stamp_ns,
+            duration_sec=self._clock() - started,
+        )
 
     def delete_entity(self, name: str) -> None:
         """Remove ``name`` and return only once it is verifiably absent.
@@ -908,6 +1116,8 @@ class SceneControlClient:
         request: Any,
         operation: str,
         entity: str | None = None,
+        *,
+        deadline: float | None = None,
     ) -> Any:
         if suffix in SCENE_OPERATION_SERVICES:
             self._require_advancing_clock(operation, entity)
@@ -922,7 +1132,8 @@ class SceneControlClient:
         with signals_held():
             future = client.call_async(request)
         started = self._clock()
-        deadline = started + self._call_timeout_sec
+        deadline = started + self._call_timeout_sec if deadline is None else min(
+            deadline, started + self._call_timeout_sec)
         if self._interrupt_deadline() is not None:
             deadline = min(deadline, started + ROLLBACK_INTERRUPT_CALL_SEC)
         while not future.done():
@@ -985,7 +1196,8 @@ def create_scene_control_client(
     alone. The client subscribes to ``/clock`` on ``node`` and refuses scene
     operations until :meth:`SceneControlClient.wait_for_advancing_clock` has
     seen it advance. ``observe_clock=False`` is only for exercising a provider
-    on its own, where nothing publishes simulation time.
+    on its own, where nothing publishes simulation time. ``robot_entity``
+    among ``options`` lets the client move that one entity.
     """
 
     names = scene_control_service_names(service_namespace)

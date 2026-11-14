@@ -55,6 +55,20 @@ to relative names. Standalone/observer default to wall time; simulation uses
 `use_sim_time:=true`. These settings must agree across hosts, with synchronized
 host clocks for wall-time acquisition-age checks.
 
+Compute and marker consumers must also share `front_offset_m`. The hardware
+launches use the [measured r100_0160 front datum](../robot/geometry.md#hardware-distance-reporting-front-datum);
+pass the same override on Thor and Intel when choosing another reporting origin.
+The visualization adds this offset back before placing a point through TF, so
+using different offsets shifts the map marker even when the estimate is correct.
+The service unit supplies the hardware default when an older
+`/etc/default/dynamo-localization` has no `FRONT_OFFSET_M`; an explicit
+environment-file setting overrides it. Deploy the rebuilt packages and re-apply
+the service template before expecting an installed service to use these changes.
+Existing running processes and recorded artifacts are not updated.
+`tools/intel_thor/record_localization_run record` uses the same hardware default;
+pass `--front-offset-m` when recording a producer with another value. Its
+summarizer reads the offset saved with each recording.
+
 `RIDGEBACK_PERCEPTION_VENV` selects the compute Python environment. Without it,
 a discovered checkout's `perception_venv` is used if present; otherwise the
 current Python environment is used. Only compute process environments change.
@@ -79,7 +93,7 @@ checkpoint.
 identifies its checkpoint; the default remains
 `google/owlv2-base-patch16-ensemble`. `target_labels` is a comma-separated list,
 default `humanoid robot`. These are language queries, not a new trained G1 class.
-`detection_threshold` defaults to `0.55`; `detector_fps` follows the
+`detection_threshold` defaults to `0.30`; `detector_fps` follows the
 [cadence defaults](detection.md#detector-cadence-defaults). All five settings
 are startup-only. Restart the compute process
 to change them; Intel's observer and `localization_mode:=external` consume the

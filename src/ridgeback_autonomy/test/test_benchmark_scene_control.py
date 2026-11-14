@@ -88,6 +88,8 @@ def _trial_runner(scene_control, *, truth=None, capture=None):
         capture_measurement_window=(capture or (lambda _duration: (_ for _ in ()).throw(
             RuntimeError('capture failed')))),
         capture_sec=0.0,
+        adjust_background=lambda _trial: None,
+        verify_scene_state=lambda _trial, _specs: None,
         capture_artifact_enabled=lambda: False,
         selected_estimators=('pointcloud',),
         estimator_display_names={'pointcloud': 'Pointcloud'},
@@ -109,6 +111,7 @@ def test_runner_waits_for_an_advancing_clock_before_its_first_scene_operation() 
             SimpleNamespace(advanced_stamp_ns=1_500_000_000)),
         readiness_timeline=lambda: {'clock_advance_after_services_sec': 0.25},
         wait_until_present=lambda names: events.append(('robot', tuple(names))),
+        find_benchmark_entities=lambda: events.append(('leftovers',)) or (),
     )
     messages = []
     runner = SimpleNamespace(
@@ -123,18 +126,24 @@ def test_runner_waits_for_an_advancing_clock_before_its_first_scene_operation() 
         asset_selection=SimpleNamespace(
             spawn_formats=frozenset({'usd'}),
             world=SimpleNamespace(native_name='g1_distance_calibration')),
+        bring_robot_home=lambda: events.append(('home',)),
         wait_for_required_streams=lambda: events.append(('streams',)),
+        background_label=lambda: 'none (bare room)',
+        background_context=contextlib.nullcontext,
         start_recording=lambda: events.append(('recording',)),
         run_trials=lambda: events.append(('trials',)),
         stop_recording=lambda: events.append(('stopped',)),
         log_readiness_timeline=lambda: events.append(('timeline',)),
     )
 
+    runner.refuse_leftover_entities = (
+        lambda: TargetDistanceBenchmarkRunner.refuse_leftover_entities(runner))
+
     TargetDistanceBenchmarkRunner.run(runner)
 
     assert [event[0] for event in events] == [
-        'provenance', 'services', 'capabilities', 'clock', 'robot', 'streams',
-        'recording', 'trials', 'stopped', 'timeline',
+        'provenance', 'services', 'capabilities', 'clock', 'robot', 'leftovers',
+        'home', 'streams', 'recording', 'trials', 'stopped', 'timeline',
     ]
     assert any('native world "g1_distance_calibration"' in message for message in messages)
     assert any('Simulation clock advancing at 1.500 s' in message for message in messages)
@@ -185,7 +194,7 @@ def test_runner_records_backend_world_catalog_and_readiness_provenance(monkeypat
     assert simulation['readiness'] == timeline
 
 
-def test_catalog_resources_resolve_into_target_first_spawn_order() -> None:
+def test_catalog_resources_resolve_into_object_first_spawn_order() -> None:
     catalog = load_asset_catalog(str(CATALOG_PATH))
     selection = catalog.select('target_distance_calibration', 'g1', {'table'})
     runner = SimpleNamespace(asset_selection=selection)
@@ -193,13 +202,14 @@ def test_catalog_resources_resolve_into_target_first_spawn_order() -> None:
     specs, targets = TargetDistanceBenchmarkRunner.scene_spawn_specs(
         runner, _scene(), 'bench_run_two_targets_r0')
 
+    # The scene is complete before a target appears in it.
     assert [spec.name for spec in specs] == [
+        'bench_run_two_targets_r0_obj_0',
         'bench_run_two_targets_r0_target_0',
         'bench_run_two_targets_r0_target_1',
-        'bench_run_two_targets_r0_obj_0',
     ]
     assert [Path(spec.uri).name for spec in specs] == ['model.sdf'] * 3
-    assert specs[-1].uri.endswith('/models/table/model.sdf')
+    assert specs[0].uri.endswith('/models/table/model.sdf')
     assert [name for _index, name, _robot in targets] == [
         'bench_run_two_targets_r0_target_0',
         'bench_run_two_targets_r0_target_1',

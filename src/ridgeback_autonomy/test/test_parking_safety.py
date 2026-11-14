@@ -19,7 +19,7 @@ from std_msgs.msg import Bool
 from rclpy.qos import QoSProfile, ReliabilityPolicy, qos_check_compatible, QoSCompatibility
 
 from ridgeback_autonomy.mission.parking_execution import ExecutionState
-from ridgeback_autonomy.mission.parking_nav2_profile import (
+from ridgeback_autonomy.mission.parking_nav2_profile import (shared_goal_checker,
     build_profile, explicit_general_tree, goal_checker_reason, parking_tree_identity,
 )
 from ridgeback_autonomy.mission.parking_safety import (
@@ -243,7 +243,9 @@ def test_real_manager_requires_fresh_loaded_active_goal_checker(manager_factory,
         assert 'unknown_or_stale' in node._goal_checker_diagnostic()
         return
     values={'goal_checker_plugins':['general_goal_checker','parking_goal_checker']}
-    for name,xy,yaw,stateful in [('general_goal_checker',.4,.4,True),('parking_goal_checker',.08,.12,False)]:
+    # A controller running the shared checker as configured, plus the parking checker.
+    shared=shared_goal_checker(Path(__file__).resolve().parents[1]/'config'/'nav2_params.yaml')
+    for name,xy,yaw,stateful in [('general_goal_checker',*shared,True),('parking_goal_checker',.08,.12,False)]:
         values.update({f'{name}.plugin':'nav2_controller::SimpleGoalChecker',
             f'{name}.xy_goal_tolerance':xy,f'{name}.yaw_goal_tolerance':yaw,
             f'{name}.stateful':stateful})

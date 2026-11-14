@@ -25,6 +25,8 @@ def _make_repo(tmp_path: Path, rebuild_exit: int = 0) -> Path:
     (repo / 'tools/hooks').mkdir(parents=True)
     (repo / 'graphify-out').mkdir()
     shutil.copy(REPO_ROOT / 'tools/hooks/pre-commit', repo / 'tools/hooks/pre-commit')
+    shutil.copy(REPO_ROOT / 'tools/check_explainer_sources.py',
+                repo / 'tools/check_explainer_sources.py')
     rebuild = repo / 'tools/rebuild_graphify'
     rebuild.write_text(
         '#!/bin/bash\n'

@@ -74,7 +74,8 @@ def generate_launch_description():
                               default_value=os.path.expanduser('~/clearpath/')),
         DeclareLaunchArgument(
             'world', default_value='initial_test_world',
-            description='Gazebo world to load: initial_test_world, depot, or coworking_space'),
+            description='Gazebo world to load: initial_test_world, robocup_hcc_arena, depot, '
+                        'or coworking_space'),
         DeclareLaunchArgument('mapping_rviz', default_value='true',
                               description='Launch RViz for map visualization during mapping'),
 

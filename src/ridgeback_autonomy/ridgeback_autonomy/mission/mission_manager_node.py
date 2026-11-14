@@ -89,7 +89,7 @@ from ridgeback_autonomy.mission.parking_planner import (
     validate_inputs,
 )
 from ridgeback_autonomy.mission.parking_geometry import (
-    normalize_angle, preparking_pose, rotated_footprint_vertices,
+    normalize_angle, parking_footprint, preparking_pose, rotated_footprint_vertices,
 )
 from ridgeback_autonomy.mission.parking_visualization import (
     clear_markers, legend_overlay, plan_markers,
@@ -477,7 +477,8 @@ class MissionManagerNode(Node):
         if not (0.0 < self.final_xy_tolerance_m <= 0.08 and 0.0 <= reference_allowance_m < 0.1):
             raise ValueError('parking final tolerance / reach allowance out of range')
         self.planner_config = PlannerConfig(
-            footprint=tuple(load_nav2_footprint(str(self.get_parameter('nav2_params_path').value))),
+            footprint=parking_footprint(
+                load_nav2_footprint(str(self.get_parameter('nav2_params_path').value))),
             reach_allowance_m=self.final_xy_tolerance_m + reference_allowance_m)
         self.odom_frame = str(self.get_parameter('odom_frame').value)
         self.motion = MotionSettlement(
@@ -2134,7 +2135,8 @@ class MissionManagerNode(Node):
             return 'parking_controller_not_active'
         values = self._probe_values['checker'][0]
         return goal_checker_reason(values or {}, self.execution.limits.xy_tolerance_m,
-                                    self.execution.limits.yaw_tolerance_rad)
+                                    self.execution.limits.yaw_tolerance_rad,
+                                    general=self._shared_goal_tolerance)
 
     def _execution_safety_check(self, ctx, moving):
         reason = target_execution_reason(ctx.plan.target) or self._parking_bt_diagnostic()

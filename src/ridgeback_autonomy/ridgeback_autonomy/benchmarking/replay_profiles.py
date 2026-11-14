@@ -376,6 +376,9 @@ AXES: dict[str, AxisSpec] = {
     'capture_timeout_sec': _axis(
         'capture_timeout_sec', 'number', 30.0, STAGE_SENSOR, 'Capture stall timeout',
         minimum=0.0),
+    'sensor_capture_mode': _axis(
+        'sensor_capture_mode', 'choice', 'quota', STAGE_SENSOR,
+        'Sensor capture window', choices=('quota', 'sampled_window')),
     'capture_sec': _axis(
         'capture_sec', 'number', 10.0, STAGE_SYSTEM, 'Live capture window',
         minimum=0.0),
@@ -400,6 +403,16 @@ AXES: dict[str, AxisSpec] = {
         'overlay', 'boolean', True, STAGE_SYSTEM, 'Camera overlay'),
     'scenario': _axis(
         'scenario', 'string', '', STAGE_SYSTEM, 'Scenario YAML'),
+    # The furnished room is spawned live; frozen evidence was captured in
+    # whichever room it was, so only the live profile can vary it.
+    'background': _axis(
+        'background', 'choice', '', STAGE_SYSTEM, 'Background props',
+        choices=('', 'lab')),
+    'background_props': _axis(
+        'background_props', 'boolean', True, STAGE_SYSTEM,
+        'Spawn background props (off: control arm)'),
+    'scene_ids': _axis(
+        'scene_ids', 'string', '', STAGE_SYSTEM, 'Scene ids (comma-separated)'),
     'repeats': _axis(
         'repeats', 'integer', 5, STAGE_SYSTEM, 'Repeats', minimum=1),
     'run_dir_name': _axis(
@@ -477,8 +490,9 @@ MASK_AXES = frozenset(
 # page would have shown. Every other live argument is an installation constant
 # (topics, namespace, world, the viz toggles) that no shipped sweep varies.
 LIVE_SWEEP_DEFAULT_AXES = (
-    'scenario', 'repeats', 'detector', 'detection_model', 'target_labels',
-    'detection_threshold', 'detector_fps', 'detector_debug',
+    'scenario', 'background', 'background_props', 'repeats', 'detector',
+    'detection_model', 'target_labels', 'detection_threshold', 'detector_fps',
+    'detector_debug',
 )
 
 _OFFLINE_LIMITS = (

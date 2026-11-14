@@ -1,0 +1,42 @@
+{
+  "reported_date": "2026-11-04",
+  "source": "operator messages in this chat",
+  "front_distance_from_A_cm": 46.5,
+  "front_distance_from_B_cm": 46.5,
+  "operator_clarification": "A to front and B to front; these are left/right readings, not front/rear distances",
+  "rear_distance_cm": null,
+  "method_context": "Instructions requested horizontal longitudinal distance, perpendicular to the A-B datum, not diagonal hole-to-tip distance; method not independently observed",
+  "datum_context": "Operator identified the illustrated candidate factory deck fasteners. Model-to-hardware datum correspondence remains recorded provenance.",
+  "mesh_provenance": {
+    "repository": "https://github.com/clearpathrobotics/clearpath_common.git",
+    "pinned_revision": "33e4b311dd9a2dcaa8e8d262ae75fab2c53e560b",
+    "file": "clearpath_platform_description/meshes/r100/end-cover.stl",
+    "git_blob": "25c9e894df805c70b246e40bf56654c17382de6b",
+    "local_bytes_match_pinned_git_object": true,
+    "last_mesh_change": "8a44e7cffa2bbebc8d7bd18c1933c25a4c40e135 (2023-12-18, Initial Ridgeback)"
+  },
+  "october_hardware_change": "7f1bb7efaa2187586753aef817ed73b8692c59a7 updated Nav2 footprint, collision reference and its tests; no mesh edits",
+  "robot": "r100_0160",
+  "accepted_hardware_front_offset_m": 0.465,
+  "uncertainty_m": null,
+  "uncertainty_note": "Nominal operator measurement; tape, alignment, projection and registration uncertainty not independently quantified. Two side readings do not establish a statistical uncertainty or a rear offset.",
+  "factory_datum": {
+    "cad_pair_coordinates_m": [
+      [
+        0,
+        0.33
+      ],
+      [
+        0,
+        -0.33
+      ]
+    ],
+    "cad_length_unit": "mm",
+    "source_url": "https://cpr-documentation-large-files.s3.us-east-2.amazonaws.com/035066-GEO_1.STEP",
+    "source_sha256": "080f1ae34508b5b064da7928073aa132313e63547e3fbb903e115911f55660a9",
+    "source_header_timestamp": "2025-08-29T14:40:44",
+    "status": "Nominal mechanical correspondence; operator identified the illustrated factory fastener pair",
+    "CAD_import_limit": "Two syntax/unresolved-reference diagnostics in whole assembly; finite top-plate geometry used for guide."
+  },
+  "measurement_guide": "r100-0160-front-datum.svg"
+}

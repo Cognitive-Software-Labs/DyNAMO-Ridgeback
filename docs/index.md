@@ -78,6 +78,8 @@ troubleshooting, planning, and historical documentation.
   provisional basket, the [scenario page](exploration/autonomous_parking_scenarios.html)
   and the [results page](exploration/autonomous_parking_results.html)
 - [Ground-truth maps](../src/ridgeback_autonomy/sim/ground_truth_maps/README.md)
+- [Visual explainer](exploration/assets/explainer.html) — plain-language
+  overview of exploration and target localization for people outside the project
 
 ## Isaac Sim
 
@@ -120,9 +122,15 @@ troubleshooting, planning, and historical documentation.
 - [Benchmark configurator](target_distance_benchmarking/configurator.md) — the local browser UI
   and its run substrate
 - [Scenario gallery](target_distance_benchmarking/benchmark_scenarios_v2_gallery.html)
+- [Gazebo placed-scene gallery](target_distance_benchmarking/benchmark_background_gallery_gazebo.html)
+  and [Isaac placed-scene gallery](target_distance_benchmarking/benchmark_background_gallery_isaac.html)
+  — every scene at its placement with the `lab` background, robot camera beside a room overview
 
 ## Active plans
 
+- [BENCHMARKING — Humanoid detector comparison](plans/BENCHMARKING_detector_comparison.md) — paused; private tooling snapshot and resumption instructions
+- [BENCHMARKING — Hardware-bag validation bridge](plans/BENCHMARKING_hardware_bag_validation_bridge.md) — saved 48-arrangement session on the workstation; unscored diagnostic
+- [BENCHMARKING — Sampled monocular capture](plans/BENCHMARKING_sampled_monocular_capture.md) — sampled-window capture with live parity
 - [BENCHMARKING — Geometry reruns](plans/BENCHMARKING_geometry_reruns.md) — baseline, concurrency and isolation sweeps on the current scene geometry; blocked on dependencies
 - [BENCHMARKING — Combined-model throughput](plans/BENCHMARKING_model_throughput.md) — run the existing sweep and determine whether concurrency is needed
 - [BENCHMARKING — Stationary hardware scene recording](plans/BENCHMARKING_hardware_recording.md) — raw sensor bags and measured G1 positions for later estimator comparison; recording not started

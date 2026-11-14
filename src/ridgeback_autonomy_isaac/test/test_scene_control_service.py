@@ -17,7 +17,9 @@ import uuid
 import pytest
 import rclpy
 from simulation_interfaces.msg import Result, SimulatorFeatures
-from simulation_interfaces.srv import DeleteEntity, GetEntities, SpawnEntity
+from simulation_interfaces.srv import (
+    DeleteEntity, GetEntities, SetEntityState, SpawnEntity,
+)
 
 from ridgeback_autonomy.benchmarking.asset_catalog import load_asset_catalog
 from ridgeback_autonomy.benchmarking.scene_control import (
@@ -49,6 +51,8 @@ class MainLoop:
     def __init__(self, service: SceneControlService) -> None:
         self._service = service
         self.sim_time = 100.0
+        self.robot = ROBOT_STATE
+        self.thread_ident = None
         self.running = threading.Event()
         self.running.set()
         self._stop = threading.Event()
@@ -56,10 +60,11 @@ class MainLoop:
         self._thread.start()
 
     def _run(self) -> None:
+        self.thread_ident = threading.get_ident()
         while not self._stop.is_set():
             if self.running.is_set():
                 self.sim_time += SIM_DT
-                self._service.process_pending(SimFrame(self.sim_time, ROBOT_STATE))
+                self._service.process_pending(SimFrame(self.sim_time, self.robot))
             time.sleep(0.002)
 
     def stop(self) -> None:
@@ -181,7 +186,7 @@ def test_catalog_g1_spawns_and_reads_back_with_the_robot_in_one_update(
     assert (robot['position']['x'], robot['position']['y']) == (1.5, -0.5)
     assert yaw_of(robot) == pytest.approx(0.3)
     assert (pose['position']['x'], pose['position']['y'], pose['position']['z']) == (
-        3.0, -1.0, 0.0)
+        3.0, -1.0, g1.spawn_z_m)
     assert yaw_of(pose) == pytest.approx(2.5)
 
 
@@ -290,3 +295,59 @@ def test_shutdown_cancels_a_queued_request_and_joins_the_executor(
     assert not service.executor_thread.is_alive()
     loop.running.set()
     assert native.prims == {}
+
+
+@pytest.fixture
+def moving_provider(ros, native, queue):
+    moves = []
+    holder = {}
+
+    def move_robot(x, y, yaw):
+        loop = holder['loop']
+        moves.append((x, y, yaw, threading.get_ident() == loop.thread_ident))
+        # As the rig does: the next update reports the robot at rest there.
+        loop.robot = RobotState(x, y, ROBOT_STATE.z, yaw)
+
+    service = SceneControlService(
+        SceneEntities(native, ROBOT, move_robot=move_robot),
+        namespace=f'/scene_control_test_{uuid.uuid4().hex[:8]}',
+        queue=queue,
+    )
+    holder['loop'] = loop = MainLoop(service)
+    yield service, loop, moves
+    loop.stop()
+    if service.executor_thread.is_alive():
+        service.shutdown()
+
+
+def test_the_robot_is_placed_on_the_main_loop_through_the_common_client(
+        moving_provider, node) -> None:
+    service, _loop, moves = moving_provider
+    client = create_scene_control_client(
+        node, service.service_namespace, observe_clock=False, robot_entity=ROBOT,
+        ready_timeout_sec=3.0, retry_sleep_sec=0.05)
+    client.wait_for_services(WAIT_SEC)
+
+    capabilities = client.require_capabilities(['usd'])
+    move = client.move_robot(2.35, 0.0, 0.0)
+
+    assert SimulatorFeatures.ENTITY_STATE_SETTING in capabilities.features
+    assert moves == [(pytest.approx(2.35), 0.0, 0.0, True)]
+    assert move.measured == pytest.approx((2.35, 0.0, ROBOT_STATE.z, 0.0))
+    assert move.position_error_m == pytest.approx(0.0)
+
+
+def test_a_placement_with_motion_is_refused_before_the_main_loop(
+        moving_provider, node) -> None:
+    service, _loop, moves = moving_provider
+    request = SetEntityState.Request()
+    request.entity = ROBOT
+    request.state.pose.position.z = ROBOT_STATE.z
+    request.state.pose.orientation.w = 1.0
+    request.state.twist.linear.x = 0.5
+
+    response = raw_call(node, service, 'set_entity_state', SetEntityState, request)
+
+    assert response.result.result == Result.RESULT_OPERATION_FAILED
+    assert 'at rest' in response.result.error_message
+    assert moves == []

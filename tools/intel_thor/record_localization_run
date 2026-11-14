@@ -23,9 +23,10 @@ from pathlib import Path
 import statistics
 import sys
 import time
+from ridgeback_localization.core.vehicle_frame import HARDWARE_FRONT_OFFSET_M
 
 ESTIMATORS = ('projective_ranging', 'euclidean_reconstruction')
-FRONT_OFFSET_M = 0.25  # ridgeback_common ROBOT_FRONT_OFFSET_M, recorded with the run
+FRONT_OFFSET_M = HARDWARE_FRONT_OFFSET_M
 CAMERA_FRAME = 'camera_0_color_optical_frame'
 
 
@@ -33,7 +34,7 @@ def stamp_ns(header):
     return header.stamp.sec * 1_000_000_000 + header.stamp.nanosec
 
 
-def record(namespace, duration, output):
+def record(namespace, duration, output, front_offset_m=FRONT_OFFSET_M):
     import rclpy
     from rclpy.qos import QoSProfile, ReliabilityPolicy
     from rclpy.time import Time
@@ -71,7 +72,7 @@ def record(namespace, duration, output):
             if camera_x is None and buffer.can_transform('base_link', CAMERA_FRAME, Time()):
                 camera_x = buffer.lookup_transform('base_link', CAMERA_FRAME, Time()).transform.translation.x
                 (output / 'geometry.json').write_text(json.dumps(
-                    {'camera_x_in_base_m': camera_x, 'front_offset_m': FRONT_OFFSET_M}) + '\n')
+                    {'camera_x_in_base_m': camera_x, 'front_offset_m': front_offset_m}) + '\n')
     finally:
         samples.close()
         node.destroy_node()
@@ -137,6 +138,8 @@ def main(argv=None):
     rec.add_argument('--namespace', required=True)
     rec.add_argument('--duration', type=float, required=True)
     rec.add_argument('--output', type=Path, required=True)
+    rec.add_argument('--front-offset-m', type=float, default=FRONT_OFFSET_M,
+                     help='Match the compute producer reporting offset (hardware default: %(default)s m)')
     add = commands.add_parser('mark')
     add.add_argument('--output', type=Path, required=True)
     add.add_argument('label')
@@ -144,7 +147,7 @@ def main(argv=None):
     summary.add_argument('--output', type=Path, required=True)
     args = parser.parse_args(argv)
     if args.command == 'record':
-        record(args.namespace, args.duration, args.output)
+        record(args.namespace, args.duration, args.output, args.front_offset_m)
     elif args.command == 'mark':
         mark(args.output, args.label)
     else:

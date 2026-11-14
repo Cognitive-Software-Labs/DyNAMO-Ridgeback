@@ -53,3 +53,59 @@ objects:
     resource: isaac/usd/models/table_low/table_low.usda
     format: usd
     spawn_z_m: 0.05
+
+# Background props (benchmark_background_lab.yaml), standing on the floor's
+# top surface like their Gazebo models.
+background:
+  bookshelf:
+    resource: isaac/usd/models/bg_bookshelf/bg_bookshelf.usda
+    format: usd
+    spawn_z_m: 0.05
+  clinic_cart:
+    resource: isaac/usd/models/bg_clinic_cart/bg_clinic_cart.usda
+    format: usd
+    spawn_z_m: 0.05
+  door:
+    resource: isaac/usd/models/bg_door/bg_door.usda
+    format: usd
+    spawn_z_m: 0.05
+  low_cabinet:
+    resource: isaac/usd/models/bg_low_cabinet/bg_low_cabinet.usda
+    format: usd
+    spawn_z_m: 0.05
+  metal_cabinet:
+    resource: isaac/usd/models/bg_metal_cabinet/bg_metal_cabinet.usda
+    format: usd
+    spawn_z_m: 0.05
+  mobile_whiteboard:
+    resource: isaac/usd/models/bg_mobile_whiteboard/bg_mobile_whiteboard.usda
+    format: usd
+    spawn_z_m: 0.05
+  office_chair:
+    resource: isaac/usd/models/bg_office_chair/bg_office_chair.usda
+    format: usd
+    spawn_z_m: 0.05
+  plant:
+    resource: isaac/usd/models/bg_plant/bg_plant.usda
+    format: usd
+    spawn_z_m: 0.05
+  trash_bin:
+    resource: isaac/usd/models/bg_trash_bin/bg_trash_bin.usda
+    format: usd
+    spawn_z_m: 0.05
+  utility_cart:
+    resource: isaac/usd/models/bg_utility_cart/bg_utility_cart.usda
+    format: usd
+    spawn_z_m: 0.05
+  visitor_chair:
+    resource: isaac/usd/models/bg_visitor_chair/bg_visitor_chair.usda
+    format: usd
+    spawn_z_m: 0.05
+  wall_whiteboard:
+    resource: isaac/usd/models/bg_wall_whiteboard/bg_wall_whiteboard.usda
+    format: usd
+    spawn_z_m: 0.05
+  workstation:
+    resource: isaac/usd/models/bg_workstation/bg_workstation.usda
+    format: usd
+    spawn_z_m: 0.05

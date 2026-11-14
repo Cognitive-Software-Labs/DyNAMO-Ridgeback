@@ -17,6 +17,7 @@ if(BUILD_TESTING)
     test/test_generated_benchmark_assets.py)
   ament_add_pytest_test(test_scene_command_queue test/test_scene_command_queue.py)
   ament_add_pytest_test(test_scene_provider test/test_scene_provider.py)
+  ament_add_pytest_test(test_runner_affinity test/test_runner_affinity.py)
   ament_add_pytest_test(test_scene_control_service test/test_scene_control_service.py
     TIMEOUT 120)
   # Skips without pxr; the Isaac interpreter provides it without Kit.

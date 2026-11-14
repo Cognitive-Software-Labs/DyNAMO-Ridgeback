@@ -6,6 +6,7 @@ from launch_ros.actions import Node
 from ridgeback_common.camera_inputs import REALSENSE_BACKEND, resolve_camera_inputs
 from ridgeback_localization.launch_helpers import estimate_viz_node, overlay_node
 from ridgeback_localization.estimator_registry import parse_estimators
+from ridgeback_localization.core.vehicle_frame import HARDWARE_FRONT_OFFSET_M
 
 
 def build_nodes(context):
@@ -18,7 +19,8 @@ def build_nodes(context):
     nodes=[Node(package='ridgeback_autonomy',executable='localization_status',namespace=namespace,
         parameters=[dict(use_sim_time=common['use_sim_time'],health_timeout=float(value('health_timeout')))],output='screen')]
     if value('displays')=='true':
-        nodes.extend([estimate_viz_node(**common,estimators=selected,base_frame=base,hud_layout='wide'),
+        nodes.extend([estimate_viz_node(**common,estimators=selected,base_frame=base,hud_layout='wide',
+                front_offset_m=float(value('front_offset_m'))),
             overlay_node(**common,estimators=selected,color_topic=value('color_topic'),
                 aligned_depth_topic=value('aligned_depth_topic'),
                 depth_source=value('depth_source'),mask_gate=value('mask_gate'))])
@@ -29,6 +31,7 @@ def generate_launch_description():
     camera=resolve_camera_inputs(REALSENSE_BACKEND)
     # The depth panel reads this host's camera, not the compute host's republish.
     defaults=dict(namespace='r100_0001',use_sim_time='false',displays='true',
+        front_offset_m=str(HARDWARE_FRONT_OFFSET_M),
         estimators='projective_ranging,euclidean_reconstruction',
         color_topic=camera.color_image_topic,aligned_depth_topic=camera.aligned_depth_topic,
         depth_source='stereoscopic',mask_gate='box',health_timeout='3.0')

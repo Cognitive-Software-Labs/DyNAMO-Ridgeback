@@ -1,4 +1,4 @@
-"""Generated Isaac clutter assets remain reproducible and SDF-equivalent."""
+"""Generated Isaac clutter and background assets stay reproducible and SDF-equivalent."""
 
 from __future__ import annotations
 
@@ -32,7 +32,25 @@ OBJECTS = (
     'privacy_curtain',
     'table',
     'table_low',
+    'bg_bookshelf',
+    'bg_clinic_cart',
+    'bg_door',
+    'bg_low_cabinet',
+    'bg_metal_cabinet',
+    'bg_mobile_whiteboard',
+    'bg_office_chair',
+    'bg_plant',
+    'bg_trash_bin',
+    'bg_utility_cart',
+    'bg_visitor_chair',
+    'bg_wall_whiteboard',
+    'bg_workstation',
 )
+# Lowest point of each asset above its origin: zero for everything that stands
+# on the floor, except the wall-mounted whiteboard. Fuel chair meshes rest
+# their casters 2 mm above their origin.
+BASE_HEIGHT_M = {'bg_wall_whiteboard': 0.9}
+BASE_TOLERANCE_M = 3e-3
 
 spec = importlib.util.spec_from_file_location(
     'sdf2usd_generated_assets', REPO_ROOT / 'tools' / 'isaac' / 'sdf2usd.py')
@@ -62,7 +80,8 @@ def test_generated_usd_bounds_match_sdf_within_one_millimetre(name: str) -> None
         True,
     )
     bounds = cache.ComputeWorldBound(stage.GetDefaultPrim()).ComputeAlignedRange()
-    assert bounds.GetMin()[2] == pytest.approx(0.0, abs=1e-3)
+    assert bounds.GetMin()[2] == pytest.approx(
+        BASE_HEIGHT_M.get(name, 0.0), abs=BASE_TOLERANCE_M)
 
 
 @pytest.mark.parametrize('name', OBJECTS)
@@ -99,3 +118,18 @@ def test_iv_pole_uses_usd_cylinders() -> None:
                  if prim.IsA(UsdGeom.Cylinder)]
 
     assert len(cylinders) == 4
+
+
+def test_textured_meshes_sample_their_copied_texture_with_the_mtl_colour() -> None:
+    _, usd_path = _paths('bg_workstation')
+    stage = Usd.Stage.Open(str(usd_path))
+    desk = stage.GetPrimAtPath('/bg_workstation/desk/wood')
+
+    assert desk.IsA(UsdGeom.Mesh)
+    assert UsdGeom.Mesh(desk).GetSubdivisionSchemeAttr().Get() == UsdGeom.Tokens.none
+    material = UsdShade.MaterialBindingAPI(desk).ComputeBoundMaterial()[0]
+    sampler = UsdShade.Shader(material.GetPrim().GetChild('diffuse_texture'))
+    assert sampler.GetInput('file').Get().path == './textures/Desk_Diffuse.png'
+    assert tuple(sampler.GetInput('scale').Get()) == pytest.approx((0.8, 0.8, 0.8, 1.0))
+    assert (usd_path.parent / 'textures' / 'Desk_Diffuse.png').read_bytes() == (
+        GZ_MODELS / 'bg_workstation' / 'meshes' / 'Desk_Diffuse.png').read_bytes()

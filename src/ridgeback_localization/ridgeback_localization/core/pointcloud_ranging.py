@@ -20,7 +20,10 @@ from ridgeback_localization.core.ranging_defaults import (
     INLIER_AHEAD_MARGIN_M as POINTCLOUD_INLIER_AHEAD_MARGIN_M,
     INLIER_BEHIND_MARGIN_M as POINTCLOUD_INLIER_BEHIND_MARGIN_M,
 )
-from ridgeback_localization.core.vehicle_frame import apply_vehicle_front_offset
+from ridgeback_localization.core.vehicle_frame import (
+    ROBOT_FRONT_OFFSET_M,
+    apply_vehicle_front_offset,
+)
 
 
 # This estimator's own range clamp, applied to planar distance in the base
@@ -105,6 +108,8 @@ def add_pointcloud_measurements(
     pointcloud_xyz: np.ndarray | None,
     rotation: np.ndarray | None,
     translation: np.ndarray | None,
+    *,
+    front_offset_m: float = ROBOT_FRONT_OFFSET_M,
 ) -> DetectionBatch:
     for detection in batch.detections:
         detection.focus_bbox_xyxy = focus_bbox(detection.bbox_xyxy)
@@ -121,6 +126,7 @@ def add_pointcloud_measurements(
             detection.focus_bbox_xyxy or focus_bbox(detection.bbox_xyxy),
             rotation,
             translation,
+            front_offset_m=front_offset_m,
         )
         if measurement is None and (rotation is not None or translation is not None):
             # Some simulator-organized point clouds are already expressed in a
@@ -132,6 +138,7 @@ def add_pointcloud_measurements(
                 detection.focus_bbox_xyxy or focus_bbox(detection.bbox_xyxy),
                 None,
                 None,
+                front_offset_m=front_offset_m,
             )
         if measurement is None:
             continue
@@ -149,6 +156,8 @@ def compute_pointcloud_measurement(
     bbox_xyxy: tuple[int, int, int, int],
     rotation: np.ndarray | None,
     translation: np.ndarray | None,
+    *,
+    front_offset_m: float = ROBOT_FRONT_OFFSET_M,
 ) -> tuple[float, float, float] | None:
     x1, y1, x2, y2 = bbox_xyxy
     roi_points = pointcloud_xyz[y1:y2, x1:x2, :].reshape(-1, 3)
@@ -167,7 +176,8 @@ def compute_pointcloud_measurement(
 
     lateral_m = points_vehicle[:, 1]
     forward_m = points_vehicle[:, 0]
-    lateral_m, forward_m = apply_vehicle_front_offset(lateral_m, forward_m)
+    lateral_m, forward_m = apply_vehicle_front_offset(
+        lateral_m, forward_m, front_offset_m=front_offset_m)
 
     planar_distance = np.hypot(lateral_m, forward_m)
     valid = np.isfinite(planar_distance) & (forward_m > 0.0)

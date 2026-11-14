@@ -1,0 +1,89 @@
+#usda 1.0
+(
+    defaultPrim = "bg_low_cabinet"
+    metersPerUnit = 1
+    upAxis = "Z"
+)
+
+def Xform "bg_low_cabinet"
+{
+    quatf xformOp:orient = (1, 0, 0, 0)
+    double3 xformOp:translate = (0, 0, 0)
+    uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:orient"]
+
+    def Scope "Looks"
+    {
+        def Material "mat_000"
+        {
+            token outputs:surface.connect = </bg_low_cabinet/Looks/mat_000/shader.outputs:surface>
+
+            def Shader "shader"
+            {
+                uniform token info:id = "UsdPreviewSurface"
+                color3f inputs:diffuseColor.connect = </bg_low_cabinet/Looks/mat_000/diffuse_texture.outputs:rgb>
+                float inputs:roughness = 1
+                token outputs:surface
+            }
+
+            def Shader "st_reader"
+            {
+                uniform token info:id = "UsdPrimvarReader_float2"
+                string inputs:varname = "st"
+                float2 outputs:result
+            }
+
+            def Shader "diffuse_texture"
+            {
+                uniform token info:id = "UsdUVTexture"
+                asset inputs:file = @./textures/WhiteCabinet.png@
+                float4 inputs:scale = (0.8, 0.8, 0.8, 1)
+                token inputs:sourceColorSpace = "sRGB"
+                float2 inputs:st.connect = </bg_low_cabinet/Looks/mat_000/st_reader.outputs:result>
+                token inputs:wrapS = "repeat"
+                token inputs:wrapT = "repeat"
+                float3 outputs:rgb
+            }
+        }
+    }
+
+    def Xform "cabinet"
+    {
+        quatf xformOp:orient = (1, 0, 0, 0)
+        float3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:translate = (0, 0, 0)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:orient", "xformOp:scale"]
+
+        def Mesh "WhiteCabinet" (
+            prepend apiSchemas = ["MaterialBindingAPI"]
+        )
+        {
+            float3[] extent = [(-0.45, -0.225, 0), (0.45, 0.225, 1.08)]
+            int[] faceVertexCounts = [4, 4, 4, 4, 4]
+            int[] faceVertexIndices = [0, 1, 2, 3, 3, 2, 4, 5, 5, 4, 6, 7, 7, 6, 1, 0, 4, 2, 1, 6]
+            rel material:binding = </bg_low_cabinet/Looks/mat_000>
+            point3f[] points = [(-0.45, -0.225, 0), (-0.45, -0.225, 1.08), (-0.45, 0.225, 1.08), (-0.45, 0.225, 0), (0.45, 0.225, 1.08), (0.45, 0.225, 0), (0.45, -0.225, 1.08), (0.45, -0.225, 0)]
+            normal3f[] primvars:normals = [(-1, 0, 0), (0, 1, 0), (1, 0, 0), (0, -1, 0), (0, 0, 1)] (
+                interpolation = "faceVarying"
+            )
+            int[] primvars:normals:indices = [0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4]
+            texCoord2f[] primvars:st = [(0.139971, 0.00683), (0.139971, 0.699741), (0.010497, 0.699741), (0.010497, 0.00683), (0.995209, 0.993017), (0.661306, 0.993017), (0.661306, 0.714764), (0.995209, 0.714764), (0.832127, 0.00683), (0.832127, 0.699741), (0.717397, 0.699741), (0.717397, 0.00683), (0.546092, 0.987914), (0.012278, 0.987914), (0.012278, 0.721007), (0.546092, 0.721007)] (
+                interpolation = "faceVarying"
+            )
+            int[] primvars:st:indices = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 11, 10, 1, 0, 12, 13, 14, 15]
+            uniform token subdivisionScheme = "none"
+        }
+    }
+
+    def Cube "collision_cabinet" (
+        prepend apiSchemas = ["PhysicsCollisionAPI"]
+    )
+    {
+        uniform token purpose = "guide"
+        double size = 1
+        token visibility = "invisible"
+        quatf xformOp:orient = (1, 0, 0, 0)
+        float3 xformOp:scale = (0.9, 0.45, 1.08)
+        double3 xformOp:translate = (0, 0, 0.54)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:orient", "xformOp:scale"]
+    }
+}

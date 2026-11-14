@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "public_world": "robocup_hcc_arena",
+  "backends": [
+    "gz",
+    "isaac"
+  ],
+  "source_world": "robocup_hcc_arena",
+  "source_revision": "c919151a3751c25a53caf00f06d0be637849818c",
+  "source_sha256": {
+    "src/ridgeback_autonomy_gz/sim/worlds/robocup_hcc_arena.sdf": "2e7bd796eb3944a665774243c173ceec25c7e6778aed9fbab7f8517e24d21be2",
+    "src/ridgeback_autonomy_gz/sim/worlds/meshes/robocup_hcc_arena.glb": "543d8e98959b52cd7f6e81b68435d91b0e3395fba2ca2521b8612c062a0226b9",
+    "src/ridgeback_autonomy_gz/sim/worlds/meshes/robocup_hcc_arena_collision.stl": "9b0ab164aa28537001f249718507f4c2472619c4a8857aa7ecd85d89629d4128",
+    "src/ridgeback_autonomy_isaac/sim/isaac/usd/worlds/robocup_hcc_arena.usda": "0646303190655b3a5ceeb1df32723a1e914b1b83b3ad26669cfdc40277110faa",
+    "src/ridgeback_autonomy_isaac/sim/isaac/usd/worlds/robocup_hcc_arena/arena.usdc": "f103540b801c9433fea7973ac94c21ef0abed39fc382bb32ea5f216531567d42"
+  },
+  "map_kind": "analytical_usd_slice",
+  "map_sha256": {
+    "pgm": "882f87f7b27136dbbb06957cf97ca15ea8e65ab79bf4326c52101d874a7a85f1",
+    "yaml": "ac7d9a227dbb18c416a00c50e9e7867578c9cbfb15fdaa21ce731922c9bbe755",
+    "png": "1568c82cdb0ed7a78d77be6db197b61fee8a47b4a93740a13888a49b08cd6763",
+    "npz": "421373e9749c482cd8ed7957761684cf0b05b6e6747eadc32b925e68b2867685"
+  },
+  "resolution_m": 0.05,
+  "plane_z_m": 0.25257,
+  "free_space_seed_xy_m": [
+    0.0,
+    0.0
+  ],
+  "certified_on": "2026-10-30"
+}

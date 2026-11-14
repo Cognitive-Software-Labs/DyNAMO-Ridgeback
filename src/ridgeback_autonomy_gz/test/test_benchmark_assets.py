@@ -50,7 +50,8 @@ def test_catalog_lists_exactly_the_scenario_objects_and_their_models() -> None:
     }
 
     assert set(catalog.objects) == set(_packaged_object_models())
-    assert set(catalog.objects) | set(catalog.targets) == model_dirs
+    background_dirs = {Path(resource.uri).parent.name for resource in catalog.background.values()}
+    assert set(catalog.objects) | set(catalog.targets) | background_dirs == model_dirs
 
 
 def test_public_world_maps_to_the_packaged_world_of_the_same_name() -> None:
@@ -83,3 +84,16 @@ def test_spawnable_resources_are_static_models_standing_on_the_floor() -> None:
         lowest = min(part.z_range[0] for part in load_sdf_model(resource.uri).parts)
         assert lowest == pytest.approx(0.0, abs=1e-4), resource.logical_name
         assert resource.spawn_z_m == pytest.approx(floor_top), resource.logical_name
+
+
+def test_background_props_are_static_models_standing_on_the_floor_top() -> None:
+    catalog = load_asset_catalog(str(CATALOG))
+
+    assert catalog.background
+    for resource in catalog.background.values():
+        model = ET.parse(resource.uri).getroot().find('model')
+        assert Path(resource.uri).parent.name == f'bg_{resource.logical_name}'
+        assert model.findtext('static') == 'true', resource.logical_name
+        # The calibration floor's top surface, like the scene objects.
+        assert resource.spawn_z_m == 0.05
+        assert resource.resource_format in GAZEBO_SPAWN_FORMATS
