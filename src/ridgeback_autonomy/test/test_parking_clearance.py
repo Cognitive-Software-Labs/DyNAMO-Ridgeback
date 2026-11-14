@@ -276,3 +276,50 @@ def test_only_the_route_ahead_of_the_robot_is_checked(manager_factory, monkeypat
     assert handle.cancels == 0 and m.state == MissionState.NAVIGATING_TO_PREPARKING
     feed(m, [tuple(zip(*base_points(robot, [final])))[0]])
     assert handle.cancels == 1 and 'lidar_obstacle_on_route' in m._parking_failure
+
+
+def test_the_prefiltered_check_gives_the_full_check_s_answer():
+    """Only returns near a pose are measured exactly (2026-11-14, after the dev merge
+    the full check took 14 ms a scan); the result must not change."""
+    import math as _math
+
+    import numpy as _np
+
+    from ridgeback_autonomy.mission import parking_clearance as pc
+    from ridgeback_autonomy.mission.parking_geometry import parking_footprint
+    from ridgeback_autonomy.mission.parking_safety import ProtectionLimits as _Limits
+
+    footprint = parking_footprint([(0.48, 0.07), (0.41, 0.32), (0.30, 0.40), (-0.30, 0.40),
+                                   (-0.41, 0.32), (-0.48, 0.07), (-0.48, -0.07), (-0.41, -0.32),
+                                   (-0.30, -0.40), (0.30, -0.40), (0.41, -0.32), (0.48, -0.07)])
+    limits = pc.ClearanceLimits()
+
+    def full(points, velocity, route):
+        px, py = points
+        for pose in pc.stopping_poses(velocity, 0.05, _Limits()):
+            d = pc.points_to_polygon_distance(px, py, pc.rotated_footprint_vertices(footprint, *pose))
+            if d.min() < limits.margin_m:
+                return 'lidar_obstacle_in_stopping_path', (float(px[d.argmin()]), float(py[d.argmin()]))
+        for pose in pc.remaining_route(route, (0.0, 0.0, 0.0), limits):
+            d = pc.points_to_polygon_distance(
+                px, py, pc.rotated_footprint_vertices(footprint, *pc.to_base(pose, (0.0, 0.0, 0.0))))
+            if d.min() <= 0.0:
+                return 'lidar_obstacle_on_route', (float(px[d.argmin()]), float(py[d.argmin()]))
+        return None, None
+
+    rng = _np.random.default_rng(7)
+    outcomes = set()
+    for _ in range(300):
+        n = int(rng.integers(5, 300))
+        angle, distance = rng.uniform(-_math.pi, _math.pi, n), rng.uniform(0.45, 3.9, n)
+        points = (distance * _np.cos(angle), distance * _np.sin(angle))
+        heading = rng.uniform(-_math.pi, _math.pi)
+        route = [(i * 0.05 * _math.cos(heading), i * 0.05 * _math.sin(heading), rng.uniform(-1, 1))
+                 for i in range(int(rng.integers(2, 60)))]
+        velocity = tuple(rng.uniform(-0.3, 0.3, 2)) + (rng.uniform(-0.5, 0.5),)
+        got = pc.clearance_reason(points, footprint, velocity, 0.05, (0.0, 0.0, 0.0), route,
+                                  (9.0, 0.0), 0.26, _Limits(), limits)
+        expected = full(points, velocity, route)
+        assert (got.reason, None if got.vetoed_by is None else got.vetoed_by[:2]) == expected
+        outcomes.add(expected[0])
+    assert outcomes == {None, 'lidar_obstacle_in_stopping_path', 'lidar_obstacle_on_route'}

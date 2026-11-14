@@ -116,18 +116,31 @@ def clearance_reason(points, footprint, velocity, age_s, robot, route, g1, g1_mi
         return result
     if not px.size:
         return result
+    # Only returns within the footprint's circumscribed radius (plus the margin) of a
+    # pose's centre can lie inside it or within the margin, so the exact distance is
+    # computed for those alone: the same result, a fraction of the work. Checked on
+    # every scan of both LiDARs, the full computation took 14 ms after the dev merge
+    # and the mission fell behind its scans (lidar_stale, 2026-11-14).
+    radius = max(math.hypot(x, y) for x, y in footprint)
     for pose in stopping_poses(velocity, age_s, protection):
+        near = np.hypot(px - pose[0], py - pose[1]) <= radius + limits.margin_m
+        if not near.any():
+            continue
         polygon = rotated_footprint_vertices(footprint, *pose)
-        distance = points_to_polygon_distance(px, py, polygon)
+        distance = points_to_polygon_distance(px[near], py[near], polygon)
         if distance.min() < limits.margin_m:
             result.reason = 'lidar_obstacle_in_stopping_path'
-            result.vetoed_by = (float(px[distance.argmin()]), float(py[distance.argmin()]), None)
+            result.vetoed_by = (float(px[near][distance.argmin()]), float(py[near][distance.argmin()]), None)
             return result
     for pose in remaining_route(route, robot, limits):
-        polygon = rotated_footprint_vertices(footprint, *to_base(pose, robot))
-        distance = points_to_polygon_distance(px, py, polygon)
+        base = to_base(pose, robot)
+        near = np.hypot(px - base[0], py - base[1]) <= radius
+        if not near.any():
+            continue
+        polygon = rotated_footprint_vertices(footprint, *base)
+        distance = points_to_polygon_distance(px[near], py[near], polygon)
         if distance.min() <= 0.0:
             result.reason = 'lidar_obstacle_on_route'
-            result.vetoed_by = (float(px[distance.argmin()]), float(py[distance.argmin()]), pose)
+            result.vetoed_by = (float(px[near][distance.argmin()]), float(py[near][distance.argmin()]), pose)
             return result
     return result
