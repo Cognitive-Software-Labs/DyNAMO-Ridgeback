@@ -67,8 +67,9 @@ historical `no_feasible` run that parked 1.72 m from G1 is kept as a false compl
 
 The reference demonstration is a video of one complete Isaac run (parked at G1's
 right, five-second wait, return): `artifacts/exploration/demo_2026-11-11/isaac_standard_run3/demo.mp4`,
-kept outside the repository. `tools/parking_scenarios/record_demo_run.sh isaac standard OUT_DIR`
-records another.
+kept outside the repository; `artifacts/exploration/p8_2026-11-14/isaac_standard/demo.mp4`
+records the merged code's Isaac run (a vetoed attempt, then G1's left).
+`tools/parking_scenarios/record_demo_run.sh isaac standard OUT_DIR` records another.
 
 ## Known limitations
 
@@ -76,8 +77,8 @@ records another.
   rear edge and G1's legs; with the camera estimate and the robot's map pose a few
   centimetres apart, the LiDAR check vetoes most Gazebo approaches beside G1
   ([backlog](../BACKLOG.md#parking-clearance-beside-g1)).
-- **Search time** depends on the explorer's frontier order: 2-15 min in the
-  workstation scenes.
+- **Search time** depends on the explorer's frontier order: from under a minute to
+  about 18 min in the workstation scenes, and completed missions took 10-18 min.
 - **Perception.** Detection scores of a static view vary with the exact view; the
   head and torso check is qualified in simulation only
   ([backlog](../BACKLOG.md#g1-detection-in-parking-scenes)); several G1s are kept
