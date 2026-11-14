@@ -426,3 +426,21 @@ def test_g1_localized_from_inside_its_keep_out_steps_back_before_planning(manage
     reasons = [t.reason for t in m2.transition_history]
     assert any('inside its keep-out; stepping' in r for r in reasons)
     assert m2._planning_step_back_done
+
+
+def test_a_re_seeded_g1_is_kept_fresh_by_views_of_the_same_surface(manager_factory):
+    """Gazebo standard on 2026-11-14: the head check moved G1 1.0 m off the worktable
+    edge the detector measured; new samples of that same edge were compared with the
+    moved position, nothing was renewed, and the plan ended target_stale."""
+    m = manager_factory(pause_client=FakePauseClient(trigger_response(True, 'safe')))
+    enter_localization(m)
+    localize(m)
+    surface = (m.target_position.map_x_m, m.target_position.map_y_m)
+    m.target_position = replace(m.target_position, map_x_m=surface[0] + 1.0)   # re-seeded
+    m._target_surface_xy = surface
+    observe_again(m, 9_000_000_000)
+    assert m.target_position.last_stamp_ns == 9_000_000_000
+    assert m.target_position.map_x_m == surface[0] + 1.0                       # not moved
+    m._target_surface_xy = None                                                 # the old rule
+    observe_again(m, 9_100_000_000)
+    assert m.target_position.last_stamp_ns == 9_000_000_000

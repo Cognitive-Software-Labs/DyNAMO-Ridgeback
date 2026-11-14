@@ -300,7 +300,9 @@ archived evidence holds the run.
 
 The same blocking checks made a verified plan's G1 estimate older than its 5 s
 limit before driving on 2026-11-09 (`target_stale`); while the robot stands still
-for planning, new views of G1 at its estimate now keep the estimate's stamp fresh.
+for planning, new views of G1 where the localization measured it now keep the
+estimate's stamp fresh (compared with that view's surface estimate, which the head
+check may have moved off a table edge).
 
 **Completion criteria.** Decide whether a timestamp fault seen right after
 blocking path checks should restart the stationary interval, as a restarted

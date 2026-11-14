@@ -630,6 +630,7 @@ class MissionManagerNode(Node):
         self.target_heading = None
         self._overhead_points = None
         self._localization_box = None
+        self._target_surface_xy = None
         self._depth_frames = deque(
             maxlen=int(self.get_parameter('target_orientation_frames').value))
         self._camera_intrinsics = None
@@ -1176,16 +1177,21 @@ class MissionManagerNode(Node):
         if association is None:
             return
         known = self.target_position
+        # New samples measure what the localization's samples measured from this same
+        # stationary view: compare them with that surface estimate, not with the
+        # verified position, which the head check may have moved off a table edge
+        # (2026-11-14: 1.0 m, and the plan went stale with G1 in view).
+        reference = self._target_surface_xy or (known.map_x_m, known.map_y_m)
         self._refresh_adapter.reset()
         result = self._refresh_adapter.observe(
             msg, association=association,
             now_ns=self.get_clock().now().nanoseconds if now_ns is None else int(now_ns),
-            known_target=(known.map_x_m, known.map_y_m),
+            known_target=reference,
             weak_minimum_score=RELOCALIZATION_DETECTION_THRESHOLD)
         if not result.accepted or result.observation is None or stamp_ns <= known.last_stamp_ns:
             return
         seen = result.observation
-        if math.hypot(seen.map_x_m - known.map_x_m, seen.map_y_m - known.map_y_m) > \
+        if math.hypot(seen.map_x_m - reference[0], seen.map_y_m - reference[1]) > \
                 self._refresh_adapter.max_sample_jump_m:
             return
         self.target_position = replace(known, last_stamp_ns=stamp_ns)
@@ -1224,6 +1230,7 @@ class MissionManagerNode(Node):
             self.target_heading = None
             self._overhead_points = None
             self._localization_box = None
+            self._target_surface_xy = None
             self._g1_best_planned_rank = PREFERENCE_RANKS
             self._parking_attempts, self._failed_bearings = 0, []
             self._failed_labels, self._failed_sides, self._last_veto_xy = [], set(), None
@@ -3449,6 +3456,7 @@ class MissionManagerNode(Node):
             return (f'depth shows no G1 torso above ({position[0]:.3f}, {position[1]:.3f}): '
                     f'{torso} points in {len(clouds)} frames')
         self.target_position = replace(self.target_position, map_x_m=position[0], map_y_m=position[1])
+        self._target_surface_xy = surface
         if clouds:
             # The view also shows what the 2D LiDARs pass under.
             self._overhead_points = overhead_obstacle_points(clouds[-1], position)
