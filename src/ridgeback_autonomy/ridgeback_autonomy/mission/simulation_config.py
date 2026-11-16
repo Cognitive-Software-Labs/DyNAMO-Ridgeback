@@ -26,6 +26,6 @@ def simulation_setup_path(package_share, requested, *, backend, namespace, demo=
 
 
 def demo_world(backend):
-    # The Isaac layer disables the world-authored distant G1 only. Gazebo's
-    # depot has no authored humanoid; its native Gazebo name is warehouse.
-    return 'parking_demo' if backend == 'isaac' else 'depot'
+    # Both backends use initial_test_world without its authored distant G1: an
+    # Isaac layer disables it, and the Gazebo parking_demo.sdf omits it.
+    return 'parking_demo' if backend in ('gz', 'isaac') else None

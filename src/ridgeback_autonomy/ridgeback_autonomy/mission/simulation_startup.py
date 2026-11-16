@@ -60,9 +60,9 @@ def demo_specs(backend, scenario='standard', *, share=get_package_share_director
     layout = parking_scenarios.world_layout(load_scenarios(share=share), scenario, backend)
     provider = benchmark_backend(backend)
     catalog = load_asset_catalog(asset_catalog_path(provider, package_share=share))
-    # Origin heights follow the selected demo world's floor, not benchmark
-    # calibration placement. The original SDF and ground-origin USD are reused.
-    floor = 0.05 if backend == 'isaac' else 0.0
+    # Origin heights follow the demo world's floor, not benchmark calibration
+    # placement: both backends' parking_demo floor slab tops out at 0.05 m.
+    floor = 0.05
     g1 = layout['g1']
     specs = [SpawnSpec(DEMO_G1, catalog.targets['g1'].uri, catalog.targets['g1'].resource_format,
                        float(g1['x']), float(g1['y']), floor, math.radians(g1['yaw_deg']))]
