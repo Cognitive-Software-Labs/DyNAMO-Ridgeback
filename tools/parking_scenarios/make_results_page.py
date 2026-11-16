@@ -69,36 +69,66 @@ VETO_TEXT = {'lidar_obstacle_on_route': 'a LiDAR return lay on the planned route
              'lidar_obstacle_in_stopping_path': 'a LiDAR return lay in the stopping path',
              'g1_protected_region': "the robot reached G1's protected region"}
 
-# The three featured experiments: the run, and the captures shown for it (file in the
-# run's shots folder, or a recording frame) with the mission states they must show.
+# The three featured experiments: the run, and the captures shown for it. Each capture is
+# a file in the run's shots folder (or a frame of the run's recording), the mission states
+# it must have been taken in, the crop shown on the page (x, y, width, height in source
+# pixels; the enlarged view shows the whole capture), and labels drawn over the crop as a
+# separate layer (text, the point labelled, and where the label sits, in crop pixels;
+# no position means the label sits on the object). Labels never alter the image.
+OVERVIEW_CROP = (220, 170, 1080, 640)
 FEATURED = [
     {'key': 'isaac_side', 'run': 'artifacts/exploration/p8_2026-11-14/isaac_standard/run',
-     'title': 'A. Side parking in Isaac Sim',
-     'images': [('simview', 'isaac_standard_parked_workstation.png', {'PARKED'},
-                 'Isaac top-down view at the parked pose: Ridgeback at G1\'s left, its basket toward G1'),
-                ('frame', 'isometric', {'PARKED'},
-                 'Isaac angled view from the run\'s recording, while parked'),
-                ('rviz', 'PARKED', {'PARKED'},
-                 'RViz while parked: the parking donut, the selected footprint and the state machine')]},
+     'letter': 'A', 'title': 'Side parking in Isaac Sim',
+     'images': [
+         {'kind': 'simview', 'ref': 'isaac_standard_parked_workstation.png', 'states': {'PARKED'},
+          'crop': (370, 150, 760, 640),
+          'caption': 'Top-down view while parked: Ridgeback beside G1\'s left, its basket toward G1',
+          'labels': [('Worktable', (430, 120), None), ('G1', (427, 345), (610, 330)),
+                     ('Ridgeback', (370, 520), (610, 560))]},
+         {'kind': 'frame', 'ref': 'isometric', 'states': {'PARKED'}, 'crop': (1150, 110, 520, 325),
+          'caption': 'Angled view from the run\'s recording while parked', 'labels': []},
+         {'kind': 'rviz', 'ref': 'PARKED', 'states': {'PARKED'}, 'crop': (640, 120, 620, 360),
+          'caption': 'RViz while parked: the parking donut (one ray per degree; green = a valid pose) '
+                     'and the selected pose', 'labels': []}]},
     {'key': 'gazebo_rear', 'run': 'artifacts/exploration/p8_2026-11-14/gz_standard_run5',
-     'title': 'B. Rear parking in Gazebo Sim',
-     'images': [('simview', 'gz_standard_parked_workstation.png', {'PARKED'},
-                 'Gazebo top-down view at the parked pose: G1 facing its worktable, Ridgeback behind it'),
-                ('rviz', 'PARKED', {'PARKED'},
-                 'RViz while parked: the parking donut, the selected footprint and the state machine'),
-                ('simview', 'gz_standard_end_overview.png', {'MISSION_COMPLETE'},
-                 'Gazebo overview after the mission: Ridgeback back at its start')]},
+     'letter': 'B', 'title': 'Rear parking in Gazebo Sim',
+     'images': [
+         {'kind': 'simview', 'ref': 'gz_standard_parked_workstation.png', 'states': {'PARKED'},
+          'crop': (450, 150, 700, 700),
+          'caption': 'Top-down view while parked: G1 facing its worktable, Ridgeback behind G1',
+          'labels': [('Worktable', (350, 140), None), ('G1', (347, 340), (565, 330)),
+                     ('Ridgeback', (460, 545), (590, 610))]},
+         {'kind': 'rviz', 'ref': 'PARKED', 'states': {'PARKED'}, 'crop': (650, 62, 605, 268),
+          'caption': 'RViz while parked: the robot footprint behind G1 inside the parking donut',
+          'labels': []},
+         {'kind': 'simview', 'ref': 'gz_standard_end_overview.png', 'states': {'MISSION_COMPLETE'},
+          'crop': OVERVIEW_CROP,
+          'caption': 'After the mission: Ridgeback back in its start area, G1 at its worktable',
+          'labels': [('Ridgeback', (355, 345), (355, 520)), ('G1', (875, 290), (875, 140))]}]},
     {'key': 'gazebo_refusal', 'run': 'artifacts/exploration/p8_2026-11-14/gz_no_feasible',
-     'title': 'C. No feasible parking position (Gazebo Sim)',
-     'images': [('simview', 'gz_no_feasible_end_workstation.png', {'MISSION_FAILED'},
-                 'Gazebo top-down view of the scene after the mission: G1 between two panels, '
-                 'its worktable ahead and a bed behind'),
-                ('rviz', 'G1_LOCALIZED', {'EXPLORING_AROUND_G1'},
-                 'RViz after the first localization, while the robot maps the floor around G1: the parking '
-                 'donut, with no valid pose among the cells already mapped'),
-                ('simview', 'gz_no_feasible_end_overview.png', {'MISSION_FAILED'},
-                 'Gazebo overview after the mission: Ridgeback back near its start')]},
+     'letter': 'C', 'title': 'No feasible parking position (Gazebo Sim)',
+     'images': [
+         {'kind': 'simview', 'ref': 'gz_no_feasible_end_workstation.png', 'states': {'MISSION_FAILED'},
+          'crop': (360, 170, 880, 800),
+          'caption': 'Top-down view of the scene after the mission: G1 boxed in by two panels, its '
+                     'worktable and a bed; Ridgeback had already driven back to its start',
+          'labels': [('Worktable', (440, 120), None), ('Bed', (440, 650), None),
+                     ('G1', (437, 330), (437, 450)), ('Panel', (205, 300), (75, 190)),
+                     ('Panel', (675, 300), (805, 190))]},
+         {'kind': 'rviz', 'ref': 'END_MISSION_FAILED', 'states': {'MISSION_FAILED'},
+          'crop': (680, 74, 575, 256),
+          'caption': 'RViz at the end: every ray of the parking donut red, no valid pose around G1',
+          'labels': []},
+         {'kind': 'simview', 'ref': 'gz_no_feasible_end_overview.png', 'states': {'MISSION_FAILED'},
+          'crop': OVERVIEW_CROP,
+          'caption': 'After the mission: Ridgeback back in its start area, G1 in its pen',
+          'labels': [('Ridgeback', (360, 354), (360, 530)), ('G1', (870, 290), (870, 120))]}]},
 ]
+SIDE_NAME = {'g1_left': "G1's left", 'g1_right': "G1's right", 'g1_rear': 'behind G1',
+             'g1_front': 'in front of G1'}
+VETO_SHORT = {'lidar_obstacle_on_route': 'obstacle on the route (LiDAR)',
+              'lidar_obstacle_in_stopping_path': 'obstacle in the stopping path (LiDAR)',
+              'g1_protected_region': "entered G1's protected region"}
 
 
 def esc(text):
@@ -211,10 +241,10 @@ def clock(seconds):
 
 # Images -----------------------------------------------------------------------------
 
-def featured_image(r, kind, ref, states, caption, tag):
-    """(relative path, caption) for one verified capture of run ``r``, or a reason why not."""
+def capture(r, image):
+    """(source file, capture time) of one featured capture of run ``r``, or (None, reason)."""
     shots = os.path.join(r['path'], 'shots')
-    t0 = r['transitions'][0][0]
+    kind, ref, states = image['kind'], image['ref'], image['states']
     if kind == 'rviz':
         stage_time = None
         for line in open(os.path.join(shots, 'stages.txt')):
@@ -224,143 +254,262 @@ def featured_image(r, kind, ref, states, caption, tag):
         files = sorted(glob.glob(os.path.join(shots, f'{ref}_rviz2_*.png')), key=os.path.getsize)
         if stage_time is None or not files:
             return None, f'no RViz capture at {ref}'
-        src, when = files[-1], stage_time
-    elif kind == 'simview':
+        return files[-1], stage_time        # the largest window is the main RViz view
+    if kind == 'simview':
         entry = next((e for e in json.load(open(os.path.join(shots, 'manifest.json')))
                       if e.get('file') == ref and e.get('ok')), None)
         if entry is None:
             return None, f'{ref} not captured'
-        src, when = os.path.join(shots, ref), float(entry['time'])
-    else:   # a recording frame: the recorder logged the mission state of every frame
-        base = os.path.dirname(r['path'])
-        rows = [line.strip().split(',') for line in open(os.path.join(base, 'frames.csv'))]
-        rows = [row for row in rows if row[2] in states]
-        if not rows:
-            return None, 'no recording frame in that state'
-        index, when, _ = rows[len(rows) // 2]
-        when = float(when)
-        frame = os.path.join(base, 'frames', f'{int(index):06d}.jpg')
-        from PIL import Image
-        tile = Image.open(frame).crop((960, 44, 1920, 644))     # the recorder's right view tile
-        src = os.path.join(ASSETS, f'_{tag}_frame.png')
-        os.makedirs(ASSETS, exist_ok=True)
-        tile.save(src)
+        return os.path.join(shots, ref), float(entry['time'])
+    # A recording frame: the recorder logged the mission state of every frame.
+    base = os.path.dirname(r['path'])
+    rows = [line.strip().split(',') for line in open(os.path.join(base, 'frames.csv'))]
+    rows = [row for row in rows if row[2] in states]
+    if not rows:
+        return None, 'no recording frame in that state'
+    index, when, _ = rows[len(rows) // 2]
+    return os.path.join(base, 'frames', f'{int(index):06d}.jpg'), float(when)
+
+
+def featured_image(r, image, tag):
+    """The figure HTML of one verified capture of run ``r``, or (None, reason)."""
+    src, when = capture(r, image)
+    if src is None:
+        return None, when
     actual = state_at(r, when)
-    if actual not in states:
-        return None, f'captured during {actual}, not {sorted(states)}'
+    if actual not in image['states']:
+        return None, f'captured during {actual}, not {sorted(image["states"])}'
     import cv2
-    rgb = cv2.imread(src)[:, :, ::-1]
-    ok, why = check(rgb)
+    x, y, w, h = image['crop']
+    whole = cv2.imread(src)
+    ok, why = check(whole[y:y + h, x:x + w, ::-1])
     if not ok:
         return None, f'blank or invalid capture ({why})'
-    rel = pages.export_jpeg(src, os.path.join(ASSETS, f'{tag}.jpg'), 1600)
-    if kind == 'frame':
-        os.remove(src)
-    return rel, f'{caption}. Mission state {actual}, +{clock(when - t0)} after the mission started.'
+    shown = pages.export_jpeg(src, os.path.join(ASSETS, f'{tag}.jpg'), 1400, crop=f'{w}x{h}+{x}+{y}')
+    full = pages.export_jpeg(src, os.path.join(ASSETS, f'{tag}_full.jpg'), 1600)
+    t0 = r['transitions'][0][0]
+    source = ('frame of the run\'s recording' if image['kind'] == 'frame'
+              else os.path.basename(src))
+    caption = (f'{image["caption"]}. State {actual}, {clock(when - t0)} into the mission. Cropped from '
+               f'{source}{"; labels added for this page" if image["labels"] else ""}; click for the '
+               f'whole capture.')
+    overlay = annotations(w, h, image['labels'])
+    toggle = ('<button type="button" class="labels-toggle" aria-pressed="true">Labels on</button>'
+              if image['labels'] else '')
+    return (f'<figure class="shot"><div class="frame"><img loading="lazy" src="{esc(shown)}" '
+            f'data-full="{esc(full)}" alt="{esc(image["caption"])}">{overlay}</div>{toggle}'
+            f'<figcaption>{esc(caption)}</figcaption></figure>'), None
+
+
+def annotations(w, h, labels):
+    """Labels drawn over a crop as their own layer: a ring on the object and a tag, joined by
+    a dashed leader, in a colour the simulators do not use."""
+    if not labels:
+        return ''
+    size = round(w / 34)
+    out = []
+    for text, (ax, ay), pill in labels:
+        px, py = pill or (ax, ay)
+        tw = len(text) * size * 0.62 + size
+        if pill:
+            out.append(f'<line x1="{ax}" y1="{ay}" x2="{px}" y2="{py}" class="lead"/>'
+                       f'<circle cx="{ax}" cy="{ay}" r="{size * 0.45:.0f}" class="ring"/>')
+        out.append(f'<rect x="{px - tw / 2:.0f}" y="{py - size * 0.8:.0f}" width="{tw:.0f}" '
+                   f'height="{size * 1.6:.0f}" rx="{size * 0.35:.0f}" class="tag"/>'
+                   f'<text x="{px}" y="{py + size * 0.36:.0f}" font-size="{size}" text-anchor="middle">'
+                   f'{esc(text)}</text>')
+    return (f'<svg class="annot" viewBox="0 0 {w} {h}" aria-hidden="true">{"".join(out)}</svg>')
+
+
+# Mission steps and timelines ------------------------------------------------------------
+
+def side_name(label):
+    return SIDE_NAME.get(label, (label or '?').replace('g1_', '').replace('_', ' '))
+
+
+def candidates(r):
+    """(candidate poses, valid poses) of the last plan that found none, if any."""
+    found = re.findall(r"No feasible parking pose \[\w+\]: [^\n]*?'candidates': (\d+), 'valid': (\d+)", r['log'])
+    return tuple(int(v) for v in found[-1]) if found else None
+
+
+def steps(r):
+    """The mission's decisive steps: each parking attempt, a refusal, the return, the end."""
+    m = r['m']
+    sides = m.get('selected_sides') or []
+    vetoes = {n: reason.split(':')[-1].strip() for _, n, reason in r['vetoes']}
+    out = []
+    for n in range(1, (m.get('attempts') or 0) + 1):
+        side = side_name(sides[n - 1]) if n <= len(sides) else 'next side'
+        if n in vetoes:
+            out.append(('fail', '✗', f'Attempt {n}: {side}', 'rejected: ' + VETO_SHORT.get(vetoes[n], vetoes[n])))
+        elif m['outcome'] == 'MISSION_COMPLETE':
+            out.append(('done', '✓', f'Attempt {n}: {side}', 'parked, waited 5 s'))
+    refused = candidates(r)
+    if refused and not m.get('attempts'):
+        out.append(('safe', '⊘', 'No safe parking pose', f'{refused[1]} of {refused[0]} candidate poses valid'))
+    if m.get('returned_to_start'):
+        out.append(('done', '✓', 'Returned to start', ''))
+    cls, _, category = classify(r)
+    end = {'Complete': 'done', 'Safe refusal': 'safe'}.get(category, 'fail')
+    out.append((end + ' end', '■', m['outcome'], 'expected for this scene' if category == 'Safe refusal' else ''))
+    return out
+
+
+def ladder(r, vertical=False):
+    items = ''.join(f'<li class="{c}"><b>{i}</b><span>{esc(t)}{f"<small>{esc(s)}</small>" if s else ""}</span></li>'
+                    for c, i, t, s in steps(r))
+    return f'<ol class="steps{" vertical" if vertical else ""}">{items}</ol>'
+
+
+def timeline(r):
+    """The mission's phases as one bar with their durations, and the decisive steps below."""
+    segs = phase_segments(r)
+    if not segs:
+        return ''
+    t0, t1 = segs[0][1], segs[-1][2]
+    total = t1 - t0
+    bar = []
+    for p, a, b in segs:
+        share = (b - a) / total
+        inside = f'<span>{esc(dict(PHASES)[p])}</span>' if share > 0.16 else ''
+        bar.append(f'<div class="seg ph-{p}" style="left:{(a - t0) / total * 100:.2f}%;width:{share * 100:.2f}%" '
+                   f'title="{esc(dict(PHASES)[p])}: {clock(b - a)}">{inside}</div>')
+    for t, n, _ in r['vetoes']:
+        bar.append(f'<i class="mark fail" style="left:{(t - t0) / total * 100:.2f}%" '
+                   f'title="Attempt {n} rejected at {clock(t - t0)}"></i>')
+    phases = ''.join(f'<li><i class="sw ph-{p}"></i>{esc(dict(PHASES)[p])} <b>{clock(sum(b - a for q, a, b in segs if q == p))}</b></li>'
+                     for p, _ in PHASES if any(q == p for q, _, _ in segs))
+    return (f'<div class="timeline"><div class="tl-head"><span>Mission timeline</span><span>total '
+            f'<b>{clock(total)}</b> (min:s)</span></div><div class="tl-bar">{"".join(bar)}</div>'
+            f'<ul class="tl-phases">{phases}</ul>{ladder(r)}</div>')
+
+
+def event_list(r):
+    """Every decisive state change, for the expandable detail."""
+    t0 = r['transitions'][0][0]
+    events, attempt = [], 0
+    sides = r['m'].get('selected_sides') or []
+    for t, previous, state, reason in r['transitions']:
+        if previous == 'SEARCH_G1':
+            events.append((t, 'G1 confirmed by the detector', ''))
+        elif state == 'G1_LOCALIZED':
+            events.append((t, 'G1 localized and verified in depth', ''))
+        elif state == 'EXPLORING_AROUND_G1':
+            events.append((t, 'Mapping the floor around G1', ''))
+        elif state == 'NAVIGATING_TO_PREPARKING':
+            attempt += 1
+            side = side_name(sides[attempt - 1]) if attempt <= len(sides) else 'next side'
+            events.append((t, f'Attempt {attempt} started: {side}', ''))
+        elif state == 'PARKED':
+            events.append((t, 'Parked', 'done'))
+        elif state == 'RETURNING_TO_START':
+            refused = 'no feasible parking pose' in reason
+            events.append((t, 'No safe parking pose: returning to start' if refused else 'Returning to start',
+                           'safe' if refused else ''))
+        elif state in ('MISSION_COMPLETE', 'MISSION_FAILED'):
+            events.append((t, state, 'done' if state == 'MISSION_COMPLETE' else 'safe'))
+    for t, n, reason in r['vetoes']:
+        events.append((t, f'Attempt {n} rejected: {VETO_SHORT.get(reason.split(":")[-1].strip(), reason)}', 'fail'))
+    rows, last = [], None
+    for t, text, cls in sorted(events):
+        if text != last:
+            rows.append(f'<li class="{cls}"><span>{clock(t - t0)}</span>{esc(text)}</li>')
+        last = text
+    return f'<ol class="events">{"".join(rows)}</ol>'
 
 
 # Charts (inline SVG, colours from the page's chart tokens) ------------------------------
 
-def svg(width, height, body, label):
-    return (f'<svg class="chart" viewBox="0 0 {width} {height}" role="img" aria-label="{esc(label)}" '
-            f'preserveAspectRatio="xMinYMin meet">{body}</svg>')
+CHART_W = 1000
 
 
-def axis(x0, x1, y, ticks, scale, unit, label=None):
+def svg(height, body, label):
+    return (f'<svg class="chart" viewBox="0 0 {CHART_W} {height}" role="img" aria-label="{esc(label)}">'
+            f'{body}</svg>')
+
+
+def axis(x0, x1, y, ticks, scale, text, title):
     out = [f'<line x1="{x0}" y1="{y}" x2="{x1}" y2="{y}" class="axis"/>']
     for v in ticks:
         x = scale(v)
-        text = label(v) if label else f'{v:g}{unit}'
-        out.append(f'<line x1="{x:.1f}" y1="12" x2="{x:.1f}" y2="{y}" class="grid"/>'
-                   f'<text x="{x:.1f}" y="{y + 16}" class="tick" text-anchor="middle">{text}</text>')
+        out.append(f'<line x1="{x:.1f}" y1="8" x2="{x:.1f}" y2="{y}" class="grid"/>'
+                   f'<text x="{x:.1f}" y="{y + 20}" class="tick" text-anchor="middle">{text(v)}</text>')
+    out.append(f'<text x="{(x0 + x1) / 2:.0f}" y="{y + 44}" class="axtitle" text-anchor="middle">{esc(title)}</text>')
     return ''.join(out)
+
+
+def run_label(r):
+    sim = 'Gazebo' if r['m']['simulator'] == 'gz' else 'Isaac'
+    return f'{sim} · {r["name"]} · {r["m"]["commit"]}'
 
 
 def duration_chart(runs):
     rows = [r for r in runs if phase_segments(r)]
-    label_w, width, bar_h, gap = 230, 940, 18, 16
-    span = max(seg[2] - phase_segments(r)[0][1] for r in rows for seg in phase_segments(r)[-1:])
-    top = 14
-    x0, x1 = label_w, width - 190
-    scale = lambda s: x0 + (x1 - x0) * s / span
+    x0, x1, top, bar_h, gap = 330, CHART_W - 200, 10, 24, 18
+    span_s = max(phase_segments(r)[-1][2] - phase_segments(r)[0][1] for r in rows)
+    scale = lambda s: x0 + (x1 - x0) * s / span_s
     body = []
     for i, r in enumerate(rows):
         y = top + i * (bar_h + gap)
         segs = phase_segments(r)
         t0 = segs[0][1]
-        sim = 'Gazebo' if r['m']['simulator'] == 'gz' else 'Isaac'
-        body.append(f'<text x="{x0 - 10}" y="{y + 13}" class="label" text-anchor="end">'
-                    f'{esc(sim)} · {esc(r["m"]["scenario"])} · {esc(r["name"])}</text>')
+        body.append(f'<text x="{x0 - 12}" y="{y + 17}" class="label" text-anchor="end">{esc(run_label(r))}</text>')
         for phase, a, b in segs:
             xa, xb = scale(a - t0), scale(b - t0)
-            w = max(1.0, xb - xa - 2)
-            body.append(f'<rect x="{xa:.1f}" y="{y}" width="{w:.1f}" height="{bar_h}" rx="3" class="ph-{phase}">'
-                        f'<title>{esc(dict(PHASES)[phase])}: {b - a:.0f} s</title></rect>')
+            body.append(f'<rect x="{xa:.1f}" y="{y}" width="{max(1.5, xb - xa - 1.5):.1f}" height="{bar_h}" '
+                        f'class="ph-{phase}"><title>{esc(dict(PHASES)[phase])}: {clock(b - a)} (min:s)</title></rect>')
         end = segs[-1][2] - t0
-        _, _, category = classify(r)
-        body.append(f'<text x="{scale(end) + 8:.1f}" y="{y + 13}" class="value">{clock(end)} · '
-                    f'{esc(SHORT.get(category, category))}</text>')
+        category = classify(r)[2]
+        body.append(f'<text x="{scale(end) + 10:.1f}" y="{y + 17}" class="value">{clock(end)}  '
+                    f'<tspan class="{"good" if category == "Complete" else "muted"}">'
+                    f'{esc(SHORT.get(category, category))}</tspan></text>')
     y_axis = top + len(rows) * (bar_h + gap)
-    ticks = [m * 60 for m in range(0, int(span // 60) + 2, 2) if m * 60 <= span]
-    body.append(axis(x0, x1, y_axis, ticks, scale, '', lambda v: f'{v // 60:g} min'))
-    chart = svg(width, y_axis + 30, ''.join(body), 'Mission duration by phase for the post-merge runs')
+    ticks = [m * 60 for m in range(0, int(span_s // 60) + 1, 2)]
+    body.insert(0, axis(x0, x1, y_axis, ticks, scale, lambda v: f'{v // 60:g}', 'minutes from mission start'))
     legend = ''.join(f'<span><i class="sw ph-{k}"></i>{esc(v)}</span>' for k, v in PHASES)
     table = ''.join(
-        f'<tr><td>{esc(r["name"])}</td><td>{"Gazebo" if r["m"]["simulator"] == "gz" else "Isaac"}</td>'
+        f'<tr><td>{esc(run_label(r))}</td>'
         + ''.join(f'<td>{sum(b - a for p, a, b in phase_segments(r) if p == k):.0f}</td>' for k, _ in PHASES)
         + f'<td>{phase_segments(r)[-1][2] - phase_segments(r)[0][1]:.0f}</td><td>{esc(classify(r)[1])}</td></tr>'
         for r in rows)
     head = ''.join(f'<th>{esc(v)} (s)</th>' for _, v in PHASES)
-    return (f'<div class="legend">{legend}</div>{chart}'
-            f'<details class="data"><summary>Durations by phase (table)</summary><div class="wrap"><table>'
-            f'<tr><th>Run</th><th>Simulator</th>{head}<th>Total (s)</th><th>Outcome</th></tr>{table}'
-            f'</table></div></details>')
+    return (f'<div class="legend">{legend}</div>'
+            + svg(y_axis + 54, ''.join(body), 'Mission duration by phase for the post-merge runs')
+            + f'<details class="data"><summary>Show the durations as a table</summary><div class="wrap"><table>'
+              f'<tr><th>Run</th>{head}<th>Total (s)</th><th>Outcome</th></tr>{table}</table></div></details>')
 
 
 def localization_chart(runs):
     """Gazebo ground-truth error of every position the mission used, per run."""
     rows = [r for r in runs if r['m']['simulator'] == 'gz' and r['m'].get('localization_errors_m')]
-    label_w, width, row_h = 230, 940, 26
-    x0, x1, top = label_w, width - 60, 14
-    hi = 0.20
+    x0, x1, top, row_h = 330, CHART_W - 60, 14, 36
+    hi = 0.15
     scale = lambda v: x0 + (x1 - x0) * min(v, hi) / hi
     body = []
     for i, r in enumerate(rows):
-        y = top + i * row_h + 10
-        body.append(f'<text x="{x0 - 10}" y="{y + 4}" class="label" text-anchor="end">{esc(r["m"]["scenario"])} · '
-                    f'{esc(r["name"])}</text><line x1="{x0}" y1="{y}" x2="{x1}" y2="{y}" class="row"/>')
+        y = top + i * row_h + 12
+        body.append(f'<text x="{x0 - 12}" y="{y + 5}" class="label" text-anchor="end">{esc(run_label(r))}</text>'
+                    f'<line x1="{x0}" y1="{y}" x2="{x1}" y2="{y}" class="row"/>')
         for k, e in enumerate(r['m']['localization_errors_m']):
-            body.append(f'<circle cx="{scale(e):.1f}" cy="{y}" r="4.5" class="dot-gz">'
-                        f'<title>{esc(r["name"])}, localization {k + 1}: {e:.3f} m from G1\'s ground truth</title></circle>')
-    y_axis = top + len(rows) * row_h + 4
-    body.append(axis(x0, x1, y_axis, [0, 0.05, 0.10, 0.15, 0.20], scale, ' m'))
-    values = [e for r in rows for e in r['m']['localization_errors_m']]
-    note = (f'{len(values)} positions in {len(rows)} post-merge Gazebo runs: '
-            f'{min(values):.3f}-{max(values):.3f} m. Isaac records no ground truth, so it has no points here.')
-    return svg(width, y_axis + 30, ''.join(body), 'G1 localization error against Gazebo ground truth') + \
-        f'<p class="note">{esc(note)}</p>'
+            body.append(f'<circle cx="{scale(e):.1f}" cy="{y}" r="7" class="dot-gz">'
+                        f'<title>{esc(r["name"])}, localization {k + 1}: {e:.3f} m from G1\'s true position</title></circle>')
+    y_axis = top + len(rows) * row_h + 6
+    body.insert(0, axis(x0, x1, y_axis, [0, 0.03, 0.06, 0.09, 0.12, 0.15], scale, lambda v: f'{v:.2f}',
+                     'distance from G1\'s true position (m), Gazebo ground truth'))
+    return svg(y_axis + 54, ''.join(body), 'G1 localization error against Gazebo ground truth')
 
 
 def attempts_chart(runs):
-    """Completed missions on the current mission logic: each attempt, vetoed or parked."""
+    """Completed missions on the current mission logic: each attempt, rejected or parked."""
     rows = [r for r in runs if r['m']['outcome'] == 'MISSION_COMPLETE' and classify(r)[2] == 'Complete']
     out = []
     for r in rows:
-        sim = 'Gazebo' if r['m']['simulator'] == 'gz' else 'Isaac'
-        sides = r['m'].get('selected_sides') or []
-        cells = []
-        vetoes = {n: reason for _, n, reason in r['vetoes']}
-        for n in range(1, (r['m'].get('attempts') or 1) + 1):
-            side = sides[n - 1].replace('g1_', '').replace('_', ' ') if n - 1 < len(sides) else '?'
-            if n in vetoes:
-                why = vetoes[n].split(':')[-1].strip()
-                cells.append(f'<span class="att veto" title="{esc(VETO_TEXT.get(why, why))}">'
-                             f'<b>✕</b> {n}: {esc(side)}<small>vetoed: {esc(VETO_TEXT.get(why, why))}</small></span>')
-            else:
-                cells.append(f'<span class="att parked"><b>✓</b> {n}: {esc(side)}<small>parked</small></span>')
-        out.append(f'<div class="attrow"><div class="attlabel">{esc(sim)} · {esc(r["name"])}<small>'
-                   f'{esc(datetime.datetime.fromtimestamp(r["start"]).strftime("%Y-%m-%d"))} · '
-                   f'{esc(r["campaign"])}</small></div><div class="atts">{"".join(cells)}</div></div>')
+        cells = ''.join(f'<li class="{c}"><b>{i}</b><span>{esc(t)}{f"<small>{esc(s)}</small>" if s else ""}</span></li>'
+                        for c, i, t, s in steps(r) if t.startswith('Attempt'))
+        out.append(f'<div class="attrow"><div class="attlabel">{esc(run_label(r))}<small>'
+                   f'{esc(datetime.datetime.fromtimestamp(r["start"]).strftime("%d %b %Y"))} · '
+                   f'{esc(r["campaign"])}</small></div><ol class="steps">{cells}</ol></div>')
     return ''.join(out)
 
 
@@ -369,232 +518,216 @@ def reach_chart(runs):
     rows = [r for r in runs if r['m']['simulator'] == 'gz' and r['m']['outcome'] == 'MISSION_COMPLETE'
             and r['m'].get('reach_truth_m') is not None]
     rows.sort(key=lambda r: (not r['final'], r['start']))
-    label_w, width, row_h = 250, 940, 24
-    x0, x1, top = label_w, width - 170, 24
+    x0, x1, top, row_h = 330, CHART_W - 210, 34, 32
     hi = 0.90
     scale = lambda v: x0 + (x1 - x0) * min(v, hi) / hi
-    body = [f'<rect x="{scale(REACH[0]):.1f}" y="10" width="{scale(REACH[1]) - scale(REACH[0]):.1f}" '
-            f'height="{len(rows) * row_h + 14}" class="band"><title>Required reach 0.30-0.60 m</title></rect>',
-            f'<text x="{(scale(REACH[0]) + scale(REACH[1])) / 2:.1f}" y="8" class="tick" text-anchor="middle">'
-            f'required 0.30-0.60 m</text>']
+    body = [f'<rect x="{scale(REACH[0]):.1f}" y="18" width="{scale(REACH[1]) - scale(REACH[0]):.1f}" '
+            f'height="{len(rows) * row_h + 4}" class="band"><title>Required reach 0.30-0.60 m</title></rect>',
+            f'<text x="{(scale(REACH[0]) + scale(REACH[1])) / 2:.1f}" y="12" class="bandlabel" '
+            f'text-anchor="middle">required 0.30-0.60 m</text>']
     for i, r in enumerate(rows):
         y = top + i * row_h
         reach = r['m']['reach_truth_m']
-        false = classify(r)[2] == FALSE_COMPLETION
         when = datetime.datetime.fromtimestamp(r['start']).strftime('%d %b')
-        body.append(f'<text x="{x0 - 10}" y="{y + 4}" class="label" text-anchor="end">{esc(r["name"])} · '
-                    f'{when}</text>')
+        body.append(f'<text x="{x0 - 12}" y="{y + 5}" class="label" text-anchor="end">{esc(r["name"])} · '
+                    f'{r["m"]["commit"]} · {when}</text>')
         if reach > hi:
-            body.append(f'<line x1="{scale(hi) - 30:.1f}" y1="{y}" x2="{scale(hi):.1f}" y2="{y}" class="arrow"/>'
-                        f'<text x="{scale(hi) + 6:.1f}" y="{y + 4}" class="value bad">{reach:.2f} m: false completion</text>')
+            body.append(f'<line x1="{scale(hi) - 40:.1f}" y1="{y}" x2="{scale(hi):.1f}" y2="{y}" class="arrow"/>'
+                        f'<text x="{scale(hi) + 8:.1f}" y="{y + 5}" class="value bad">{reach:.2f} m: false '
+                        f'completion</text>')
         else:
-            body.append(f'<circle cx="{scale(reach):.1f}" cy="{y}" r="5" class="{"dot-bad" if false else "dot-gz"}">'
+            body.append(f'<circle cx="{scale(reach):.1f}" cy="{y}" r="7" class="dot-gz">'
                         f'<title>{esc(r["name"])}: {reach:.3f} m (ground truth)</title></circle>'
-                        f'<text x="{scale(reach) + 9:.1f}" y="{y + 4}" class="value">{reach:.2f}</text>')
-    y_axis = top + len(rows) * row_h
-    body.append(axis(x0, x1, y_axis, [0, 0.15, 0.30, 0.45, 0.60, 0.75, 0.90], scale, ' m'))
-    return svg(width, y_axis + 30, ''.join(body), 'Parked reach against Gazebo ground truth')
+                        f'<text x="{scale(reach) + 12:.1f}" y="{y + 5}" class="value">{reach:.2f}</text>')
+    y_axis = top + len(rows) * row_h - 8
+    body.insert(1, axis(x0, x1, y_axis, [0, 0.15, 0.30, 0.45, 0.60, 0.75, 0.90], scale, lambda v: f'{v:.2f}',
+                     'distance from G1\'s axis to the basket centre (m), Gazebo ground truth'))
+    return svg(y_axis + 54, ''.join(body), 'Parked reach against Gazebo ground truth')
 
 
 # Page sections ------------------------------------------------------------------------
 
-def stat(value, label, detail):
-    return (f'<div class="stat"><div class="v">{value}</div><div class="l">{esc(label)}</div>'
-            f'<div class="d">{esc(detail)}</div></div>')
-
-
 def overview(final, scenario_count):
+    groups = [('Complete', 'ok', 'completed missions', 'parked, waited and returned to start'),
+              ('Safe refusal', 'safe', 'correct safe refusal', 'no_feasible: no pose fits, no attempt, returned'),
+              (None, 'bad', 'failed or incomplete runs', ''),
+              ('all', 'neutral', 'evaluated post-merge runs', '14 Nov 2026, Gazebo and Isaac')]
     complete = [r for r in final if classify(r)[2] == 'Complete']
     refusals = [r for r in final if classify(r)[2] == 'Safe refusal']
     others = [r for r in final if r not in complete and r not in refusals]
-    scen = sorted({r['m']['scenario'] for r in final})
-    durations = [r['m']['mission_s'] for r in complete]
-    gz_reach = [r['m']['reach_truth_m'] for r in complete if r['m'].get('reach_truth_m') is not None]
-    cards = [
-        stat(scenario_count, 'scenarios defined', f'{len(scen)} evaluated after the merge: {", ".join(scen)}'),
-        stat(len(final), 'post-merge runs', f'14 Nov 2026, code {FINAL_SET[0]}-{FINAL_SET[-1]}'),
-        stat(len(complete), 'complete missions', ' and '.join(
-            ('Gazebo' if r['m']['simulator'] == 'gz' else 'Isaac') for r in complete) + ': parked, waited, returned'),
-        stat(len(refusals), 'safe refusal', 'no_feasible: no pose fits, no attempt, returned'),
-        stat(len(others), 'stopped or failed', '3 integration defects found and fixed during the runs, '
-                                               '1 G1 not detected'),
-        stat(f'{gz_reach[0]:.3f} m' if gz_reach else '-', 'parked reach (Gazebo, ground truth)',
-             f'required {REACH[0]:.2f}-{REACH[1]:.2f} m; Isaac records no ground truth'),
-        stat(' / '.join(f'{d / 60:.1f}' for d in sorted(durations)) + ' min', 'complete mission duration',
-             'Isaac / Gazebo; most of it is the search for G1'),
-    ]
-    return (f'<section id="overview"><div class="stats">{"".join(cards)}</div>'
-            f'<p class="note">Every number above comes from the {len(final)} runs on the merged code '
-            f'(14 November 2026); earlier runs used earlier code and are counted only in the '
-            f'<a href="#history">records</a>. {len(complete)} completed missions do not establish a '
-            f'success rate.</p></section>')
-
-
-def mission_summary(r):
-    m = r['m']
-    sides = [s.replace('g1_', 'G1 ').replace('_', ' ') for s in m.get('selected_sides') or []]
-    vetoes = {n: reason.split(':')[-1].strip() for _, n, reason in r['vetoes']}
-    items = []
-    for n, side in enumerate(sides, 1):
-        if n in vetoes:
-            items.append(f'Attempt {n} at {side}: vetoed, {VETO_TEXT.get(vetoes[n], vetoes[n])}')
-        elif m['outcome'] == 'MISSION_COMPLETE' and n == len(sides):
-            items.append(f'Attempt {n} at {side}: parked')
-    return items
+    defects = sum(classify(r)[2] in ('Planning gate', STALE_LIDAR) for r in others)
+    counts = {'Complete': complete, 'Safe refusal': refusals, None: others, 'all': final}
+    cards = []
+    for key, cls, label, detail in groups:
+        if key is None:
+            detail = (f'{defects} integration defects, each fixed before the next run; '
+                      f'{len(others) - defects} G1 not localized')
+        cards.append(f'<div class="kpi {cls}"><div class="v">{len(counts[key])}</div>'
+                     f'<div class="l">{esc(label)}</div><div class="d">{esc(detail)}</div></div>')
+    pips = ''.join(
+        f'<li class="{ {"Complete": "done", "Safe refusal": "safe"}.get(classify(r)[2], "fail") }">'
+        f'<b>{ {"Complete": "✓", "Safe refusal": "⊘"}.get(classify(r)[2], "✗") }</b>'
+        f'<span>{esc(("Gazebo " if r["m"]["simulator"] == "gz" else "Isaac ") + r["name"].replace("gz_", "").replace("isaac_", ""))}'
+        f'<small>{esc(r["m"]["commit"])} · {esc(SHORT.get(classify(r)[2], classify(r)[2]))}</small></span></li>'
+        for r in sorted(final, key=lambda r: r['start']))
+    rows = []
+    for r in complete:
+        m = r['m']
+        sim = 'Gazebo Sim' if m['simulator'] == 'gz' else 'Isaac Sim'
+        side = side_name((m.get('selected_sides') or ['?'])[-1])
+        reach = (f'{m["reach_truth_m"]:.3f} m <span class="src gt">ground truth</span>'
+                 if m.get('reach_truth_m') is not None else '<span class="na">not measured (no ground truth)</span>')
+        rows.append(f'<tr><td>{sim}</td><td>{esc(side)}</td><td>{m["attempts"]}</td>'
+                    f'<td>{clock(m["mission_s"])}</td><td>{reach}</td></tr>')
+    commits = list(dict.fromkeys(r['m']['commit'] for r in sorted(final, key=lambda r: r['start'])))
+    return (f'<section id="overview"><div class="kpis-main">{"".join(cards)}</div>'
+            f'<ol class="pips">{pips}</ol>'
+            f'<div class="secondary"><div><h3>Completed missions</h3><div class="wrap"><table class="compact">'
+            f'<tr><th>Simulator</th><th>Parked</th><th>Attempts</th><th>Duration (min:s)</th>'
+            f'<th>Parked reach (required {REACH[0]:.2f}-{REACH[1]:.2f} m)</th></tr>{"".join(rows)}</table></div></div>'
+            f'<p class="caveat"><b>How to read these numbers.</b> The {len(final)} runs span {len(commits)} '
+            f'commits ({", ".join(commits)}): the merged code, then three fixes for defects these runs exposed. '
+            f'Each count describes these runs only; they do not establish a general success rate. '
+            f'{len({r["m"]["scenario"] for r in final})} of the {scenario_count} scenarios were run after the '
+            f'merge; earlier runs are in the <a href="#history">records</a>.</p></div></section>')
 
 
 def comparison(by_key, refusal):
-    def column(r, sim, truth):
-        m = r['m']
-        facts = [f'Final state <code>{esc(m["outcome"])}</code>, {m["mission_s"] / 60:.1f} min']
-        facts += [esc(x) for x in mission_summary(r)]
-        if truth and m.get('localization_errors_m'):
-            errs = m['localization_errors_m']
-            facts.append(f'G1 localization error {min(errs):.3f}-{max(errs):.3f} m (ground truth)')
-        if truth and m.get('reach_truth_m') is not None:
-            facts.append(f'Parked reach {m["reach_truth_m"]:.3f} m, basket {m["parked_truth_clearance_m"]:.3f} m '
-                         f'from G1\'s lower body (ground truth)')
-        if not truth:
-            facts.append('No ground truth recorded: positions and reach are the mission\'s own estimates')
-        facts.append('Returned to its start' + (f', {m["final_distance_from_start_m"]:.2f} m from it (ground truth)'
-                                                if truth and m.get('final_distance_from_start_m') is not None else ''))
-        return (f'<div class="col"><h3>{esc(sim)}</h3><p class="sub">{esc(m["scenario"])} · '
-                f'<code>{esc(r["name"])}</code> · code {esc(r["code"])}</p><ul>'
-                + ''.join(f'<li>{f}</li>' for f in facts) + '</ul></div>')
-    rm = refusal['m']
-    errs = rm.get('localization_errors_m') or []
-    refusal_html = (
-        f'<div class="col wide"><h3>Gazebo Sim · safety test</h3><p class="sub">no_feasible · '
-        f'<code>{esc(refusal["name"])}</code> · code {esc(refusal["code"])}</p><ul>'
-        f'<li>G1 between two panels with a bed behind it: no robot footprint fits beside it</li>'
-        f'<li>G1 localized {", ".join(f"{e:.3f}" for e in errs)} m from its ground truth</li>'
-        f'<li>Every parking pose rejected (<code>no_valid_candidate</code>); no parking attempt</li>'
-        f'<li>Returned {rm["final_distance_from_start_m"]:.2f} m from its start (ground truth); final state '
-        f'<code>{esc(rm["outcome"])}</code> with the planner\'s reason</li></ul></div>')
+    isaac, gz = by_key['isaac_side'], by_key['gazebo_rear']
+
+    def arrival(r):
+        found = re.findall(r'Arrived at parking: error xy=([\d.]+) m', r['log'])
+        return f'{float(found[-1]):.3f} m' if found else '-'
+
+    def phase(r, key):
+        return clock(sum(b - a for p, a, b in phase_segments(r) if p == key))
+    im, gm = isaac['m'], gz['m']
+    na = '<span class="na">no ground truth</span>'
+    gt, est, log = ('<span class="src gt">ground truth</span>', '<span class="src est">mission estimate</span>',
+                    '<span class="src log">mission log</span>')
+    rows = [
+        ('Mission duration', clock(im['mission_s']), clock(gm['mission_s']), log),
+        ('of which: search for G1', phase(isaac, 'search'), phase(gz, 'search'), log),
+        ('Arrival error at the parking pose', arrival(isaac), arrival(gz), est),
+        ('G1 localization error', na, f'{span(gm["localization_errors_m"])} m', gt),
+        ('Parked reach (required 0.30-0.60 m)', na, f'{gm["reach_truth_m"]:.3f} m', gt),
+        ('Basket to G1\'s lower body', na, f'{gm["parked_truth_clearance_m"]:.3f} m', gt),
+        ('Final distance from the start', na, f'{gm["final_distance_from_start_m"]:.2f} m', gt),
+    ]
+    table = ''.join(f'<tr><th>{esc(k)}</th><td>{a}</td><td>{b}</td><td>{src}</td></tr>' for k, a, b, src in rows)
+    errs = refusal['m'].get('localization_errors_m') or []
     return (f'<section id="compare"><h2>Gazebo Sim and Isaac Sim</h2>'
-            f'<p class="lead">Both simulators run the same autonomy code on the same scene. In Isaac the live '
-            f'LiDAR check cancelled the approach to G1\'s right and the robot parked at G1\'s left; in Gazebo '
-            f'it cancelled both sides and the mission parked behind G1, the next class in its priority '
-            f'order. Gazebo measurements are ground truth; Isaac records only the mission\'s own estimates. '
-            f'One run per simulator: a demonstration, not a rate.</p><div class="cmp">{column(by_key["isaac_side"], "Isaac Sim", False)}'
-            f'{column(by_key["gazebo_rear"], "Gazebo Sim", True)}{refusal_html}</div></section>')
+            f'<p class="lead">The same autonomy code, scene and parking priorities in both simulators. One run '
+            f'each: a demonstration, not a rate.</p>'
+            f'<div class="cmp"><div class="col isaac"><h3>Isaac Sim</h3><p class="sub"><code>{esc(isaac["name"])}</code>'
+            f' · code {esc(im["commit"])}</p>{ladder(isaac, True)}</div>'
+            f'<div class="col gz"><h3>Gazebo Sim</h3><p class="sub"><code>{esc(gz["name"])}</code> · code '
+            f'{esc(gm["commit"])}</p>{ladder(gz, True)}</div></div>'
+            f'<div class="wrap"><table class="measures"><tr><th>Measurement</th><th>Isaac Sim</th><th>Gazebo Sim</th>'
+            f'<th>Source</th></tr>{table}</table></div>'
+            f'<p class="note">Gazebo samples the true poses of the robot and G1; Isaac records only what the '
+            f'mission itself estimated, so its ground-truth cells are empty rather than estimated.</p>'
+            f'<div class="col safety"><h3>Safety test: no feasible parking position (Gazebo)</h3>'
+            f'<p class="sub"><code>{esc(refusal["name"])}</code> · code {esc(refusal["m"]["commit"])} · G1 '
+            f'localized {", ".join(f"{e:.3f}" for e in errs)} m from its true position (ground truth)</p>'
+            f'{ladder(refusal)}</div>'
+            f'<details class="more"><summary>Why the two simulators parked differently</summary>'
+            f'<p>Each parking leg is checked live against both LiDAR scans; a return on the route ahead or in '
+            f'the stopping path cancels the leg before contact, and the mission tries the next direction in its '
+            f'priority order (G1\'s sides, then behind, then in front). In Isaac the check rejected G1\'s right '
+            f'and the left succeeded. In Gazebo it rejected both sides, so the mission parked behind G1. '
+            f'{esc(veto_sentence(gz))}</p></details></section>')
 
 
-def _reason(r, t):
-    return next((w for when, _, _, w in r['transitions'] if when == t), '')
+def veto_sentence(r):
+    parts = []
+    for (_, n, reason), (nearest, gap) in zip(r['vetoes'], r['veto_detail']):
+        why = reason.split(':')[-1].strip()
+        parts.append(f'attempt {n}: {VETO_TEXT.get(why, why)}, {nearest:.2f} m from the robot while the '
+                     f'robot was {gap:.2f} m from G1')
+    return ('In the Gazebo run, ' + '; '.join(parts) + ' (LiDAR measurements).') if parts else ''
 
 
-def timeline(r):
-    segs = phase_segments(r)
-    if not segs:
-        return ''
-    t0, t1 = segs[0][1], segs[-1][2]
-    bar = ''.join(f'<span class="seg ph-{p}" style="flex:{max(b - a, 1):.1f}" title="{esc(dict(PHASES)[p])}: '
-                  f'{b - a:.0f} s"></span>' for p, a, b in segs)
-    events, attempt = [], 0
-    sides = r['m'].get('selected_sides') or []
-    for t, previous, state, _ in r['transitions']:
-        if previous == 'SEARCH_G1':
-            events.append((t, 'G1 confirmed', ''))
-        elif state == 'G1_LOCALIZED':
-            events.append((t, 'G1 localized and verified', ''))
-        elif state == 'NAVIGATING_TO_PREPARKING':
-            attempt += 1
-            side = sides[attempt - 1].replace('g1_', "G1's ") if attempt <= len(sides) else 'next side'
-            events.append((t, f'Attempt {attempt} started: {side}', ''))
-        elif state == 'PARKED':
-            events.append((t, 'Parked', 'ok'))
-        elif state == 'RETURNING_TO_START' and 'no feasible parking pose' in _reason(r, t):
-            events.append((t, 'No safe parking pose: refused, returning home', 'safe'))
-        elif state == 'RETURNING_TO_START':
-            events.append((t, 'Returning to start', ''))
-        elif state in ('MISSION_COMPLETE', 'MISSION_FAILED'):
-            events.append((t, state, 'ok' if state == 'MISSION_COMPLETE' else 'safe'))
-    for t, n, reason in r['vetoes']:
-        events.append((t, f'Attempt {n} cancelled by the LiDAR check', 'bad'))
-    events.sort()
-    # Repeated localizations: keep the first of each kind between other events.
-    rows, last = [], None
-    for t, text, cls in events:
-        if text == last:
+def kpis(r, key):
+    m = r['m']
+    cls, _, category = classify(r)
+    sides = m.get('selected_sides') or []
+    items = [('Outcome', f'<code>{esc(m["outcome"])}</code>', 'expected refusal' if category == 'Safe refusal' else '')]
+    if m['outcome'] == 'MISSION_COMPLETE':
+        items.append(('Parked', esc(side_name(sides[-1])), ''))
+    else:
+        items.append(('Parked', 'no', 'no safe pose'))
+    items.append(('Parking attempts', str(m.get('attempts') or 0),
+                  f'{len(r["vetoes"])} rejected by the LiDAR check' if r['vetoes'] else ''))
+    if m.get('reach_truth_m') is not None:
+        items.append(('Parked reach', f'{m["reach_truth_m"]:.3f} m', 'ground truth; required 0.30-0.60'))
+    if m.get('localization_errors_m'):
+        items.append(('G1 localization error', f'{span(m["localization_errors_m"])} m', 'ground truth'))
+    if key == 'isaac_side':
+        found = re.findall(r'Arrived at parking: error xy=([\d.]+) m', r['log'])
+        items.append(('Arrival error', f'{float(found[-1]):.3f} m', 'mission estimate; no ground truth'))
+    if key == 'gazebo_refusal' and candidates(r):
+        n, ok = candidates(r)
+        items.append(('Valid parking poses', f'{ok} of {n}', 'all blocked by the scene'))
+    items.append(('Duration', clock(m['mission_s']), 'min:s'))
+    return ''.join(f'<div class="k"><span class="l">{esc(l)}</span><span class="v">{v}</span>'
+                   f'{f"<span class=d>{esc(d)}</span>" if d else ""}</div>' for l, v, d in items)
+
+
+def featured(r, spec, summary, details):
+    figs = []
+    for i, image in enumerate(spec['images']):
+        html_, why = featured_image(r, image, f'{spec["key"]}_{i}')
+        if html_ is None:
+            print(f'{spec["key"]} image {image["ref"]} excluded: {why}')
             continue
-        last = text
-        rows.append(f'<li class="{cls}"><span>{clock(t - t0)}</span>{esc(text)}</li>')
-    legend = ''.join(f'<span><i class="sw ph-{k}"></i>{esc(v)}</span>' for k, v in PHASES
-                     if any(p == k for p, _, _ in segs))
-    return (f'<div class="timeline"><div class="bar">{bar}</div><div class="tl-axis"><span>0:00</span>'
-            f'<span>{clock(t1 - t0)}</span></div><div class="legend small">{legend}</div>'
-            f'<ol class="events">{"".join(rows)}</ol></div>')
-
-
-def featured(r, spec, explanation):
-    figs, missing = [], []
-    for i, (kind, ref, states, caption) in enumerate(spec['images']):
-        rel, text = featured_image(r, kind, ref, states, caption, f'{spec["key"]}_{i}')
-        if rel is None:
-            print(f'{spec["key"]} image {ref} excluded: {text}')
-            missing.append(text)
-            continue
-        figs.append(pages.figure(rel, text))
+        figs.append(html_)
     lead = figs[0] if figs else pages.missing('No verified capture')
-    rest = ''.join(f'<div>{f}</div>' for f in figs[1:])
+    side = ''.join(figs[1:])
     badge_cls, outcome, _ = classify(r)
-    facts = '<div class="factlist">' + ''.join(f'<div><b>{esc(k)}</b><span>{v}</span></div>'
-                                               for k, v in explanation) + '</div>'
-    return (f'<article class="exp" id="{spec["key"]}"><header><h3>{esc(spec["title"])}</h3>'
-            f'<span class="badge {badge_cls}">{esc(outcome)}</span><span class="meta">{esc(r["name"])} · '
-            f'code {esc(r["code"])} · {esc(datetime.datetime.fromtimestamp(r["start"]).strftime("%Y-%m-%d %H:%M"))}'
-            f'</span></header><div class="exp-grid"><div class="lead-fig">{lead}</div>'
-            f'<div class="exp-facts">{facts}{timeline(r)}</div></div>'
-            f'<div class="exp-more">{rest}</div></article>')
+    facts = ''.join(f'<div><b>{esc(k)}</b><span>{v}</span></div>' for k, v in details)
+    return (f'<article class="exp" id="{spec["key"]}"><header><span class="letter">{spec["letter"]}</span>'
+            f'<h3>{esc(spec["title"])}</h3><span class="badge {badge_cls}">{esc(outcome)}</span>'
+            f'<span class="meta">{esc(r["name"])} · code {esc(r["m"]["commit"])} · '
+            f'{esc(datetime.datetime.fromtimestamp(r["start"]).strftime("%d %b %Y %H:%M"))}</span></header>'
+            f'<p class="summary">{summary}</p><div class="kpis">{kpis(r, spec["key"])}</div>'
+            f'<div class="media"><div class="main">{lead}</div><div class="aside">{side}</div></div>'
+            f'{timeline(r)}<details class="more"><summary>Details: measurements and every state change'
+            f'</summary><div class="factlist">{facts}</div>{event_list(r)}</details></article>')
 
 
 def explanations(by_key):
+    """(one-sentence summary, detail rows) per featured experiment, from the runs' records."""
     a, b, c = by_key['isaac_side'], by_key['gazebo_rear'], by_key['gazebo_refusal']
     am, bm, cm = a['m'], b['m'], c['m']
-
-    def veto_text(r):
-        parts = []
-        for (_, n, reason), (nearest, gap) in zip(r['vetoes'], r['veto_detail']):
-            why = reason.split(':')[-1].strip()
-            parts.append(f'attempt {n}: {VETO_TEXT.get(why, why)}, {nearest:.2f} m from the robot while '
-                         f'the robot was {gap:.2f} m from G1')
-        return 'The live LiDAR check cancelled both side approaches before contact (' + '; '.join(
-            esc(p) for p in parts) + '; LiDAR measurements)'
-
-    def attempts_text(r):
-        return '<br>'.join(esc(x) for x in mission_summary(r)) or '-'
+    n, ok = candidates(c)
     return {
-        'isaac_side': [
-            ('Parking side', 'G1\'s left (its right was tried first)'),
-            ('Attempts', attempts_text(a)),
-            ('Outcome', f'<code>{esc(am["outcome"])}</code>: parked, waited 5 s, returned'),
-            ('Measured', 'Isaac records no ground truth; the arrival error to the planned pose was '
-                         + esc(re.findall(r'Arrived at parking: error xy=([\d.]+) m', a['log'])[-1]) + ' m'),
-            ('Return to start', 'Reached within the shared 0.40 m goal tolerance, any heading'),
-        ],
-        'gazebo_rear': [
-            ('Why not beside G1', veto_text(b)),
-            ('Why behind G1', 'After two vetoed sides, the next class in the priority order was the rear'),
-            ('Attempts', attempts_text(b)),
-            ('Reach (ground truth)', f'{bm["reach_truth_m"]:.3f} m, inside {REACH[0]:.2f}-{REACH[1]:.2f} m; '
-                                     f'basket {bm["parked_truth_clearance_m"]:.3f} m from G1\'s lower body'),
-            ('G1 localization (ground truth)', f'{min(bm["localization_errors_m"]):.3f}-'
-                                               f'{max(bm["localization_errors_m"]):.3f} m error, heading '
-                                               f'error {bm["heading_error_deg"]:.1f} deg'),
-            ('Outcome', f'<code>{esc(bm["outcome"])}</code>; returned {bm["final_distance_from_start_m"]:.2f} m '
-                        f'from the start (ground truth)'),
-        ],
-        'gazebo_refusal': [
-            ('Scene', 'G1 at its worktable between two 1.7 m panels 0.8 m to each side, a bed 1.25 m behind'),
-            ('Why nothing fits', 'Every footprint within reach of G1 overlaps a panel, the table or the bed '
-                                 '(<code>no_valid_candidate</code>)'),
-            ('G1 localization (ground truth)', ', '.join(f'{e:.3f}' for e in cm['localization_errors_m'])
-             + f' m error, heading error {cm["heading_error_deg"]:.1f} deg'),
-            ('Parking attempts', 'None'),
-            ('Outcome', f'<code>{esc(cm["outcome"])}</code> with the reason; returned '
-                        f'{cm["final_distance_from_start_m"]:.2f} m from the start (ground truth)'),
-        ],
+        'isaac_side': (
+            f'The LiDAR check rejected the approach to {side_name(am["selected_sides"][0])}; Ridgeback parked at '
+            f'{side_name(am["selected_sides"][-1])} on attempt {am["attempts"]}, waited and drove back to its start.',
+            [('G1 heading estimate', f'{am["g1_heading_log"]} deg (configured -90 deg)'),
+             ('Return', 'Ended within the shared 0.40 m goal tolerance of the start, any heading (mission estimate)'),
+             ('Ground truth', 'Isaac records none: positions and distances here are the mission\'s own estimates'),
+             ('Evidence', f'<code>{esc(a["rel"])}</code> and the run\'s recording, outside the repository')]),
+        'gazebo_rear': (
+            f'The LiDAR check rejected both sides of G1; Ridgeback parked behind G1 on its third attempt, '
+            f'{bm["reach_truth_m"]:.3f} m from G1\'s axis (ground truth), and drove back to its start.',
+            [('Why not beside G1', esc(veto_sentence(b))),
+             ('Why behind G1', 'After both sides were rejected, the rear is the next class in the priority order'),
+             ('G1 heading error', f'{bm["heading_error_deg"]:.1f} deg (ground truth)'),
+             ('Basket to G1', f'{bm["parked_truth_clearance_m"]:.3f} m from G1\'s lower body (ground truth)'),
+             ('Return', f'Ended {bm["final_distance_from_start_m"]:.2f} m from the true start (ground truth); the '
+                        f'mission\'s own estimate was within its 0.40 m tolerance'),
+             ('Evidence', f'<code>{esc(b["rel"])}</code>, outside the repository')]),
+        'gazebo_refusal': (
+            f'Two panels, the worktable and a bed leave no room for Ridgeback near G1: none of the {n} candidate '
+            f'poses was valid, so the mission made no parking attempt, drove back to its start and reported why.',
+            [('Scene', 'G1 at its worktable inside a pen: panels 0.8 m to each side and a 0.5 m bed 1.25 m behind'),
+             ('Planner result', f'<code>no_valid_candidate</code>: {ok} of {n} candidate poses valid; the '
+                                f'footprints overlap the panels, table or bed'),
+             ('G1 heading error', f'{cm["heading_error_deg"]:.1f} deg (ground truth)'),
+             ('Return', f'Ended {cm["final_distance_from_start_m"]:.2f} m from the true start (ground truth)'),
+             ('Evidence', f'<code>{esc(c["rel"])}</code>, outside the repository')]),
     }
 
 
@@ -701,102 +834,200 @@ def fmt(value, unit=''):
 
 
 RESULTS_CSS = """
-  :root { --gz: #2a78d6; --isaac: #eb6834;
-          --ph-search: #1baf7a; --ph-locate: #eda100; --ph-park: #6250d6; --ph-wait: #e87ba4;
-          --ph-return: #008300; --st-good: #0ca30c; --st-crit: #d03b3b; --band: rgba(12,163,12,.10); }
+  /* Status colours follow the RViz mission state machine (hud_style.py): completed green,
+     active blue, failed red, pending grey; light mode uses darker steps of the same hues. */
+  :root { --done: #1f8f4a; --done-bg: #e7f5ec; --now: #1f6fc2; --fail: #c93a3a; --fail-bg: #fbeceb;
+          --safe-c: #9a6b00; --safe-bg2: #fbf3dc; --muted: #6f7884;
+          --gz: #2a78d6; --annot: #ffb000;
+          --ph-search: #7f8b99; --ph-locate: #c9dff5; --ph-park: #1f6fc2; --ph-wait: #2e9b57; --ph-return: #4f5a66;
+          --ph-ink-locate: #1d2530; --band: rgba(31,143,74,.12); }
   @media (prefers-color-scheme: dark) {
-    :root { --gz: #3987e5; --isaac: #d95926;
-            --ph-search: #199e70; --ph-locate: #c98500; --ph-park: #9085e9; --ph-wait: #d55181;
-            --ph-return: #008300; --band: rgba(12,163,12,.16); }
+    :root { --done: #5ac878; --done-bg: #183324; --now: #50aaff; --fail: #ff5555; --fail-bg: #3a1d1d;
+            --safe-c: #ebb450; --safe-bg2: #33280f; --muted: #8b96a3; --gz: #50aaff;
+            --ph-search: #5b6673; --ph-locate: #2d4a66; --ph-park: #3a8de0; --ph-wait: #3fa864; --ph-return: #8b96a3;
+            --ph-ink-locate: #e8edf3; --band: rgba(90,200,120,.14); }
   }
-  .subtitle { font-size: 1.05rem; color: var(--body); margin: 0 0 .6rem; }
+  .subtitle { font-size: 1.1rem; color: var(--body); margin: 0 0 .6rem; }
   section { scroll-margin-top: 3rem; }
-  .lead { max-width: 90ch; }
-  .stats { display: grid; gap: .8rem; grid-template-columns: repeat(auto-fill, minmax(min(100%, 230px), 1fr));
-           margin: 1.6rem 0 .6rem; }
-  .stat { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: .9rem 1rem; }
-  .stat .v { color: var(--ink); font-size: 1.7rem; font-weight: 600; line-height: 1.2; }
-  .stat .l { color: var(--ink); font-size: .9rem; margin-top: .15rem; }
-  .stat .d { color: var(--faint); font-size: .8rem; margin-top: .25rem; }
-  .cmp { display: grid; gap: .9rem; grid-template-columns: 1fr 1fr; }
-  .cmp .col { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 1rem 1.2rem; }
-  .cmp .col.wide { grid-column: 1 / -1; }
-  .cmp ul { margin: .4rem 0 0; padding-left: 1.1rem; font-size: .9rem; }
-  .cmp li { margin: .2rem 0; }
-  .sub { color: var(--faint); font-size: .82rem; margin: .2rem 0 0; }
-  .exp { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 1.2rem 1.3rem;
-         margin: 1.4rem 0; scroll-margin-top: 3rem; }
-  .exp > header { display: flex; flex-wrap: wrap; gap: .4rem .8rem; align-items: center; margin-bottom: .9rem; }
-  .exp > header .meta { margin-left: auto; font-family: var(--mono); font-size: .76rem; color: var(--faint); }
-  .exp-grid { display: grid; gap: 1.2rem; grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr); align-items: start; }
-  .factlist > div { display: grid; grid-template-columns: 11rem 1fr; gap: .6rem; font-size: .88rem;
-                     padding: .35rem 0; border-bottom: 1px solid var(--line); }
-  .exp-facts b { color: var(--ink); font-weight: 600; }
-  .exp-more { display: grid; gap: .9rem; grid-template-columns: 1fr 1fr; margin-top: 1rem; }
-  .timeline { margin-top: 1rem; }
-  .timeline .bar { display: flex; gap: 2px; height: 14px; border-radius: 4px; overflow: hidden; }
-  .timeline .seg { display: block; min-width: 3px; }
-  .tl-axis { display: flex; justify-content: space-between; font-size: .72rem; color: var(--faint); margin-top: .15rem; }
-  .events { list-style: none; padding: 0; margin: .5rem 0 0; font-size: .82rem; columns: 2; column-gap: 1.2rem; }
-  .events li { break-inside: avoid; padding: .12rem 0; }
-  .events li span { font-family: var(--mono); color: var(--faint); display: inline-block; width: 3.4rem; }
-  .events li.bad { color: var(--bad); } .events li.ok { color: var(--ok); } .events li.safe { color: var(--safe); }
-  .legend { display: flex; flex-wrap: wrap; gap: .3rem 1rem; font-size: .8rem; color: var(--body); margin: .4rem 0; }
-  .legend.small { font-size: .74rem; margin-top: .5rem; }
-  .legend .sw { display: inline-block; width: .8rem; height: .8rem; border-radius: 3px; margin-right: .35rem;
-                vertical-align: -1px; }
+  .lead { max-width: 90ch; font-size: 1rem; }
+  h2 { font-size: 1.45rem; margin-top: 2.8rem; }
+  /* Overview */
+  .kpis-main { display: grid; gap: 1rem; grid-template-columns: repeat(4, minmax(0, 1fr)); margin: 1.8rem 0 1rem; }
+  .kpi { background: var(--card); border: 1px solid var(--line); border-top: 4px solid var(--muted);
+         border-radius: 10px; padding: 1rem 1.2rem 1.1rem; }
+  .kpi.ok { border-top-color: var(--done); } .kpi.safe { border-top-color: var(--safe-c); }
+  .kpi.bad { border-top-color: var(--fail); } .kpi.neutral { border-top-color: var(--now); }
+  .kpi .v { color: var(--ink); font-size: 2.6rem; font-weight: 650; line-height: 1.05; }
+  .kpi .l { color: var(--ink); font-size: 1.02rem; font-weight: 600; margin-top: .25rem; }
+  .kpi .d { color: var(--faint); font-size: .86rem; margin-top: .3rem; }
+  .pips { list-style: none; display: flex; flex-wrap: wrap; gap: .5rem; padding: 0; margin: 0 0 1.2rem; max-width: none; }
+  .pips li, .steps li { display: flex; gap: .5rem; align-items: flex-start; background: var(--card);
+         border: 1px solid var(--line); border-left: 4px solid var(--muted); border-radius: 8px;
+         padding: .4rem .7rem; font-size: .9rem; color: var(--ink); }
+  .pips small, .steps small { display: block; color: var(--faint); font-size: .8rem; }
+  .pips b, .steps b { font-size: 1rem; line-height: 1.35; }
+  li.done { border-left-color: var(--done); } li.done > b { color: var(--done); }
+  li.fail { border-left-color: var(--fail); } li.fail > b { color: var(--fail); }
+  li.safe { border-left-color: var(--safe-c); } li.safe > b { color: var(--safe-c); }
+  li.end.done { background: var(--done-bg); } li.end.safe { background: var(--safe-bg2); }
+  li.end.fail { background: var(--fail-bg); }
+  li.end span { font-family: var(--mono); font-weight: 600; font-size: .86rem; }
+  .secondary { display: grid; gap: 1.2rem; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); align-items: start; }
+  .secondary h3 { color: var(--ink); font-size: 1rem; margin-bottom: .5rem; }
+  table.compact th, table.compact td, table.measures th, table.measures td { padding: .45rem .7rem; font-size: .92rem; }
+  table.compact td { white-space: nowrap; }
+  .caveat { background: var(--accent-bg); border-radius: 10px; padding: .9rem 1.1rem; margin: 2rem 0 0; font-size: .92rem;
+            color: var(--body); }
+  .caveat b { color: var(--ink); }
+  .src { font-size: .72rem; font-family: var(--mono); padding: .05rem .45rem; border-radius: 999px; white-space: nowrap;
+         border: 1px solid var(--line); color: var(--faint); }
+  .src.gt { color: var(--done); border-color: var(--done); }
+  .src.est { color: var(--now); border-color: var(--now); }
+  .na { color: var(--faint); font-style: italic; font-size: .88rem; }
+  /* Comparison */
+  .cmp { display: grid; gap: 1rem; grid-template-columns: 1fr 1fr; margin-bottom: 1rem; }
+  .col { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 1rem 1.2rem; }
+  .col h3 { color: var(--ink); font-size: 1.15rem; }
+  .col.safety { margin-top: 1rem; }
+  .sub { color: var(--faint); font-size: .84rem; margin: .2rem 0 .7rem; }
+  .steps { list-style: none; padding: 0; margin: .6rem 0 0; display: flex; flex-wrap: wrap; gap: .5rem; max-width: none;
+           counter-reset: none; }
+  .steps:not(.vertical) li:not(:last-child)::after { content: '→'; color: var(--faint); margin-left: .3rem; }
+  .steps.vertical { flex-direction: column; }
+  .steps.vertical li { font-size: .98rem; }
+  table.measures th { width: 30%; font-weight: 600; }
+  table.measures tr:first-child th { width: auto; }
+  details.more { margin-top: .9rem; }
+  details.more > summary { cursor: pointer; color: var(--accent); font-size: .92rem; }
+  details.more p { font-size: .92rem; }
+  /* Featured experiments */
+  .exp { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 1.4rem 1.5rem;
+         margin: 1.6rem 0; scroll-margin-top: 3rem; }
+  .exp > header { display: flex; flex-wrap: wrap; gap: .5rem .9rem; align-items: center; }
+  .exp > header h3 { color: var(--ink); font-size: 1.3rem; }
+  .exp > header .meta { margin-left: auto; font-family: var(--mono); font-size: .78rem; color: var(--faint); }
+  .letter { display: inline-grid; place-items: center; width: 2rem; height: 2rem; border-radius: 50%;
+            background: var(--accent); color: var(--card); font-weight: 700; }
+  .summary { font-size: 1.05rem; color: var(--ink); margin: .7rem 0 1rem; max-width: 100ch; }
+  .kpis { display: flex; flex-wrap: wrap; gap: .6rem; margin-bottom: 1.1rem; }
+  .kpis .k { background: var(--paper); border: 1px solid var(--line); border-radius: 8px; padding: .45rem .8rem;
+             min-width: 9rem; }
+  .kpis .l { display: block; font-size: .76rem; color: var(--faint); text-transform: uppercase; letter-spacing: .04em; }
+  .kpis .v { display: block; font-size: 1.15rem; color: var(--ink); font-weight: 600; }
+  .kpis .v code { font-size: .92rem; }
+  .kpis .d { display: block; font-size: .76rem; color: var(--faint); }
+  .media { display: grid; gap: 1rem; grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr); align-items: start; }
+  .aside { display: grid; gap: 1rem; }
+  figure.shot .frame { position: relative; }
+  figure.shot img { background: var(--paper); }
+  figure.shot figcaption { font-size: .84rem; line-height: 1.45; }
+  svg.annot { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+  svg.annot .lead { stroke: var(--annot); stroke-width: 3; stroke-dasharray: 8 6; }
+  svg.annot .ring { fill: none; stroke: var(--annot); stroke-width: 4; }
+  svg.annot .tag { fill: rgba(17,20,26,.82); stroke: var(--annot); stroke-width: 2.5; }
+  svg.annot text { fill: #fff; font-weight: 600; font-family: -apple-system, "Segoe UI", Roboto, sans-serif; }
+  figure.labels-off svg.annot { display: none; }
+  .labels-toggle { font: inherit; font-size: .76rem; margin-top: .35rem; color: var(--accent); background: var(--card);
+                   border: 1px solid var(--line); border-radius: 6px; padding: .1rem .5rem; cursor: pointer; }
+  .timeline { margin-top: 1.3rem; border-top: 1px solid var(--line); padding-top: 1rem; }
+  .tl-head { display: flex; justify-content: space-between; font-size: .92rem; color: var(--ink); font-weight: 600;
+             margin-bottom: .4rem; }
+  .tl-head b { font-family: var(--mono); }
+  .tl-bar { position: relative; height: 34px; border-radius: 6px; overflow: hidden; background: var(--line); }
+  .tl-bar .seg { position: absolute; top: 0; bottom: 0; border-right: 2px solid var(--card); display: flex;
+                 align-items: center; padding: 0 .6rem; overflow: hidden; white-space: nowrap; }
+  .tl-bar .seg span { color: #fff; font-size: .86rem; font-weight: 600; }
+  .tl-bar .ph-locate span { color: var(--ph-ink-locate); }
+  .tl-bar .mark { position: absolute; top: 0; bottom: 0; width: 3px; margin-left: -1px; background: var(--fail); }
+  .tl-phases { list-style: none; display: flex; flex-wrap: wrap; gap: .3rem 1.3rem; padding: 0; margin: .55rem 0 .2rem;
+               font-size: .92rem; max-width: none; }
+  .tl-phases b { font-family: var(--mono); color: var(--ink); font-weight: 600; }
+  .sw { display: inline-block; width: .85rem; height: .85rem; border-radius: 3px; margin-right: .4rem; vertical-align: -1px; }
   .ph-search { background: var(--ph-search); fill: var(--ph-search); }
   .ph-locate { background: var(--ph-locate); fill: var(--ph-locate); }
   .ph-park { background: var(--ph-park); fill: var(--ph-park); }
   .ph-wait { background: var(--ph-wait); fill: var(--ph-wait); }
   .ph-return { background: var(--ph-return); fill: var(--ph-return); }
-  .charts { display: grid; gap: 1rem; grid-template-columns: 1fr; }
-  .chartcard { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 1rem 1.2rem; }
-  .chartcard h3 { color: var(--ink); font-size: 1rem; }
-  .chartcard p.q { color: var(--faint); font-size: .84rem; margin: .2rem 0 .6rem; }
-  svg.chart { width: 100%; height: auto; display: block; }
-  svg .axis { stroke: var(--line); stroke-width: 1; } svg .grid { stroke: var(--line); stroke-width: 1; opacity: .6; }
+  .factlist > div { display: grid; grid-template-columns: 13rem 1fr; gap: .8rem; font-size: .92rem;
+                    padding: .45rem 0; border-bottom: 1px solid var(--line); }
+  .factlist b { color: var(--ink); font-weight: 600; }
+  .events { list-style: none; padding: 0; margin: .8rem 0 0; font-size: .9rem; columns: 2; column-gap: 2rem; max-width: none; }
+  .events li { break-inside: avoid; padding: .15rem 0; }
+  .events li span { font-family: var(--mono); color: var(--faint); display: inline-block; width: 3.6rem; }
+  .events li.fail { color: var(--fail); } .events li.done { color: var(--done); } .events li.safe { color: var(--safe-c); }
+  /* Charts */
+  .charts { display: grid; gap: 1.2rem; }
+  .chartcard { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 1.2rem 1.4rem; }
+  .chartcard h3 { color: var(--ink); font-size: 1.15rem; }
+  .chartcard p.q { color: var(--body); font-size: .95rem; margin: .35rem 0 .8rem; }
+  .chartcard p.q b { color: var(--ink); }
+  .chartcard .note { margin-top: .6rem; }
+  .legend { display: flex; flex-wrap: wrap; gap: .3rem 1.2rem; font-size: .9rem; color: var(--body); margin: .2rem 0 .6rem; }
+  svg.chart { width: 100%; max-width: 1080px; height: auto; display: block; font-family: inherit; }
+  svg .axis { stroke: var(--faint); stroke-width: 1; } svg .grid { stroke: var(--line); stroke-width: 1; }
   svg .row { stroke: var(--line); stroke-width: 1; }
-  svg .tick { fill: var(--faint); font-size: 11px; } svg .label { fill: var(--body); font-size: 12px; }
-  svg .value { fill: var(--ink); font-size: 11px; } svg .value.bad { fill: var(--bad); }
-  svg .dot-gz { fill: var(--gz); stroke: var(--card); stroke-width: 2; }
-  svg .dot-bad { fill: var(--st-crit); stroke: var(--card); stroke-width: 2; }
-  svg .band { fill: var(--band); } svg .arrow { stroke: var(--bad); stroke-width: 2; }
-  details.data { margin-top: .5rem; } details.data summary { cursor: pointer; color: var(--faint); font-size: .82rem; }
-  .attrow { display: grid; grid-template-columns: 16rem 1fr; gap: .8rem; padding: .5rem 0; border-bottom: 1px solid var(--line); }
-  .attlabel { font-size: .86rem; color: var(--ink); } .attlabel small { display: block; color: var(--faint); font-size: .76rem; }
-  .atts { display: flex; flex-wrap: wrap; gap: .4rem; }
-  .att { border: 1px solid var(--line); border-radius: 8px; padding: .3rem .6rem; font-size: .84rem; color: var(--ink); }
-  .att b { margin-right: .2rem; } .att small { display: block; color: var(--faint); font-size: .74rem; }
-  .att.veto b { color: var(--st-crit); } .att.parked b { color: var(--st-good); }
-  .att.parked { border-color: var(--st-good); }
+  svg .tick { fill: var(--body); font-size: 14px; } svg .axtitle { fill: var(--faint); font-size: 14px; }
+  svg .label { fill: var(--ink); font-size: 15px; }
+  svg .value { fill: var(--ink); font-size: 14px; font-weight: 600; } svg .value.bad { fill: var(--fail); }
+  svg .good { fill: var(--done); font-weight: 600; } svg .muted { fill: var(--faint); font-weight: 400; }
+  svg .bandlabel { fill: var(--done); font-size: 14px; font-weight: 600; }
+  svg .dot-gz { fill: var(--gz); stroke: var(--card); stroke-width: 2.5; }
+  svg .band { fill: var(--band); } svg .arrow { stroke: var(--fail); stroke-width: 2.5; }
+  details.data { margin-top: .5rem; } details.data summary { cursor: pointer; color: var(--accent); font-size: .88rem; }
+  .attrow { display: grid; grid-template-columns: 19rem 1fr; gap: 1rem; padding: .7rem 0; border-bottom: 1px solid var(--line); }
+  .attrow .steps { margin: 0; }
+  .attlabel { font-size: .95rem; color: var(--ink); } .attlabel small { display: block; color: var(--faint); font-size: .82rem; }
+  /* Historical records */
+  #history { margin-top: 3rem; }
+  details.archive { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 1rem 1.3rem; }
   details.archive > summary { cursor: pointer; list-style: none; }
   details.archive > summary::-webkit-details-marker { display: none; }
-  details.archive > summary h2 { display: inline; }
+  details.archive > summary h2 { display: inline; font-size: 1.2rem; margin: 0; }
   details.archive > summary h2::before { content: '▸ '; color: var(--accent); }
   details.archive[open] > summary h2::before { content: '▾ '; }
-  details.archive > summary .note { display: block; margin: .2rem 0 .8rem; }
-  .filters { display: flex; flex-wrap: wrap; gap: .5rem 1rem; align-items: center; margin: .6rem 0; font-size: .84rem; }
-  .filters select, .filters input { font: inherit; padding: .2rem .4rem; border: 1px solid var(--line);
+  details.archive > summary .note { display: block; margin: .3rem 0 0; }
+  details.archive[open] > summary .note { margin-bottom: .8rem; }
+  .filters { display: flex; flex-wrap: wrap; gap: .5rem 1rem; align-items: center; margin: .6rem 0; font-size: .88rem; }
+  .filters select, .filters input { font: inherit; padding: .25rem .45rem; border: 1px solid var(--line);
                                      border-radius: 6px; background: var(--card); color: var(--ink); }
-  button.more { font: inherit; font-size: .78rem; color: var(--accent); background: none; cursor: pointer;
+  button.more { font: inherit; font-size: .8rem; color: var(--accent); background: none; cursor: pointer;
                 border: 1px solid var(--line); border-radius: 6px; padding: .1rem .5rem; }
   #runs tr.detail td { background: var(--paper); }
-  #runs tr.detail .outcome { margin: .2rem 0 .5rem; color: var(--ink); font-weight: 600; font-size: .86rem; }
+  #runs tr.detail .outcome { margin: .2rem 0 .5rem; color: var(--ink); font-weight: 600; font-size: .88rem; }
   .rowdetail { display: grid; gap: .3rem 1.4rem; grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr));
-               font-size: .8rem; }
+               font-size: .84rem; }
   .rowdetail div { display: grid; grid-template-columns: 9.5rem 1fr; gap: .5rem; }
   .rowdetail b { color: var(--ink); font-weight: 600; }
   #runs td { vertical-align: top; }
-  @media (max-width: 960px) {
-    .exp-grid, .cmp, .exp-more { grid-template-columns: 1fr; }
+  @media (max-width: 1100px) {
+    .kpis-main { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .secondary, .media { grid-template-columns: minmax(0, 1fr); }
+    .aside { grid-template-columns: 1fr 1fr; }
+  }
+  @media (max-width: 760px) {
+    .cmp, .aside { grid-template-columns: minmax(0, 1fr); }
     .attrow { grid-template-columns: 1fr; } .events { columns: 1; }
-  }
-  @media (max-width: 560px) {
-    .factlist > div, .rowdetail div { grid-template-columns: 7rem 1fr; }
+    .factlist > div, .rowdetail div { grid-template-columns: 8rem 1fr; }
     .exp > header .meta { margin-left: 0; }
+    .tl-bar .seg span { display: none; }
   }
+  @media (max-width: 480px) { .kpis-main { grid-template-columns: 1fr 1fr; } .kpi .v { font-size: 2rem; } }
 """
+
+RESULTS_JS = """<script>
+  // Enlarging a cropped capture shows the whole capture it was cut from.
+  window.addEventListener('load', () => {
+    document.querySelectorAll('figure img[data-full]').forEach(img => img.addEventListener('click', () => {
+      document.querySelector('#viewer img').src = img.dataset.full;
+    }));
+  });
+  document.querySelectorAll('.labels-toggle').forEach(b => b.addEventListener('click', () => {
+    const fig = b.closest('figure');
+    const off = fig.classList.toggle('labels-off');
+    b.setAttribute('aria-pressed', String(!off));
+    b.textContent = off ? 'Labels off' : 'Labels on';
+  }));
+</script>"""
 
 
 def main():
@@ -809,23 +1040,37 @@ def main():
                                 os.path.normpath(os.path.join(ROOT, spec['run'])))
               for spec in FEATURED}
     explain = explanations(by_key)
-    featured_html = ''.join(featured(by_key[spec['key']], spec, explain[spec['key']]) for spec in FEATURED)
+    featured_html = ''.join(featured(by_key[spec['key']], spec, *explain[spec['key']]) for spec in FEATURED)
+    since = by_key['isaac_side']['start'] - 6 * 86400        # the G1 position check, 9 November
+
+    def card(title, shows, body, note=''):
+        return (f'<div class="chartcard"><h3>{title}</h3><p class="q"><b>What it shows:</b> {shows}</p>{body}'
+                f'{f"<p class=note>{note}</p>" if note else ""}</div>')
+    gz_errors = [e for r in final if r['m']['simulator'] == 'gz' for e in r['m'].get('localization_errors_m') or []]
     charts = (
         '<div class="charts">'
-        '<div class="chartcard"><h3>Mission duration by phase</h3><p class="q">The post-merge runs, from the '
-        'first mission state to the last; hover a segment for its seconds.</p>'
-        f'{duration_chart(final)}</div>'
-        '<div class="chartcard"><h3>G1 localization error (Gazebo ground truth)</h3><p class="q">Distance from '
-        'each G1 position the mission used to G1\'s true position, post-merge Gazebo runs.</p>'
-        f'{localization_chart(final)}</div>'
-        '<div class="chartcard"><h3>Parking attempts in completed missions</h3><p class="q">Every completed '
-        'mission since the G1 position check (9 November): each attempt, and why it was vetoed. Three '
-        'attempts is the limit.</p>'
-        f'{attempts_chart([r for r in runs if r["start"] >= by_key["isaac_side"]["start"] - 6 * 86400])}</div>'
-        '<div class="chartcard"><h3>Parked reach against the requirement (Gazebo ground truth)</h3><p class="q">'
-        'Distance from G1\'s axis to the basket centre at every completed Gazebo mission, all campaigns; the '
-        'shaded band is the required 0.30-0.60 m. Isaac records no ground truth and is not shown.</p>'
-        f'{reach_chart(runs)}</div></div>')
+        + card('Mission duration by phase',
+               'how long each post-merge run spent searching for G1, localizing and planning, parking, waiting '
+               'and returning. Searching dominates every run; hover a segment for its duration.',
+               duration_chart(final),
+               'Times from the mission\'s logged state changes (mission log), not from ground truth.')
+        + card('G1 localization error',
+               'how far each G1 position the mission planned with was from G1\'s true position, in the '
+               'post-merge Gazebo runs (one dot per localization).',
+               localization_chart(final),
+               f'{len(gz_errors)} localizations: {min(gz_errors):.3f}-{max(gz_errors):.3f} m. Gazebo ground truth '
+               f'only; Isaac records no ground truth, so it has no points here.')
+        + card('Parking attempts in completed missions',
+               'every completed mission since the G1 position check (9 November): each attempt in order, '
+               'whether the live LiDAR check rejected it and why. A mission makes at most three attempts.',
+               attempts_chart([r for r in runs if r['start'] >= since]))
+        + card('Parked reach against the requirement',
+               'the distance from G1\'s axis to the basket centre at every completed Gazebo mission, all '
+               'campaigns, against the required 0.30-0.60 m band.',
+               reach_chart(runs),
+               'Gazebo ground truth only; Isaac records no ground truth and is not shown. The historical false '
+               'completion parked 1.72 m away, off the scale.')
+        + '</div>')
     jump = ''.join(f'<a href="#{k}">{v}</a>' for k, v in (
         ('overview', 'Overview'), ('compare', 'Gazebo and Isaac'), ('featured', 'Featured experiments'),
         ('performance', 'Performance'), ('history', 'All runs')))
@@ -839,9 +1084,10 @@ def main():
             f'{overview(final, scenario_count)}'
             f'{comparison(by_key, by_key["gazebo_refusal"])}'
             f'<section id="featured"><h2>Featured experiments</h2><p class="lead">Three runs on the merged '
-            f'code, each with captures from that run only. Click an image to enlarge it.</p>{featured_html}</section>'
+            f'code, each with captures from that run only, cropped to the robot and G1. Labels are drawn over the '
+            f'images and can be switched off; click an image to see the whole capture.</p>{featured_html}</section>'
             f'<section id="performance"><h2>Performance</h2>{charts}</section>'
-            f'{history(runs)}</main>')
+            f'{history(runs)}</main>{RESULTS_JS}')
     with open(OUT, 'w') as stream:
         stream.write(pages.page('Autonomous Parking — Experimental Results', pages.RESULTS_PAGE, intro, body,
                                 extra_css=RESULTS_CSS))

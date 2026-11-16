@@ -159,8 +159,9 @@ in `results_runs.txt` (or the run folders given as arguments, such as
 comparison and charts use the post-merge runs (`FINAL_SET`), its featured
 experiments name their run and captures in `FEATURED`, and every run appears in its
 filterable table. Each featured capture is shown only if it is not blank and was
-taken in the mission state its caption names; the page keeps only the images it
-uses in `assets/parking_results/`.
+taken in the mission state its caption names; the page shows the crop named in
+`FEATURED`, draws any labels as a separate layer over it, and enlarges to the whole
+capture. It keeps only the images it uses in `assets/parking_results/`.
 
 `FRAMES=1` also saves a camera frame every `FRAMES_PERIOD` seconds (default 1;
 `FRAMES_EXT=png` is lossless and about 0.4 MB a frame).
