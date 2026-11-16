@@ -3,7 +3,8 @@
 # Waits for a free workstation, starts start_parking_demo.sh in its own session, records a small
 # bag (with both 2D scans, for parking-clearance review), samples Gazebo ground truth, takes RViz screenshots at mission stages and
 # server-rendered top-down views of the scene (capture_scene_views.py) when parked and at the
-# end, and stops only that session with SIGTERM. LIMIT (s) bounds the run; DEMO_ARGS adds launch arguments (e.g. rviz_layout:=compact).
+# end, and stops only that session with SIGTERM. LIMIT (s) bounds the run; DEMO_ARGS adds launch arguments (e.g. rviz_layout:=compact);
+# END_VIEWS names the scene views taken at the end (default overview,workstation).
 B=$1; SC=$2; D=$(realpath -m "$3"); P=$(cd "$(dirname "$0")" && pwd); ROOT=$(cd "$P/../.." && pwd); LIMIT=${LIMIT:-900}
 : "${RIDGEBACK_PERCEPTION_VENV:?set RIDGEBACK_PERCEPTION_VENV}"; export DISPLAY="${DISPLAY:?a display is needed for screenshots}"
 mkdir -p "$D/shots"; cd "$ROOT"
@@ -55,7 +56,7 @@ while [ $SECONDS -lt $end ]; do
   kill -0 $LPID 2>/dev/null || { result=launch_exited; break; }
   timeout 2 tail -n0 -f /dev/null
 done
-timeout 3 tail -n0 -f /dev/null; shot "END_$result"; simview end overview,workstation
+timeout 3 tail -n0 -f /dev/null; shot "END_$result"; simview end "${END_VIEWS:-overview,workstation}"
 kill -TERM $RPID 2>/dev/null; pkill -TERM -P $RPID 2>/dev/null; timeout 30 tail --pid=$RPID -f /dev/null
 [ -n "$TPID" ] && kill $TPID 2>/dev/null
 if [ -s "$D/frame_saver.pid" ]; then FPID=$(cat "$D/frame_saver.pid")
