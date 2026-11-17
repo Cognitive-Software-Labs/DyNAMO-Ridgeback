@@ -25,7 +25,16 @@ def simulation_setup_path(package_share, requested, *, backend, namespace, demo=
     return str(selected) + '/'
 
 
+def demo_worlds(backend):
+    """The worlds this backend's parking demo may load; the first is the default.
+
+    Each holds no humanoid but the scenario's G1: parking_demo (both backends) is
+    initial_test_world without its authored distant G1, removed by Gazebo's
+    parking_demo.sdf and disabled by Isaac's USD layer. Gazebo's depot, the
+    Clearpath warehouse (native name warehouse), has none."""
+    from ridgeback_autonomy.mission.parking_scenarios import DEMO_WORLDS
+    return DEMO_WORLDS[backend]
+
+
 def demo_world(backend):
-    # The Isaac layer disables the world-authored distant G1 only. Gazebo's
-    # depot has no authored humanoid; its native Gazebo name is warehouse.
-    return 'parking_demo' if backend == 'isaac' else 'depot'
+    return demo_worlds(backend)[0]

@@ -3,26 +3,33 @@
 #
 # Every scene is built around a workstation: G1 standing at a worktable, facing
 # it, out of the robot's sight from its start (the backend's default spawn at the
-# world origin, facing +x). The robot must explore to find G1. Objects are placed
-# in the workstation frame: `forward` toward the worktable, `left` to G1's left when
-# it faces the table, `yaw_deg` relative to the workstation heading. `g1_turn_deg`
-# turns G1 away from the table. Assets are logical names from each backend's
+# world origin, facing +x) in the selected demo world. The robot must explore to
+# find G1. Objects are placed in the workstation frame: `forward` toward the
+# worktable, `left` to G1's left when it faces the table, `yaw_deg` relative to the
+# workstation heading. `g1_turn_deg` turns G1 away from the table. Assets are logical names from each backend's
 # sim/benchmark_assets.yaml, so Gazebo and Isaac spawn the same collision geometry
 # around G1. `expected` and `purpose` document intent; the mission never reads them,
 # and nothing here is passed to the mission.
-schema: ridgeback_parking_scenarios/2
+schema: ridgeback_parking_scenarios/3
+# One workstation per demo world (launch argument world). floor_z is the top of the
+# world's floor, where G1 and the objects stand. A run folder keeps the scenario file
+# it ran with, so older runs keep their schema-2 workstations per backend.
 workstations:
-  # In the lane west of the start, facing west: behind the camera at the start; the
-  # explorer heads down this lane first and meets G1 from behind, the view the
-  # detector localizes reliably. Earlier layouts (2026-11-05/08, see the record): an
-  # aisle behind the long shelf the explorer never entered; the floor north of the
-  # start, where G1 was found before the robot left its spawn, so every route began
-  # in the unscanned wedges beside its flanks and was rightly rejected; and the west
-  # lane's edge, where a front-left view scored below the 0.50 localization floor.
-  gz: {x: -4.5, y: -0.6, yaw_deg: 180}
-  # The south room off the corridor, entered through the doorway at x 2.7-5.3; the
-  # corridor wall hides G1 from the start (the robot arrives from G1's back-left).
-  isaac: {x: 0.5, y: -4.5, yaw_deg: -90}
+  # The hospital ward (initial_test_world without its authored G1), loaded by both
+  # simulators: Gazebo's parking_demo.sdf and Isaac's parking_demo.usda layer share
+  # its walls, rooms and furniture. G1 stands in the south room off the corridor,
+  # entered through the doorway at x 2.7-5.3; the corridor wall hides G1 from the
+  # start (the robot arrives from G1's back-left). The 0.1 m floor slab tops out at 0.05 m.
+  parking_demo: {x: 0.5, y: -4.5, yaw_deg: -90, floor_z: 0.05}
+  # Gazebo's warehouse (Clearpath depot), the Gazebo parking world until 2026-11-17;
+  # world:=depot reproduces those runs. In the lane west of the start, facing west:
+  # behind the camera at the start; the explorer heads down this lane first and meets
+  # G1 from behind. Earlier layouts (2026-11-05/08, see the record): an aisle behind
+  # the long shelf the explorer never entered; the floor north of the start, where G1
+  # was found before the robot left its spawn, so every route began in the unscanned
+  # wedges beside its flanks and was rightly rejected; and the west lane's edge, where
+  # a front-left view scored below the 0.50 localization floor.
+  depot: {x: -4.5, y: -0.6, yaw_deg: 180, floor_z: 0.0}
 robot_start: {x: 0.0, y: 0.0, yaw_deg: 0.0}
 scenarios:
   standard:

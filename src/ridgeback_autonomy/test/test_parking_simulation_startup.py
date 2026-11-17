@@ -15,7 +15,7 @@ from launch import LaunchContext
 from simulation_interfaces.msg import Result
 from simulation_interfaces.srv import SpawnEntity
 
-from ridgeback_autonomy.mission.simulation_config import simulation_setup_path
+from ridgeback_autonomy.mission.simulation_config import demo_worlds, simulation_setup_path
 from ridgeback_autonomy.mission.simulation_startup import (
     NAV2_NODES, DEMO_G1, DEMO_TABLE, SimulationStartup, demo_specs, missing_readiness, spawn_demo_scene,
     check_demo_entities,
@@ -57,9 +57,17 @@ def test_backend_defaults_and_explicit_odometry_override(backend, world, odom):
     assert context.launch_configurations['parking_navigation_enabled'] == 'false'
 
 
-def test_isaac_demo_has_an_unambiguous_world():
-    context = defaults(backend='isaac', demo_scene_enabled='true')
+@pytest.mark.parametrize('backend', ['gz', 'isaac'])
+def test_demo_loads_the_hospital_ward_by_default(backend):
+    context = defaults(backend=backend, demo_scene_enabled='true')
     assert context.launch_configurations['world'] == 'parking_demo'
+
+
+def test_the_warehouse_stays_an_explicit_gazebo_demo_world():
+    assert defaults(backend='gz', demo_scene_enabled='true',
+                    world='depot').launch_configurations['world'] == 'depot'
+    assert demo_worlds('gz') == ('parking_demo', 'depot')
+    assert demo_worlds('isaac') == ('parking_demo',)
 
 
 @pytest.mark.parametrize('backend', ['gz', 'isaac'])
@@ -172,13 +180,14 @@ def scene():
                                          ready_timeout_sec=.1, retry_sleep_sec=.01)
 
 
-def specs(backend='gz'):
-    return demo_specs(backend, share=lambda package: str(ROOT/'src'/package))
+def specs(backend='gz', world=None):
+    return demo_specs(backend, world=world, share=lambda package: str(ROOT/'src'/package))
 
 
 def test_real_asset_catalogs_supply_the_two_models_and_world_floor_heights():
-    for backend, floor in [('gz',0.),('isaac',.05)]:
-        g1, table = specs(backend)
+    # The ward's floor slab tops out at 0.05 m in both simulators; the warehouse floor is 0.
+    for backend, world, floor in [('gz', None, .05), ('isaac', None, .05), ('gz', 'depot', 0.)]:
+        g1, table = specs(backend, world)
         assert (g1.name, table.name) == (DEMO_G1, DEMO_TABLE)
         assert g1.z == table.z == floor
         assert Path(g1.uri).is_file() and Path(table.uri).is_file()
@@ -192,38 +201,55 @@ def test_every_scenario_spawns_catalog_assets_in_both_simulators():
     names = load_scenarios(share=lambda package: str(ROOT/'src'/package))['scenarios']
     assert set(names) == {'standard', 'right_blocked', 'left_blocked', 'both_sides_blocked',
                           'restricted', 'no_feasible', 'heading_90', 'heading_away'}
-    for backend in ('gz', 'isaac'):
+    for backend, world in (('gz', 'parking_demo'), ('gz', 'depot'), ('isaac', 'parking_demo')):
         for name in names:
             if backend not in names[name].get('backends', ('gz', 'isaac')):
                 with pytest.raises(ValueError, match='does not fit'):
-                    demo_specs(backend, name, share=lambda package: str(ROOT/'src'/package))
+                    demo_specs(backend, name, world, share=lambda package: str(ROOT/'src'/package))
                 continue
-            spawned = demo_specs(backend, name, share=lambda package: str(ROOT/'src'/package))
+            spawned = demo_specs(backend, name, world, share=lambda package: str(ROOT/'src'/package))
             assert spawned[0].name == DEMO_G1
             assert all(Path(s.uri).is_file() for s in spawned)
             assert len({s.name for s in spawned}) == len(spawned)
             check_demo_entities([])          # names are owned, never pre-existing
 
 
-@pytest.mark.parametrize('backend', ['gz', 'isaac'])
-def test_g1_works_out_of_sight_of_the_robot_start(backend):
+@pytest.mark.parametrize('backend,world', [('gz', None), ('isaac', None), ('gz', 'depot')])
+def test_g1_works_out_of_sight_of_the_robot_start(backend, world):
     # The robot spawns at the origin facing +x with a 79.6 deg colour camera: the
     # workstation lies outside that view and several metres away, so G1 must be found.
-    g1 = specs(backend)[0]
+    g1 = specs(backend, world)[0]
     assert math.hypot(g1.x, g1.y) > 4.0
     assert abs(math.degrees(math.atan2(g1.y, g1.x))) > 40.0
 
 
 def test_scenarios_share_one_layout_around_g1_in_both_worlds():
-    def relative(backend, name):
-        spawned = demo_specs(backend, name, share=lambda package: str(ROOT/'src'/package))
+    def relative(backend, name, world=None):
+        spawned = demo_specs(backend, name, world, share=lambda package: str(ROOT/'src'/package))
         g1 = spawned[0]
         heading = math.atan2(spawned[1].y - g1.y, spawned[1].x - g1.x)   # toward the worktable
         return [(round((s.x - g1.x) * math.cos(heading) + (s.y - g1.y) * math.sin(heading), 3),
                  round(-(s.x - g1.x) * math.sin(heading) + (s.y - g1.y) * math.cos(heading), 3))
                 for s in spawned]
     for name in ('standard', 'right_blocked', 'no_feasible', 'restricted'):
-        assert relative('gz', name) == relative('isaac', name)
+        assert relative('gz', name) == relative('isaac', name) == relative('gz', name, 'depot')
+
+
+def test_both_simulators_place_the_hospital_scene_identically():
+    for name in ('standard', 'no_feasible', 'restricted'):
+        gz, isaac = specs_for('gz', name), specs_for('isaac', name)
+        assert [(s.name, s.x, s.y, s.z, s.yaw) for s in gz] == [(s.name, s.x, s.y, s.z, s.yaw) for s in isaac]
+
+
+def specs_for(backend, name, world=None):
+    return demo_specs(backend, name, world, share=lambda package: str(ROOT/'src'/package))
+
+
+def test_a_world_the_backend_does_not_load_is_refused():
+    with pytest.raises(ValueError, match='supports world'):
+        specs('isaac', 'depot')
+    with pytest.raises(ValueError, match='supports world'):
+        specs('gz', 'initial_test_world')
 
 
 def test_g1_turns_relative_to_its_worktable():

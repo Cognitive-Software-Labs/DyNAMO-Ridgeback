@@ -111,10 +111,13 @@ def run(d):
     own = f'{d}/scenarios.yaml'
     data = parking_scenarios.load(own if os.path.exists(own) else SCENARIO_FILE)
     scene = data['scenarios'][name]
-    layout = parking_scenarios.world_layout(data, name, backend)
+    # The demo world the run loaded (run_scenario.sh records it; older runs ran their
+    # backend's only world and keep schema-2 scenario files).
+    world = open(f'{d}/world.txt').read().strip() if os.path.exists(f'{d}/world.txt') else None
+    layout = parking_scenarios.world_layout(data, name, backend, world)
     tr = [(float(t), a, b, w) for t, a, b, w in re.findall(
         r'\[(\d+\.\d+)\] \[[^\]]*mission_manager_node\]: Mission state transition: (\w+) -> (\w+); reason=([^\n]*)', log)]
-    m = dict(scenario=name, simulator=backend, run=os.path.basename(d),
+    m = dict(scenario=name, simulator=backend, world=world, run=os.path.basename(d),
              commit=open(f'{d}/commit.txt').readline().strip()[:7], expected=scene['expected'],
              description=scene['description'])
     g = layout['g1']

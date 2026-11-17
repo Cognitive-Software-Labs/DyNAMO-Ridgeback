@@ -25,7 +25,7 @@ from launch.substitutions import LaunchConfiguration, PythonExpression
 from launch_ros.actions import Node
 
 from ridgeback_autonomy.mission.parking_rviz import COMPACT_VIEW_AREA_PX, parking_layout, task_view
-from ridgeback_autonomy.mission.simulation_config import demo_world, simulation_setup_path
+from ridgeback_autonomy.mission.simulation_config import demo_worlds, simulation_setup_path
 from ridgeback_autonomy.mission.target_detection import RELOCALIZATION_DETECTION_THRESHOLD
 from ridgeback_common.detector_config import DETECTION_THRESHOLD_DEFAULT
 
@@ -58,7 +58,8 @@ def _parking_rviz(context):
         try:
             g1 = parking_scenarios.world_layout(
                 data, LaunchConfiguration('demo_scenario').perform(context),
-                LaunchConfiguration('backend').perform(context))['g1']
+                LaunchConfiguration('backend').perform(context),
+                LaunchConfiguration('world').perform(context))['g1']
             view = (task_view((0.0, 0.0), (g1['x'], g1['y']), COMPACT_VIEW_AREA_PX) if compact
                     else task_view((0.0, 0.0), (g1['x'], g1['y'])))
         except ValueError:
@@ -85,8 +86,8 @@ def _configure_simulation(context):
     if value('use_sim_time') != 'true':
         raise ValueError('The simulation-only mission requires use_sim_time:=true')
     if demo:
-        if value('world') != demo_world(backend):
-            raise ValueError(f'{backend} demo requires world:={demo_world(backend)}; '
+        if value('world') not in demo_worlds(backend):
+            raise ValueError(f'{backend} demo requires world:={"|".join(demo_worlds(backend))}; '
                              'other worlds may already contain a G1')
         if value('mission_management_enabled') != 'true':
             raise ValueError('demo_scene_enabled requires mission_management_enabled:=true')
@@ -139,7 +140,8 @@ def _startup_nodes(context):
         return Node(package='ridgeback_autonomy', executable='parking_simulation_startup',
             name='parking_startup_' + phase, namespace=value('namespace'),
             arguments=['--phase', phase, *common,
-                       *(['--demo', '--scenario', value('demo_scenario')] if demo else [])],
+                       *(['--demo', '--scenario', value('demo_scenario'), '--world', value('world')]
+                         if demo else [])],
             parameters=[{'use_sim_time': True}],
             remappings=[('/tf', 'tf'), ('/tf_static', 'tf_static')], output='screen')
     prepare, release = gate('prepare'), gate('release')
@@ -179,10 +181,10 @@ def generate_launch_description():
                               description='Demo scene from config/parking_scenarios.yaml'),
         DeclareLaunchArgument(
             'world', default_value=PythonExpression([
-                "'parking_demo' if '", backend, "' == 'isaac' and '",
-                LaunchConfiguration('demo_scene_enabled'), "' == 'true' else "
+                "'parking_demo' if '", LaunchConfiguration('demo_scene_enabled'), "' == 'true' else "
                 "'initial_test_world' if '", backend, "' == 'isaac' else 'depot'"]),
-            description='Existing backend world to load'),
+            description='Existing backend world to load; the parking demo loads the hospital ward '
+                        '(parking_demo), or on Gazebo the warehouse with world:=depot'),
         DeclareLaunchArgument('namespace', default_value='r100_0001'),
         DeclareLaunchArgument('use_sim_time', default_value='true'),
         DeclareLaunchArgument('setup_path', default_value='',

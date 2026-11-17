@@ -55,14 +55,14 @@ def load_scenarios(*, share=get_package_share_directory):
     return parking_scenarios.load(f"{share('ridgeback_autonomy')}/{SCENARIOS_RELATIVE_PATH}")
 
 
-def demo_specs(backend, scenario='standard', *, share=get_package_share_directory):
+def demo_specs(backend, scenario='standard', world=None, *, share=get_package_share_directory):
     from ridgeback_autonomy.mission import parking_scenarios
-    layout = parking_scenarios.world_layout(load_scenarios(share=share), scenario, backend)
+    layout = parking_scenarios.world_layout(load_scenarios(share=share), scenario, backend, world)
     provider = benchmark_backend(backend)
     catalog = load_asset_catalog(asset_catalog_path(provider, package_share=share))
     # Origin heights follow the selected demo world's floor, not benchmark
     # calibration placement. The original SDF and ground-origin USD are reused.
-    floor = 0.05 if backend == 'isaac' else 0.0
+    floor = float(layout['workstation']['floor_z'])
     g1 = layout['g1']
     specs = [SpawnSpec(DEMO_G1, catalog.targets['g1'].uri, catalog.targets['g1'].resource_format,
                        float(g1['x']), float(g1['y']), floor, math.radians(g1['yaw_deg']))]
@@ -271,7 +271,7 @@ class SimulationStartup(Node):
             self.get_logger().info('Waiting for simulator scene services and advancing /clock')
             self.scene.wait_for_services(self.remaining())
             self.scene.wait_for_advancing_clock(self.remaining())
-            specs = demo_specs(self.args.backend, self.args.scenario)
+            specs = demo_specs(self.args.backend, self.args.scenario, self.args.world)
             entities = self.create_client(GetEntities,
                 provider.scene_control_service_namespace + '/get_entities')
             response = self.call(entities, GetEntities.Request())
@@ -332,6 +332,7 @@ def main():
     parser.add_argument('--timeout', type=float, default=300.0)
     parser.add_argument('--demo', action='store_true')
     parser.add_argument('--scenario', default='standard')
+    parser.add_argument('--world', default=None, help='demo world (default: the backend\'s)')
     parser.add_argument('--hold-explorer', action='store_true')
     args, ros_args = parser.parse_known_args()
     if not math.isfinite(args.timeout) or args.timeout <= 0:

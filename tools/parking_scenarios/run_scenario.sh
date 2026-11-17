@@ -4,7 +4,9 @@
 # bag (with both 2D scans, for parking-clearance review), samples Gazebo ground truth, takes RViz screenshots at mission stages and
 # server-rendered top-down views of the scene (capture_scene_views.py) when parked and at the
 # end, and stops only that session with SIGTERM. LIMIT (s) bounds the run; DEMO_ARGS adds launch arguments (e.g. rviz_layout:=compact);
-# END_VIEWS names the scene views taken at the end (default overview,workstation).
+# END_VIEWS names the scene views taken at the end (default overview,workstation), PARKED_VIEWS those
+# taken while parked (default workstation). The demo world (DEMO_ARGS world:=..., else the backend's
+# default) is written to world.txt.
 B=$1; SC=$2; D=$(realpath -m "$3"); P=$(cd "$(dirname "$0")" && pwd); ROOT=$(cd "$P/../.." && pwd); LIMIT=${LIMIT:-900}
 : "${RIDGEBACK_PERCEPTION_VENV:?set RIDGEBACK_PERCEPTION_VENV}"; export DISPLAY="${DISPLAY:?a display is needed for screenshots}"
 mkdir -p "$D/shots"; cd "$ROOT"
@@ -13,8 +15,11 @@ while pgrep -f '(^|/)(isaac_runner\.py|gzserver)( |$)|[/ ]gz sim( |$)' >/dev/nul
 LOCK="${XDG_RUNTIME_DIR:-/tmp}/ridgeback-parking-${UID}.lock"
 until flock -n "$LOCK" true 2>/dev/null; do timeout 2 tail -n0 -f /dev/null; done
 git rev-parse HEAD > "$D/commit.txt"; git status --short >> "$D/commit.txt"; cp src/ridgeback_autonomy/config/parking_scenarios.yaml "$D/scenarios.yaml"
+W=$(printf '%s\n' ${DEMO_ARGS:-} | sed -n 's/^world:=//p' | tail -1)
+[ -n "$W" ] || W=$(python3 -c "import sys; sys.path.insert(0,'src/ridgeback_autonomy'); from ridgeback_autonomy.mission.parking_scenarios import default_world; print(default_world('$B'))")
+echo "$W" > "$D/world.txt"
 if [ "$B" = isaac ]; then   # the runner's opt-in top-down cameras for the stage views
-  python3 -c "import json,sys; sys.path.insert(0,'$P'); import scene_views as v; json.dump([x for x in v.views('isaac','$SC') if x['name'] in '${ISAAC_VIEWS:-overview,workstation}'.split(',')], open('$D/isaac_views.json','w'))" || exit 1
+  python3 -c "import json,sys; sys.path.insert(0,'$P'); import scene_views as v; json.dump([x for x in v.views('isaac','$SC',world='$W') if x['name'] in '${ISAAC_VIEWS:-overview,workstation}'.split(',')], open('$D/isaac_views.json','w'))" || exit 1
   export RIDGEBACK_ISAAC_VIEW_CAMERAS="$D/isaac_views.json"
 fi
 setsid bash start_parking_demo.sh $B demo_scenario:=$SC ${DEMO_ARGS:-} > "$D/console.log" 2>&1 &
@@ -48,7 +53,7 @@ while [ $SECONDS -lt $end ]; do
   for st in G1_LOCALIZED NAVIGATING_TO_PREPARKING NAVIGATING_TO_PARKING PARKED; do
     [ -z "${done[$st]}" ] && grep -q -- "-> $st;" "$D/console.log" 2>/dev/null && { done[$st]=1
       # Parked for 5 s: the scene view first, while the robot still stands at its pose.
-      [ $st = PARKED ] && simview parked workstation
+      [ $st = PARKED ] && simview parked "${PARKED_VIEWS:-workstation}"
       timeout 2 tail -n0 -f /dev/null; shot "$st"; }
   done
   r=$(grep -oE -- "-> (MISSION_COMPLETE|MISSION_FAILED|PARKING_PLANNING_FAILED|PARKING_EXECUTION_FAILED|MOTION_SETTLEMENT_FAILED)" "$D/console.log" 2>/dev/null | tail -1)

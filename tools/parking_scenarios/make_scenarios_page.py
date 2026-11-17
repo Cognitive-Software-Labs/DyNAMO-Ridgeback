@@ -79,14 +79,18 @@ def image(best, backend, name, view, scene):
     rel = pages.export_jpeg(os.path.join(scenes_dir, entry['file']), os.path.join(
         ASSETS, entry['file'].replace('.png', '.jpg')), 1600)
     code = CODE.get(commit, commit + (' + working tree' if dirty else ''))
-    caption = CAPTION[view].format(h=scene_views.OVERVIEW_HEIGHT_M[backend])
+    caption = CAPTION[view].format(h=scene_views.OVERVIEW_HEIGHT_M[PAGE_WORLD[backend]])
     return pages.figure(rel, f'{SIM[backend].split(" ")[0]}: {caption} (captured with {code})')
+
+
+# The worlds this page's captures show: Gazebo's are the warehouse runs of 2026-11-14.
+PAGE_WORLD = {'gz': 'depot', 'isaac': 'parking_demo'}
 
 
 def layout_facts(data, name, backend):
     if backend not in parking_scenarios.backends(data['scenarios'][name]):
         return None
-    layout = parking_scenarios.world_layout(data, name, backend)
+    layout = parking_scenarios.world_layout(data, name, backend, PAGE_WORLD[backend])
     start = data.get('robot_start', {'x': 0.0, 'y': 0.0, 'yaw_deg': 0.0})
     g1 = layout['g1']
     dist = math.hypot(g1['x'] - start['x'], g1['y'] - start['y'])
@@ -100,7 +104,7 @@ def layout_facts(data, name, backend):
 def main():
     data = parking_scenarios.load(scene_views.SCENARIO_FILE)
     best = load_captures(sys.argv[1:])
-    stations = data['workstations']
+    stations = {b: parking_scenarios.workstation(data, b, w) for b, w in PAGE_WORLD.items()}
     rows, cards = [], []
     for name in ORDER:
         scene = data['scenarios'][name]

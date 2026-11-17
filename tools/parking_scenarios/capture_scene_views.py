@@ -76,6 +76,10 @@ def gz_world():
     raise RuntimeError('no Gazebo world found in this partition')
 
 
+# Gazebo's running world name -> the demo world it is (Clearpath names its depot warehouse).
+DEMO_WORLD_BY_GZ_NAME = {'parking_demo': 'parking_demo', 'warehouse': 'depot'}
+
+
 def gz_service(world, name, reqtype, req):
     subprocess.run(['gz', 'service', '-s', f'/world/{world}/{name}', '--reqtype', reqtype,
                     '--reptype', 'gz.msgs.Boolean', '--timeout', '5000', '--req', req],
@@ -127,21 +131,34 @@ def main():
     args = ap.parse_args()
     os.makedirs(args.out_dir, exist_ok=True)
     wanted = set(filter(None, args.views.split(',')))
-    selected = [v for v in scene_views.views(args.backend, args.scenario)
+    world = gz_world() if args.backend == 'gz' else None
+    demo_world = DEMO_WORLD_BY_GZ_NAME[world] if world else 'parking_demo'
+    selected = [v for v in scene_views.views(args.backend, args.scenario, world=demo_world)
                 if not wanted or v['name'] in wanted]
     manifest_path = os.path.join(args.out_dir, 'manifest.json')
     manifest = json.load(open(manifest_path)) if os.path.exists(manifest_path) else []
-    world = gz_world() if args.backend == 'gz' else None
     jobs = [(v['name'], v) for v in selected]
     if not args.no_robot_camera:
         jobs.append(('robot_camera', None))
+    # Gazebo renders the views together: a parked robot stands still for about 5 s.
+    captured_at, pending = {}, {}
+    if args.backend == 'gz' and selected:
+        from concurrent.futures import ThreadPoolExecutor
+
+        def render(view):
+            rgb = gz_image(world, view)
+            captured_at[view['name']] = time.time()
+            return rgb
+        pool = ThreadPoolExecutor(max_workers=len(selected))
+        pending = {v['name']: pool.submit(render, v) for v in selected}
+        pool.shutdown(wait=False)
     for name, view in jobs:
         try:
             if view is None:
                 rgb = ros_image('sensors/camera_0/color/image')
                 source = 'robot camera topic sensors/camera_0/color/image'
             elif args.backend == 'gz':
-                rgb = gz_image(world, view)
+                rgb = pending[name].result()
                 source = 'Gazebo server camera sensor (temporary, removed after capture)'
             else:
                 rgb = ros_image(f'views/{name}/image')
@@ -155,7 +172,8 @@ def main():
         save_png(os.path.join(args.out_dir, filename), rgb)
         manifest.append({'view': name, 'stage': args.stage, 'file': filename, 'ok': ok,
                          'check': reason, 'backend': args.backend, 'scenario': args.scenario,
-                         'source': source, 'time': time.time(),
+                         'world': demo_world,
+                         'source': source, 'time': captured_at.get(name, time.time()),
                          'camera': None if view is None else
                          {k: view[k] for k in ('eye', 'target', 'hfov_deg')}})
         print(f'{name}: {"ok" if ok else "REJECTED"} ({reason}) -> {filename}', flush=True)
