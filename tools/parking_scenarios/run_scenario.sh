@@ -52,8 +52,12 @@ while [ $SECONDS -lt $end ]; do
     done[EXPLORING]=1; grep -q -- "-> STOPPING_EXPLORATION;" "$D/console.log" || shot EXPLORING; }
   for st in G1_LOCALIZED NAVIGATING_TO_PREPARKING NAVIGATING_TO_PARKING PARKED; do
     [ -z "${done[$st]}" ] && grep -q -- "-> $st;" "$D/console.log" 2>/dev/null && { done[$st]=1
-      # Parked for 5 s: the scene view first, while the robot still stands at its pose.
-      [ $st = PARKED ] && simview parked "${PARKED_VIEWS:-workstation}"
+      # Parked: the scene views once the mission has confirmed the stop, during its wait,
+      # while the robot still stands at its pose. Creating Gazebo's view cameras stalls the
+      # server briefly; before the stop is confirmed that can starve the stop gate's odometry.
+      [ $st = PARKED ] && { for _ in $(seq 30); do grep -qE "Parked and stopped|PARKED -> " "$D/console.log" && break
+          timeout 0.5 tail -n0 -f /dev/null; done; grep -q "Parked and stopped" "$D/console.log" &&
+        simview parked "${PARKED_VIEWS:-workstation}"; }
       timeout 2 tail -n0 -f /dev/null; shot "$st"; }
   done
   r=$(grep -oE -- "-> (MISSION_COMPLETE|MISSION_FAILED|PARKING_PLANNING_FAILED|PARKING_EXECUTION_FAILED|MOTION_SETTLEMENT_FAILED)" "$D/console.log" 2>/dev/null | tail -1)
