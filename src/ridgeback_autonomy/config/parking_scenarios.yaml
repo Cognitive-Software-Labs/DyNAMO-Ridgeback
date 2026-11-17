@@ -12,13 +12,16 @@
 # and nothing here is passed to the mission.
 schema: ridgeback_parking_scenarios/2
 workstations:
-  # Both backends load parking_demo (initial_test_world without its authored G1), so
-  # both use the same workstation: the south room off the corridor, entered through
-  # the doorway at x 2.7-5.3; the corridor wall hides G1 from the start (the robot
-  # arrives from G1's back-left). Runs before 2026-11-17 used Gazebo's warehouse
-  # (depot) with G1 at (-4.5, -0.6, 180 deg) in the lane west of the start; each run
-  # folder keeps the scenario file it ran with.
-  gz: {x: 0.5, y: -4.5, yaw_deg: -90}
+  # In the lane west of the start, facing west: behind the camera at the start; the
+  # explorer heads down this lane first and meets G1 from behind, the view the
+  # detector localizes reliably. Earlier layouts (2026-11-05/08, see the record): an
+  # aisle behind the long shelf the explorer never entered; the floor north of the
+  # start, where G1 was found before the robot left its spawn, so every route began
+  # in the unscanned wedges beside its flanks and was rightly rejected; and the west
+  # lane's edge, where a front-left view scored below the 0.50 localization floor.
+  gz: {x: -4.5, y: -0.6, yaw_deg: 180}
+  # The south room off the corridor, entered through the doorway at x 2.7-5.3; the
+  # corridor wall hides G1 from the start (the robot arrives from G1's back-left).
   isaac: {x: 0.5, y: -4.5, yaw_deg: -90}
 robot_start: {x: 0.0, y: 0.0, yaw_deg: 0.0}
 scenarios:

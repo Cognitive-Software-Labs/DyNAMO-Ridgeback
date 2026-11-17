@@ -20,10 +20,8 @@ sys.path.insert(0, f'{ROOT}/src/ridgeback_autonomy')   # the pure scenario modul
 from ridgeback_autonomy.mission import parking_scenarios  # noqa: E402
 
 SCENARIO_FILE = f'{ROOT}/src/ridgeback_autonomy/config/parking_scenarios.yaml'
-# Both backends' parking world (initial_test_world's rooms) is open above. The Gazebo
-# warehouse used until 2026-11-17 had a roof and took its views from 8.0 m (overview)
-# and 5.0 m / 7.0 m (angled).
-OVERVIEW_HEIGHT_M = {'gz': 11.0, 'isaac': 11.0}
+# The warehouse has a roof, so its overall view stays below it; Isaac's rooms are open.
+OVERVIEW_HEIGHT_M = {'gz': 8.0, 'isaac': 11.0}
 START = (0.0, 0.0)
 CAPTIONS = {
     'overview': 'Top-down: the robot start (lower left) and G1\'s workstation',
@@ -33,8 +31,9 @@ CAPTIONS = {
     'task': 'Top-down: the robot at its start and G1 at its workstation, framed together',
     'isometric': 'Angled view from above: the robot (mast and basket) and G1 at its table',
 }
-# Room walls stand 2.8 m high; the angled view looks down steeply enough to see over them.
-ISOMETRIC = {'gz': (5.5, 11.0), 'isaac': (5.5, 11.0)}   # horizontal offset, height (m)
+# Room walls stand about 3 m high in Isaac's hospital floor; the angled view looks
+# down steeply enough to see over them.
+ISOMETRIC = {'gz': (5.0, 7.0), 'isaac': (5.5, 11.0)}   # horizontal offset, height (m)
 TASK_MARGIN_M = 1.2
 
 

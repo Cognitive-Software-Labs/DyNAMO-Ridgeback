@@ -179,7 +179,8 @@ def generate_launch_description():
                               description='Demo scene from config/parking_scenarios.yaml'),
         DeclareLaunchArgument(
             'world', default_value=PythonExpression([
-                "'parking_demo' if '", LaunchConfiguration('demo_scene_enabled'), "' == 'true' else "
+                "'parking_demo' if '", backend, "' == 'isaac' and '",
+                LaunchConfiguration('demo_scene_enabled'), "' == 'true' else "
                 "'initial_test_world' if '", backend, "' == 'isaac' else 'depot'"]),
             description='Existing backend world to load'),
         DeclareLaunchArgument('namespace', default_value='r100_0001'),

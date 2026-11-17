@@ -57,9 +57,8 @@ def test_backend_defaults_and_explicit_odometry_override(backend, world, odom):
     assert context.launch_configurations['parking_navigation_enabled'] == 'false'
 
 
-@pytest.mark.parametrize('backend', ['gz', 'isaac'])
-def test_demo_has_an_unambiguous_world(backend):
-    context = defaults(backend=backend, demo_scene_enabled='true')
+def test_isaac_demo_has_an_unambiguous_world():
+    context = defaults(backend='isaac', demo_scene_enabled='true')
     assert context.launch_configurations['world'] == 'parking_demo'
 
 
@@ -178,7 +177,7 @@ def specs(backend='gz'):
 
 
 def test_real_asset_catalogs_supply_the_two_models_and_world_floor_heights():
-    for backend, floor in [('gz', .05), ('isaac', .05)]:   # both parking_demo floor slabs
+    for backend, floor in [('gz',0.),('isaac',.05)]:
         g1, table = specs(backend)
         assert (g1.name, table.name) == (DEMO_G1, DEMO_TABLE)
         assert g1.z == table.z == floor
