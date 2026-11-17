@@ -3423,8 +3423,9 @@ class MissionManagerNode(Node):
         panel's end) is what the surface range measured. The axis then replaces the
         surface-based position, which the forearms pull toward a camera G1 faces; the
         keep-out reference stays generic. A position is used only with G1's torso above
-        it and nothing taller than G1 there: when G1 is partly hidden, the head region
-        can show a panel or wall behind it instead. The heading only ranks poses at the next planning, and is None when the frames
+        it and nothing taller than G1 there. When the head region shows something taller
+        than G1 (a panel or wall behind a partly hidden or obliquely seen G1), the surface
+        estimate is kept instead, and refused if G1's legs place its axis elsewhere. The heading only ranks poses at the next planning, and is None when the frames
         do not show it reliably."""
         frames = list(self._depth_frames)
         self._depth_frames.clear()
@@ -3448,21 +3449,38 @@ class MissionManagerNode(Node):
         if head is None and self.target_body_check:
             return (f'no consistent depth in the head region of the detection box '
                     f'({len(depths)} depth frames)')
+        head_not_g1 = False
         if head is not None:
             offset = surface_offset_from_head(surface, head, camera_xy)
             if not surface_is_g1(offset):
-                center = head_axis(head, camera_xy)
-                self.get_logger().warning(
-                    f'G1 surface estimate ({surface[0]:.3f}, {surface[1]:.3f}) lies {offset:+.2f} m '
-                    f'{"in front of" if offset > 0 else "behind"} G1\'s head at {head.range_m:.2f} m: '
-                    f'another object in the detection box; position re-seeded on the head '
-                    f'({center[0]:.3f}, {center[1]:.3f})')
+                reseed = head_axis(head, camera_xy)
+                above_head = [points_above_g1(points, reseed) for points in clouds]
+                if taller_than_g1(above_head):
+                    # The head region missed G1's head (hidden, or off the box's middle) and
+                    # measured what stands behind G1: keep the surface estimate.
+                    head_not_g1 = True
+                    self.get_logger().warning(
+                        f'G1 head region at {head.range_m:.2f} m shows an object taller than G1 at '
+                        f'({reseed[0]:.3f}, {reseed[1]:.3f}) ({above_head} points): not G1\'s head; '
+                        f'keeping the surface estimate ({surface[0]:.3f}, {surface[1]:.3f})')
+                else:
+                    center = reseed
+                    self.get_logger().warning(
+                        f'G1 surface estimate ({surface[0]:.3f}, {surface[1]:.3f}) lies {offset:+.2f} m '
+                        f'{"in front of" if offset > 0 else "behind"} G1\'s head at {head.range_m:.2f} m: '
+                        f'another object in the detection box; position re-seeded on the head '
+                        f'({center[0]:.3f}, {center[1]:.3f})')
         estimates, axes = [], []
         for points in clouds:
             estimates.append(estimate_target_yaw(points, center))
             axes.append(estimate_body_axis(points, center, camera_xy))
         axis = combined_axis(axes)
-        if axis is not None and math.hypot(axis[0] - center[0], axis[1] - center[1]) <= self.target_axis_max_shift_m:
+        shift = None if axis is None else math.hypot(axis[0] - center[0], axis[1] - center[1])
+        if head_not_g1 and self.target_body_check and shift is not None and shift > self.target_axis_max_shift_m:
+            return (f'G1\'s legs place its axis at ({axis[0]:.3f}, {axis[1]:.3f}), {shift:.2f} m from the '
+                    f'surface estimate ({center[0]:.3f}, {center[1]:.3f}), and the head region shows '
+                    f'another object: the view does not show where G1 stands')
+        if axis is not None and shift <= self.target_axis_max_shift_m:
             position = axis
             self.get_logger().info(f'G1 position from its body axis: ({axis[0]:.3f}, {axis[1]:.3f}), '
                                    f'surface estimate ({surface[0]:.3f}, {surface[1]:.3f})')

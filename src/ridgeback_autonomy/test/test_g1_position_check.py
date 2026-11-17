@@ -6,11 +6,13 @@ workstation runs. ``table_in_front`` is the gz_no_feasible view whose detector s
 estimate (-5.673, -1.031) was a worktable's edge 1.25 m in front of G1, after which the
 mission parked beside that estimate and reported MISSION_COMPLETE; ``panel_beside`` is
 the gz_left_blocked view whose estimate was a panel's end. A second fixture holds three
-views of the hospital ward's no_feasible pen captured on 2026-11-18 by the same tool:
-``ward_occluded`` at the robot's ground-truth pose when the 2026-11-17 run localized G1
-0.57 m off (its recorded surface estimate and the same detection box), where the near
-panel hides most of G1, and two clear views from in front of and behind G1. G1's ground
-truth is used only to measure the error.
+views of the hospital ward captured on 2026-11-18 by the same tool: ``ward_occluded`` at
+the robot's ground-truth pose when the 2026-11-17 no_feasible run localized G1 0.57 m off
+(its recorded surface estimate and the same detection box), where the near panel hides
+most of G1; two clear views of that pen from in front of and behind G1; and
+``ward_close``, the standard scene 0.7 m from G1, at the pose and with the surface
+estimate of a 2026-11-18 run whose head region measured the wall 5.25 m away. G1's
+ground truth is used only to measure the error.
 """
 
 import math
@@ -33,7 +35,7 @@ from test_mission_manager import (  # noqa: F401 (fixture)
 DATA = np.load(os.path.join(os.path.dirname(__file__), 'data', 'g1_views_2026-11-09.npz'))
 WARD = np.load(os.path.join(os.path.dirname(__file__), 'data', 'g1_views_2026-11-18.npz'))
 VIEWS = ('table_in_front', 'panel_beside', 'clear_view', 'side_view_close')
-WARD_VIEWS = ('ward_occluded', 'ward_front', 'ward_behind')
+WARD_VIEWS = ('ward_occluded', 'ward_front', 'ward_behind', 'ward_close')
 # Error to G1's ground truth that a usable position must stay within: the planner's
 # reference margin for the generic estimate.
 MAX_ERROR_M = 0.10
@@ -191,11 +193,24 @@ def test_the_mission_refuses_a_position_without_g1_in_depth(manager_factory):
 
 
 def test_the_mission_refuses_the_panel_it_planned_around_on_2026_11_17(manager_factory):
+    # The head region shows the far panel, so the surface estimate (G1's hands) is kept;
+    # G1's visible legs put its axis 0.32 m from it, so the view is refused.
     v = view('ward_occluded')
     m = mission_at(manager_factory, v)
     reason = m._observe_target_body()
-    assert reason is not None and 'taller than G1' in reason, reason
+    assert reason is not None and 'legs place its axis' in reason, reason
     assert (m.target_position.map_x_m, m.target_position.map_y_m) == tuple(v['surface'])
+
+
+def test_a_head_region_on_the_wall_behind_g1_keeps_the_surface_estimate(manager_factory):
+    # Close and oblique, G1's head sits off the box's middle columns: the head region
+    # measured the wall behind G1, 4.7 m off, until 2026-11-18.
+    v = view('ward_close')
+    camera = v['camera_translation'][:2]
+    assert math.dist(to.head_axis(head(v), camera), v['g1_truth']) > 4.0
+    m = mission_at(manager_factory, v)
+    assert m._observe_target_body() is None
+    assert error(v, (m.target_position.map_x_m, m.target_position.map_y_m)) <= MAX_ERROR_M
 
 
 def test_the_mission_verifies_clear_ward_views(manager_factory):
