@@ -172,6 +172,14 @@ MAX_SURFACE_BEHIND_HEAD_M = 0.30
 TORSO_HEIGHT_M = (0.85, 1.40)
 TORSO_RADIUS_M = 0.25
 MIN_TORSO_POINTS = 20
+# Nothing of G1 stands higher than 1.33 m. On 2026-11-17 a G1 half hidden behind the
+# near panel of the hospital no_feasible pen left the top of its detection box on the far
+# panel, 0.8 m behind G1; the head check took that panel for G1's head and the panel gave
+# 1648 torso-height points, so a position 0.57 m off was verified. Depth from 1.45 m to
+# 2.20 m within the torso radius is such an object (that panel showed 443-505 points there;
+# G1 views from 2.0-6.9 m show none).
+ABOVE_G1_HEIGHT_M = (1.45, 2.20)
+MIN_ABOVE_G1_POINTS = 20
 
 
 @dataclass(frozen=True)
@@ -264,6 +272,23 @@ def torso_points(points_map, axis_xy, floor_z=0.0):
 def torso_confirmed(counts):
     """Whether enough frames of a stationary view show G1's torso above the axis."""
     return sum(c >= MIN_TORSO_POINTS for c in counts) >= MIN_AGREEING_FRAMES
+
+
+def points_above_g1(points_map, axis_xy, floor_z=0.0):
+    """How many depth points stand above ``axis_xy`` higher than G1's head."""
+    points = np.asarray(points_map, dtype=float)
+    if points.size == 0:
+        return 0
+    radius = np.hypot(points[:, 0] - axis_xy[0], points[:, 1] - axis_xy[1])
+    height = points[:, 2] - floor_z
+    return int(np.count_nonzero((radius <= TORSO_RADIUS_M) & (height >= ABOVE_G1_HEIGHT_M[0])
+                                & (height <= ABOVE_G1_HEIGHT_M[1])))
+
+
+def taller_than_g1(counts):
+    """Whether enough frames show something taller than G1 at the position: a panel,
+    wall or shelf there is not G1, however many torso-height points it gives."""
+    return sum(c >= MIN_ABOVE_G1_POINTS for c in counts) >= MIN_AGREEING_FRAMES
 
 
 def combined_axis(axes):

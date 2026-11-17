@@ -69,10 +69,10 @@ from ridgeback_autonomy.mission.target_localization import (
     TargetLocalizationAdapter,
 )
 from ridgeback_autonomy.mission.target_orientation import (
-    box_pixels, combined_axis, combined_estimate, combined_head, depth_metres, depth_to_map_points,
-    estimate_body_axis, G1_BODY_RADIUS_M, estimate_target_yaw, head_axis, head_observation,
-    occupied_cells, overhead_obstacle_points, surface_is_g1, surface_offset_from_head,
-    torso_confirmed, torso_points,
+    ABOVE_G1_HEIGHT_M, box_pixels, combined_axis, combined_estimate, combined_head, depth_metres,
+    depth_to_map_points, estimate_body_axis, G1_BODY_RADIUS_M, estimate_target_yaw, head_axis,
+    head_observation, occupied_cells, overhead_obstacle_points, points_above_g1, surface_is_g1,
+    surface_offset_from_head, taller_than_g1, torso_confirmed, torso_points,
 )
 from ridgeback_autonomy.mission.parking_planner import (
     GridSnapshot,
@@ -3423,7 +3423,8 @@ class MissionManagerNode(Node):
         panel's end) is what the surface range measured. The axis then replaces the
         surface-based position, which the forearms pull toward a camera G1 faces; the
         keep-out reference stays generic. A position is used only with G1's torso above
-        it. The heading only ranks poses at the next planning, and is None when the frames
+        it and nothing taller than G1 there: when G1 is partly hidden, the head region
+        can show a panel or wall behind it instead. The heading only ranks poses at the next planning, and is None when the frames
         do not show it reliably."""
         frames = list(self._depth_frames)
         self._depth_frames.clear()
@@ -3473,6 +3474,11 @@ class MissionManagerNode(Node):
         if self.target_body_check and not torso_confirmed(torso):
             return (f'depth shows no G1 torso above ({position[0]:.3f}, {position[1]:.3f}): '
                     f'{torso} points in {len(clouds)} frames')
+        above = [points_above_g1(points, position) for points in clouds]
+        if self.target_body_check and taller_than_g1(above):
+            return (f'depth shows an object taller than G1 at ({position[0]:.3f}, {position[1]:.3f}): '
+                    f'{above} points {ABOVE_G1_HEIGHT_M[0]:.2f}-{ABOVE_G1_HEIGHT_M[1]:.2f} m high in '
+                    f'{len(clouds)} frames, where G1 stands at most 1.33 m')
         self.target_position = replace(self.target_position, map_x_m=position[0], map_y_m=position[1])
         self._target_surface_xy = surface
         if clouds:
@@ -3481,7 +3487,7 @@ class MissionManagerNode(Node):
         self.target_heading = combined_estimate(estimates)
         if head is not None:
             self.get_logger().info(f'G1 verified in depth: head {head.range_m:.2f} m from the camera, '
-                                   f'torso points {torso}')
+                                   f'torso points {torso}, points above G1 {above}')
         if self.target_heading is None:
             self.get_logger().info(f'G1 heading unknown: no reliable forearm view in {len(frames)} '
                                    'depth frames; parking ranking stays undirected')

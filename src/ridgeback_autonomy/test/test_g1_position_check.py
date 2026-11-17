@@ -5,8 +5,12 @@ tools/parking_scenarios/capture_g1_views.py, at the robot poses of the 2026-11-0
 workstation runs. ``table_in_front`` is the gz_no_feasible view whose detector surface
 estimate (-5.673, -1.031) was a worktable's edge 1.25 m in front of G1, after which the
 mission parked beside that estimate and reported MISSION_COMPLETE; ``panel_beside`` is
-the gz_left_blocked view whose estimate was a panel's end. G1's ground truth is used
-only to measure the error.
+the gz_left_blocked view whose estimate was a panel's end. A second fixture holds three
+views of the hospital ward's no_feasible pen captured on 2026-11-18 by the same tool:
+``ward_occluded`` at the robot's ground-truth pose when the 2026-11-17 run localized G1
+0.57 m off (its recorded surface estimate and the same detection box), where the near
+panel hides most of G1, and two clear views from in front of and behind G1. G1's ground
+truth is used only to measure the error.
 """
 
 import math
@@ -27,14 +31,17 @@ from test_mission_manager import (  # noqa: F401 (fixture)
 )
 
 DATA = np.load(os.path.join(os.path.dirname(__file__), 'data', 'g1_views_2026-11-09.npz'))
+WARD = np.load(os.path.join(os.path.dirname(__file__), 'data', 'g1_views_2026-11-18.npz'))
 VIEWS = ('table_in_front', 'panel_beside', 'clear_view', 'side_view_close')
+WARD_VIEWS = ('ward_occluded', 'ward_front', 'ward_behind')
 # Error to G1's ground truth that a usable position must stay within: the planner's
 # reference margin for the generic estimate.
 MAX_ERROR_M = 0.10
 
 
 def view(name):
-    return {key[len(name) + 1:]: DATA[key] for key in DATA.files if key.startswith(name + '_')}
+    data = WARD if name.startswith('ward_') else DATA
+    return {key[len(name) + 1:]: data[key] for key in data.files if key.startswith(name + '_')}
 
 
 def depth_m(v):
@@ -111,6 +118,36 @@ def test_an_empty_head_region_gives_no_head():
     assert to.combined_head([None, None, head(v)]) is None
 
 
+def test_a_half_hidden_g1_leaves_its_head_region_on_the_panel_behind_it():
+    v = view('ward_occluded')
+    camera = v['camera_translation'][:2]
+    reseeded = to.head_axis(head(v), camera)
+    assert math.dist(reseeded, v['g1_truth']) > 0.8                      # the far panel
+    assert error(v, v['surface']) < 0.30                                # the detector saw G1's hands
+    # The check used until 2026-11-18 verified that panel: torso-height points stand there.
+    assert to.torso_confirmed([to.torso_points(points(v), corrected(v, tuple(v['surface'])))] * 3)
+    assert to.points_above_g1(points(v), reseeded) >= to.MIN_ABOVE_G1_POINTS
+
+
+def test_nothing_taller_than_g1_stands_on_g1_in_any_recorded_view():
+    for name in VIEWS + WARD_VIEWS:
+        v = view(name)
+        assert to.points_above_g1(points(v), tuple(v['g1_truth'])) == 0, name
+    for name in ('table_in_front', 'panel_beside', 'clear_view'):
+        v = view(name)
+        assert to.points_above_g1(points(v), corrected(v, tuple(v['surface']))) == 0, name
+
+
+def test_clear_ward_views_localize_g1_from_its_head():
+    for name in ('ward_front', 'ward_behind'):
+        v = view(name)
+        seed = to.head_axis(head(v), v['camera_translation'][:2])
+        xy = corrected(v, seed)
+        assert error(v, xy) <= MAX_ERROR_M, (name, xy)
+        assert to.torso_confirmed([to.torso_points(points(v), xy)] * 3), name
+        assert not to.taller_than_g1([to.points_above_g1(points(v), xy)] * 3), name
+
+
 def test_box_pixels_scale_a_box_from_a_larger_colour_image():
     assert to.box_pixels((100, 50, 200, 150), (1280, 960), (480, 640)) == (50, 25, 101, 76)
 
@@ -151,6 +188,23 @@ def test_the_mission_refuses_a_position_without_g1_in_depth(manager_factory):
     reason = m._observe_target_body()
     assert reason is not None and 'head region' in reason
     assert (m.target_position.map_x_m, m.target_position.map_y_m) == tuple(v['surface'])
+
+
+def test_the_mission_refuses_the_panel_it_planned_around_on_2026_11_17(manager_factory):
+    v = view('ward_occluded')
+    m = mission_at(manager_factory, v)
+    reason = m._observe_target_body()
+    assert reason is not None and 'taller than G1' in reason, reason
+    assert (m.target_position.map_x_m, m.target_position.map_y_m) == tuple(v['surface'])
+
+
+def test_the_mission_verifies_clear_ward_views(manager_factory):
+    for name in ('ward_front', 'ward_behind'):
+        v = dict(view(name))
+        v['surface'] = np.array(to.head_axis(head(v), v['camera_translation'][:2]))
+        m = mission_at(manager_factory, v)
+        assert m._observe_target_body() is None, name
+        assert error(v, (m.target_position.map_x_m, m.target_position.map_y_m)) <= MAX_ERROR_M, name
 
 
 def test_an_unverified_position_is_never_localized_or_planned(manager_factory):
