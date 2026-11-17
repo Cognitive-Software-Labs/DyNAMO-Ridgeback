@@ -366,3 +366,19 @@ def test_initial_planning_uses_clock_time_tf_without_accepting_future_data(manag
     manager.try_plan_parking(0., now_ns=PLAN_NOW_NS)
     assert manager.parking_plan is not None
     assert ('map', 'base_link', PLAN_NOW_NS) in manager.tf_buffer.calls
+
+
+def test_the_ward_no_feasible_bed_leaves_a_passage_at_any_heading():
+    # Between the bed behind G1 and the ward's corridor wall the robot must pass however
+    # it is turned: its footprint is 1.05 m across its diagonal, and a 1.10 m strip
+    # wedged it sideways on 2026-11-18. Collision boxes from parking_demo.sdf and the
+    # asset catalog (the bed is 0.9 m deep).
+    bed = next(s for s in specs_for('gz', 'no_feasible') if s.name.endswith('rear_bed'))
+    world = ET.parse(ROOT / 'src/ridgeback_autonomy_gz/sim/worlds/parking_demo.sdf').getroot()
+    wall = next(m for m in world.iter('model') if m.get('name') == 'south_seg_1')
+    wall_x, wall_y = (float(v) for v in wall.findtext('pose').split()[:2])
+    length, depth = (float(v) for v in wall.find('.//collision/geometry/box/size').text.split()[:2])
+    assert wall_x - length / 2 < bed.x < wall_x + length / 2
+    assert abs(math.cos(bed.yaw)) == pytest.approx(1.0, abs=1e-6)   # long side along the wall
+    strip = (wall_y - depth / 2) - (bed.y + 0.45)
+    assert strip >= 1.35, strip
