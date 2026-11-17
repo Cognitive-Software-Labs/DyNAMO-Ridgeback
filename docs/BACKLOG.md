@@ -246,8 +246,16 @@ show G1's head and torso in depth ([G1 position check](exploration/architecture.
 That check is qualified on Gazebo views only; the 2026-11-09 G1 position-check
 record under archived evidence holds the runs.
 
+A 2026-11-17 trial ran Gazebo's demo in the hospital ward Isaac uses, for clearer
+screenshots. In `no_feasible` the head check re-seeded G1 0.55 m to its right,
+between G1 and a panel (0.57 m from ground truth); a pose beyond the panel passed
+planning and only the live LiDAR check stopped the attempt. The standard scene
+parked, but with G1 0.10-0.12 m off. Gazebo kept the warehouse; the 2026-11-17
+hospital-ward record under archived evidence holds the runs.
+
 **Completion criteria.** Measure detection over G1 headings, backgrounds and a
-humanoid distractor in both simulators; qualify the head and torso check on Isaac
+humanoid distractor in both simulators; explain the ward re-seed beside the panel
+before moving Gazebo's demo there; qualify the head and torso check on Isaac
 and hardware depth (the real D455 is noisier beyond 4 m, where Gazebo G1s were
 localized from up to 10 m); decide whether a static view that still fails needs a
 second viewpoint.

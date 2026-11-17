@@ -49,3 +49,5 @@ artifacts/exploration/p8_2026-11-14/gz_standard_run4
 artifacts/exploration/p8_2026-11-14/gz_standard_run5
 artifacts/exploration/p8_2026-11-14/gz_no_feasible
 artifacts/exploration/p8_2026-11-14/isaac_standard/run
+artifacts/exploration/hospital_2026-11-17/gz_standard
+artifacts/exploration/hospital_2026-11-17/gz_no_feasible

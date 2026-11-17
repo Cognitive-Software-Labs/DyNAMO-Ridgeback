@@ -65,6 +65,10 @@ Latest runs on the merged code (Gazebo errors against ground truth, Isaac estima
 Earlier Gazebo runs on the same scene also ended in perception timeouts, LiDAR
 vetoes beside G1, and two planning-gate failures fixed during the merge; the
 historical `no_feasible` run that parked 1.72 m from G1 is kept as a false completion.
+A later Gazebo trial in Isaac's hospital ward (2026-11-17) parked behind G1 in
+`standard` (reach 0.500 m) but missed the `no_feasible` refusal: G1 was localized
+0.57 m off and the LiDAR check stopped the resulting attempt. Gazebo keeps the
+warehouse ([backlog](../BACKLOG.md#g1-detection-in-parking-scenes)).
 
 The reference demonstration is a video of one complete Isaac run (parked at G1's
 right, five-second wait, return): `artifacts/exploration/demo_2026-11-11/isaac_standard_run3/demo.mp4`,
