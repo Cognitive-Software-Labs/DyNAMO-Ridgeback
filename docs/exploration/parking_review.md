@@ -49,26 +49,28 @@ Every state, its limit and its measured duration are in
 
 ## Validation
 
-Both simulators run one shared autonomy stack. The
-[results page](autonomous_parking_results.html) lists every recorded run with its
+Both simulators run one shared autonomy stack in the same hospital ward
+(`parking_demo`); Gazebo's warehouse remains available with `world:=depot`. The
+[results page](autonomous_parking_results.html) lists the recorded runs with their
 code version; the [scenarios page](autonomous_parking_scenarios.html) shows the eight
-scenes.
+scenes. Neither page shows the ward runs below yet.
 
-Latest runs on the merged code (Gazebo errors against ground truth, Isaac estimated):
+Latest ward runs (Gazebo errors against ground truth, used only offline; Isaac
+estimated):
 
 | Scenario | Simulator | Outcome |
 |---|---|---|
-| `standard` | Isaac | `MISSION_COMPLETE`: G1's right vetoed by the LiDAR check, parked at G1's left on attempt 2, waited, returned |
-| `standard` | Gazebo | `MISSION_COMPLETE`: G1 0.015-0.041 m from ground truth, both sides vetoed, parked behind G1 on attempt 3 (reach 0.479 m, basket 0.089 m from G1's lower body), returned |
-| `no_feasible` | Gazebo | `MISSION_FAILED` as intended: G1 0.025 m from ground truth, no pose fits, no attempt, returned |
+| `standard` | Gazebo | `MISSION_COMPLETE` on the final code: G1 0.073-0.084 m and 2-6 deg off; G1's right vetoed by the LiDAR check; parked behind G1's left hip on attempt 2 (reach 0.509 m, basket 0.118 m from G1's lower body), waited, returned |
+| `standard` | Isaac | `MISSION_COMPLETE` on the final code: parked at G1's right on attempt 1, waited, returned |
+| `no_feasible` | Gazebo | `MISSION_FAILED` as intended, on the code before the surface fallback: G1 0.125 m off, none of 255 poses fit, no attempt, returned |
 
-Earlier Gazebo runs on the same scene also ended in perception timeouts, LiDAR
-vetoes beside G1, and two planning-gate failures fixed during the merge; the
-historical `no_feasible` run that parked 1.72 m from G1 is kept as a false completion.
-A later Gazebo trial in Isaac's hospital ward (2026-11-17) parked behind G1 in
-`standard` (reach 0.500 m) but missed the `no_feasible` refusal: G1 was localized
-0.57 m off and the LiDAR check stopped the resulting attempt. Gazebo keeps the
-warehouse ([backlog](../BACKLOG.md#g1-detection-in-parking-scenes)).
+An earlier Gazebo `standard` completion in the ward, before the surface fallback,
+estimated G1's heading 65 degrees off from a 0.68 m view and parked with a reach of
+0.607 m, outside the 0.30-0.60 m band; it is not counted as meeting the reach
+requirement. Earlier warehouse runs (2026-11-14) completed `standard` in both
+simulators with G1 0.015-0.041 m off and refused `no_feasible`; perception
+timeouts, LiDAR vetoes beside G1 and a historical `no_feasible` false completion
+(parked 1.72 m from G1) are kept in the archive records.
 
 The reference demonstration is a video of one complete Isaac run (parked at G1's
 right, five-second wait, return): `artifacts/exploration/demo_2026-11-11/isaac_standard_run3/demo.mp4`,
@@ -83,9 +85,14 @@ records the merged code's Isaac run (a vetoed attempt, then G1's left).
   centimetres apart, the LiDAR check vetoes most Gazebo approaches beside G1
   ([backlog](../BACKLOG.md#parking-clearance-beside-g1)).
 - **Search time** depends on the explorer's frontier order: from under a minute to
-  about 18 min in the workstation scenes, and completed missions took 10-18 min.
+  about 18 min in the workstation scenes, and completed missions took 3-18 min.
+- **Narrow passages.** Nothing chooses the heading at which the robot enters a
+  passage between its width (0.80 m) and its diagonal (1.05 m); the ward's
+  `no_feasible` bed was moved after one wedged it
+  ([backlog](../BACKLOG.md#orientation-aware-navigation-through-narrow-passages)).
 - **Perception.** Detection scores of a static view vary with the exact view; the
-  head and torso check is qualified in simulation only
+  head and torso check is qualified in simulation only, the head region can
+  measure what stands behind G1, and one close view gave a heading 65 degrees off
   ([backlog](../BACKLOG.md#g1-detection-in-parking-scenes)); several G1s are kept
   apart by geometry only ([backlog](../BACKLOG.md#more-than-one-g1-in-a-scene)).
 - **Basket and reach.** The basket is provisional and unmeasured, and nothing

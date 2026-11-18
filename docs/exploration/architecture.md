@@ -218,7 +218,22 @@ itself in the same stationary depth frames (`target_orientation.py`):
    the position is re-seeded on the head, 0.07 m behind its surface.
 3. The body axis is then taken from the legs around that seed, as above.
 4. The position is used only when at least 20 depth points stand within 0.25 m
-   of it at 0.85-1.40 m, G1's torso and head, in 3 of the frames.
+   of it at 0.85-1.40 m, G1's torso and head, in 3 of the frames, and fewer than
+   20 at 1.45-2.20 m in 3 of them: G1 stands at most 1.33 m, so depth that high is
+   a panel, wall or shelf, however many torso-height points it gives.
+
+Step 2 assumes the head region shows G1's head. It can instead show what stands
+behind G1: when something in front hides most of G1 and the detector boxes only the
+visible part, or when G1, seen close and obliquely with its arms forward, has its
+head off the box's middle columns. In the hospital ward on 2026-11-17 the
+head region fell on a panel 0.8 m behind G1 and on walls 4-5 m behind it, while the
+surface estimate was on G1. Re-seeding onto the panel planned parking 0.57 m from G1,
+since a panel passes the torso check. So when a re-seed position shows something
+taller than G1 (step 4's limit), the head region is not G1's head: the surface
+estimate is kept, and the view is refused if G1's legs place its axis more than
+0.25 m from it. On the reproduced views, the half-hidden G1's legs lay 0.32 m from
+the estimate on its hands, and that view is refused; the close view, whose legs were
+out of the image, was localized 0.07 m from G1.
 
 Otherwise the localization is not accepted (`target_position_unverified`): the
 samples start again, and the existing localization deadline ends the attempt as a
@@ -226,7 +241,8 @@ timeout, with the observation-pose fallback or the return after a parking attemp
 Nothing is planned or parked against an unverified position. On Gazebo views
 recorded at the 2026-11-08 run poses, the checked position was 0.018-0.034 m from
 G1's ground truth, including both mislocalized views; there was no torso on the
-table edge the run had parked beside. The shared estimators and benchmarks are
+table edge the run had parked beside. Reproduced at the 2026-11-17 robot pose, the
+far panel showed 443-505 points above G1's height; no recorded view shows any on G1. The shared estimators and benchmarks are
 unchanged. `target_body_check` turns the check off only for tests without depth.
 
 Once a G1 is chosen the target does not switch to another humanoid. In a frame with

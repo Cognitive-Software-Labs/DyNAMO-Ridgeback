@@ -35,12 +35,24 @@ so Gazebo and Isaac spawn the same collision geometry. A scene's `purpose` and
 
 The robot starts at both simulators' default spawn, the world origin facing +x,
 so the SLAM map frame is the world frame. Each demo world has one workstation pose
-for G1 (schema `ridgeback_parking_scenarios/2`):
+for G1 and its floor height (schema `ridgeback_parking_scenarios/3`); the launch
+argument `world` selects the world:
 
-| World | G1 at the workstation | Why the robot cannot see it from the start |
-|---|---|---|
-| Gazebo `depot` (warehouse) | (-4.5, -0.6) m, facing -x | it stands behind the camera at the start; the explorer heads down this lane first and meets G1 from behind |
-| Isaac `parking_demo` (hospital floor) | (0.5, -4.5) m, facing -y | the corridor wall hides the south room; the robot enters through the doorway at x 2.7-5.3 m, behind G1's left shoulder |
+| World | Simulators | G1 at the workstation | Why the robot cannot see it from the start |
+|---|---|---|---|
+| `parking_demo` (hospital ward, default) | Gazebo and Isaac | (0.5, -4.5) m, facing -y | the corridor wall hides the south room; the robot enters through the doorway at x 2.7-5.3 m, behind G1's left shoulder |
+| `depot` (warehouse, `world:=depot`) | Gazebo | (-4.5, -0.6) m, facing -x | it stands behind the camera at the start; the explorer heads down this lane first and meets G1 from behind |
+
+`parking_demo` is `initial_test_world` without its authored distant G1: Gazebo
+loads `parking_demo.sdf`, a copy that omits that G1, and Isaac a USD layer that
+disables it. The two describe the same ward. Its walls, doorways, beds, exam
+tables, chairs, nurse desk and waiting area have identical collision boxes in the
+SDF and the converted USD (largest difference below 1e-7 m), and the scenario
+objects come from the same box models in both asset catalogs. Only lighting and
+rendering differ. The floor slab tops out at 0.05 m, where G1 and the objects stand.
+Gazebo ran the warehouse until 2026-11-17, and `world:=depot` reproduces those
+runs; each run folder keeps the scenario file it ran with (schema 2 then, one
+workstation per backend).
 
 Two earlier Gazebo workstations were dropped (2026-11-05/08; see the dated record).
 The explorer never entered an aisle behind the long shelf south of the start. North
@@ -52,7 +64,8 @@ has driven into its area before it sees G1.
 A scenario places its objects in the workstation frame: `forward` from G1 toward
 its table, `left` to G1's left when it faces the table, `yaw_deg` relative to that
 heading; `g1_turn_deg` turns G1 away from the table. A scenario therefore has the
-same layout around G1 in both worlds, and only the surroundings differ. The
+same layout around G1 in every world; in the ward both simulators also share the
+surroundings. The
 worktable (1.20 x 0.70 m, top 0.75 m) stands 0.75 m ahead of G1, its long side
 toward G1.
 
@@ -63,15 +76,25 @@ toward G1.
 | `left_blocked` | 1.7 m panel 0.8 m to G1's left | right |
 | `both_sides_blocked` | panels on both sides | behind G1 |
 | `restricted` | side tables 1.2 m left and right (the base fits under, the mast and basket do not); a 2.1 m passage behind | behind G1, never under a tabletop |
-| `no_feasible` | panels on both sides and a 0.5 m bed behind: a pen G1 is visible over | no manoeuvre; bounded planning, return to start with `no_valid_candidate` |
+| `no_feasible` | panels on both sides and a 0.5 m high bed 0.95 m behind: a pen G1 is visible over | no manoeuvre; bounded planning, return to start with `no_valid_candidate` |
 | `heading_90` | G1 turned 90 degrees to its left, the table on its right | left; right-side poses would be under the table |
 | `heading_away` | G1 turned 180 degrees, its back to the table | left or right; behind G1 is the table |
+
+Objects must not leave the robot a passage only slightly wider than itself. The
+navigation footprint is 0.80 m wide but 1.05 m across its diagonal, and nothing
+chooses the heading at which it enters a passage
+([backlog](../BACKLOG.md#orientation-aware-navigation-through-narrow-passages)).
+Until 2026-11-17 the `no_feasible` bed stood 1.25 m behind G1 and left a 1.10 m
+strip to the ward's corridor wall, where the robot wedged sideways during its
+search. The bed now stands 0.95 m behind G1: the strip is 1.40 m, and the gaps
+between the bed and the ward's exam table and chair (0.60 and 0.78 m) are too
+narrow to enter. Runs before then keep their own scenario file.
 
 The P7 scenes (G1 3 m in front of the start, schema 1, plus a separate `worktable`
 scene) are retired; their runs keep the scenario file they ran, and the evaluation
 tools still read it. A scenario that does not fit a world can list where it does,
 for example `backends: [gz]`, and startup then refuses it elsewhere; every current
-scene fits both worlds.
+scene fits every world.
 
 OWLv2 scores a Gazebo G1 at about 0.42-0.68 depending on the view; side-on and
 partly hidden views sit near 0.50. The depot's walking person scored at most 0.19
@@ -143,7 +166,8 @@ python3 tools/parking_scenarios/make_results_page.py      # the runs in results_
 `--plan-only` (the robot stays at its start) and saves the documentation views:
 top-down views of the whole task, of the start and G1 framed together, and of the
 workstation, a close-up of G1 and its table, an oblique view, an angled view from
-above of the robot and G1, and one frame of the robot's own camera. The scenarios
+above of the robot and G1, a close angled view of the workstation (`angled`), and
+one frame of the robot's own camera. The scenarios
 page leads each scenario with Isaac Sim's top-down, close-up and angled views and
 keeps the Gazebo views of the same layout in a collapsed section.
 `capture_scene_views.py` renders them in the simulator itself, so a locked or
@@ -151,8 +175,15 @@ disconnected desktop cannot blank them: Gazebo through temporary camera sensors
 that are removed afterwards, Isaac through the runner's opt-in view cameras
 (`RIDGEBACK_ISAAC_VIEW_CAMERAS`, a JSON list from `scene_views.py`; experiment runs
 carry only the top-down two). Each image is checked and listed in a manifest.
-`run_scenario.sh` takes the same top-down views while parked and at the end, and
-RViz screenshots at the mission stages. `make_scenarios_page.py` and
+`run_scenario.sh` takes views while parked (`PARKED_VIEWS`, default
+`workstation`) and at the end (`END_VIEWS`, default `overview,workstation`), and
+RViz screenshots at the mission stages; it records the run's demo world in
+`world.txt` (`DEMO_ARGS="world:=depot"` selects the warehouse). The parked views
+are taken once the mission has confirmed the stop, during its five-second wait:
+creating Gazebo's view cameras stalls the server briefly, and on 2026-11-17 three
+created at the parking arrival starved the stop confirmation, so that run failed
+with the robot parked. Gazebo renders the requested views together, so a top-down,
+a close-up and an angled view fit within the wait. `make_scenarios_page.py` and
 `make_results_page.py` build the two pages. The results page reads the runs listed
 in `results_runs.txt` (or the run folders given as arguments, such as
 `artifacts/exploration/scenarios/*/`): its overview,
@@ -214,3 +245,5 @@ those views, the RViz screen and the mission state at the same moment of that ru
 - [Parking after merging the group's dev](../../archive/engineering/2026-11-14-parking-dev-integration.md) — the merge, the basket-aware outline, the regressions the runs found and the completed missions in both simulators.
 - [Reacquisition and recorded demonstration](../../archive/engineering/2026-11-11-parking-reacquisition-and-demo.md) — the stalled observation returns and the step back, target identity with several humanoids, and the recorded Isaac runs.
 - [G1 position check](../../archive/engineering/2026-11-09-parking-g1-position-check.md) — why `no_feasible` parked beside a worktable edge and reported success, the head and torso check, the first-localization changes, and the workstation reruns.
+- [Gazebo parking in the hospital ward](../../archive/engineering/2026-11-17-parking-gazebo-hospital-ward.md) — the first Gazebo trial in the ward and its 0.57 m mislocalization in `no_feasible`.
+- [Parking in the hospital ward](../../archive/engineering/2026-11-18-parking-hospital-validation.md) — both simulators on the ward, the panel and wall behind G1 in the head region, the bed strip, and the ward runs.

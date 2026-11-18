@@ -247,18 +247,29 @@ That check is qualified on Gazebo views only; the 2026-11-09 G1 position-check
 record under archived evidence holds the runs.
 
 A 2026-11-17 trial ran Gazebo's demo in the hospital ward Isaac uses, for clearer
-screenshots. In `no_feasible` the head check re-seeded G1 0.55 m to its right,
-between G1 and a panel (0.57 m from ground truth); a pose beyond the panel passed
-planning and only the live LiDAR check stopped the attempt. The standard scene
-parked, but with G1 0.10-0.12 m off. Gazebo kept the warehouse; the 2026-11-17
-hospital-ward record under archived evidence holds the runs.
+screenshots. In `no_feasible` the head check re-seeded G1 0.55 m to its right
+(0.57 m from ground truth); a pose beyond the panel passed planning and only the
+live LiDAR check stopped the attempt. The head region had measured the far panel
+behind a half-hidden G1, and the panel passed the torso check. A position with
+depth above G1's height is now refused, and when the head region shows such an
+object the surface estimate is kept if G1's legs agree
+([G1 position check](exploration/architecture.md#g1-position-check)). Both
+simulators now load the ward. On that code each completed `standard` once and
+Gazebo `no_feasible` refused as intended, with G1 0.05-0.13 m from ground truth in
+Gazebo against 0.015-0.041 m in the warehouse. Open: the head region still misses
+G1's head in oblique, close and partly hidden views; one Gazebo run estimated G1's
+heading 65 degrees off from a view 0.68 m from G1 (14589 points on the forearm
+band, against 41-506 elsewhere), which moved the parked bin behind G1 and the
+reach to 0.607 m, and two reproductions near that pose gave no heading. The
+2026-11-17 and 2026-11-18 hospital records under archived evidence hold the runs.
 
 **Completion criteria.** Measure detection over G1 headings, backgrounds and a
-humanoid distractor in both simulators; explain the ward re-seed beside the panel
-before moving Gazebo's demo there; qualify the head and torso check on Isaac
-and hardware depth (the real D455 is noisier beyond 4 m, where Gazebo G1s were
-localized from up to 10 m); decide whether a static view that still fails needs a
-second viewpoint.
+humanoid distractor in both simulators; qualify the head, torso and height checks
+on Isaac and hardware depth (the real D455 is noisier beyond 4 m, where Gazebo G1s
+were localized from up to 10 m); explain or bound the close-view heading error,
+for example by refusing a forearm fit with implausibly many points, and check the
+parked reach against ground truth over several ward runs; decide whether a static
+view that still fails needs a second viewpoint.
 
 ## More than one G1 in a scene
 
@@ -318,6 +329,31 @@ check may have moved off a table edge).
 blocking path checks should restart the stationary interval, as a restarted
 interval already does, and whether a planning failure after a feasible plan
 should return to the start; then rerun a long-route scene.
+
+## Orientation-aware navigation through narrow passages
+
+**Gap.** Nav2 plans routes for a point with an inflated cost, and the MPPI
+controller then fits the full footprint to them. Neither chooses the heading at
+which the robot enters a narrow passage. Ridgeback's navigation footprint is
+0.80 m wide but 1.05 m across its diagonal, so a passage between those widths fits
+only when the robot is nearly aligned with it. On 2026-11-17, in the hospital
+ward's `no_feasible` scene, a frontier goal routed the robot east through the
+1.10 m strip between the pen's bed and the corridor wall. The robot reached the
+strip's end turned 58 degrees from it, with 0.03 m to spare on each side: below the
+0.05 m costmap cell. It was also too close to the wall to turn in place (0.005 m to
+spare). Nav2 reported no progress; the explorer blacklisted the goal after three
+60 s stalls and chose the next goal through the same strip. G1 was never seen, and
+the run was stopped after six minutes at the same pose. The scene's bed was moved
+0.3 m closer to G1 so the strip is 1.40 m, which fits at any heading; nothing in
+navigation changed.
+
+**Completion criteria.** Investigate whether entry headings that fit can be derived
+from the full collision footprint and the costmap, for example by checking the
+rotated footprint along a route's narrowest section and turning before it where
+there is room. Do not weaken collision checking. Also decide whether the explorer
+should stop choosing goals whose routes share a section that has already stalled
+the robot. Validate in a scene with a 0.9-1.2 m passage that the robot crosses it
+or refuses it, rather than wedging at its end.
 
 ## Collision-envelope and navigation-footprint validation
 
@@ -393,6 +429,8 @@ in the reference that owns the fact or moved to the item that owns the work.
 - [Parking scenarios](../archive/engineering/2026-11-05-parking-scenarios.md) — G1 detection rates by layout and heading, and the localization timeouts they caused.
 - [Parking detection gaps](../archive/engineering/2026-11-05-parking-detection-gaps.md) — OWLv2 scores by view, the parking detector floor and relocalization hysteresis, and the `heading_90` and `no_feasible` reruns.
 - [Parking workstation scenes](../archive/engineering/2026-11-05-parking-workstation-scenes.md) — G1 out of the robot's sight at a worktable, the presentation captures and pages, and the planning failure after a delayed odometry stamp.
+- [Gazebo parking in the hospital ward](../archive/engineering/2026-11-17-parking-gazebo-hospital-ward.md) — the first Gazebo trial in the ward and its 0.57 m mislocalization in `no_feasible`.
+- [Parking in the hospital ward](../archive/engineering/2026-11-18-parking-hospital-validation.md) — why the head region measured a panel or wall, the height check and surface fallback, the bed strip that wedged the robot, and the ward runs in both simulators.
 - [LiDAR/closed-loop SLAM qualification](../archive/engineering/2026-09-17-isaac-lidar-qualification.md)
 - [paired results and interpretation](../archive/engineering/2026-09-17-isaac-lidar-qualification.md#interpretation)
 - [Isaac port history](../archive/engineering/port-history.md#lidars-detached-from-the-articulation-2026-09-11)
