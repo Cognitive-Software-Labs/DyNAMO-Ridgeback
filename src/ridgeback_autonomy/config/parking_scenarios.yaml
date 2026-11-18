@@ -83,7 +83,7 @@ scenarios:
       - {name: worktable, asset: table, forward: 0.75, left: 0.0, yaw_deg: 90}
       - {name: right_panel, asset: privacy_curtain, forward: 0.0, left: -0.8, yaw_deg: 90}
       - {name: left_panel, asset: privacy_curtain, forward: 0.0, left: 0.8, yaw_deg: 90}
-      # The bed's near edge is 0.5 m behind G1's axis. Until 2026-11-18 it stood 0.3 m
+      # The bed's near edge is 0.5 m behind G1's axis. Until 2026-11-17 it stood 0.3 m
       # further back, which left a 1.10 m strip to the ward's corridor wall: wider than
       # the robot (0.80 m) but narrower than it is when turned (1.05 m) plus a margin, so
       # the explorer routed through it and the robot wedged sideways at its end. Now the

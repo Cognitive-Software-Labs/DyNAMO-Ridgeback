@@ -24,8 +24,8 @@ SCHEMA_V3 = 'ridgeback_parking_scenarios/3'
 BACKENDS = ('gz', 'isaac')
 # The worlds each backend's parking demo may load; the first is its default. Both
 # backends' parking_demo is initial_test_world (the hospital ward) without its
-# authored G1. Gazebo's depot (Clearpath's warehouse) reproduces the runs before
-# 2026-11-18 and is selected explicitly with world:=depot.
+# authored G1. Gazebo's depot (Clearpath's warehouse) reproduces the earlier
+# Gazebo runs and is selected explicitly with world:=depot.
 DEMO_WORLDS = {'gz': ('parking_demo', 'depot'), 'isaac': ('parking_demo',)}
 # The floor top of a schema-2 recorded run, by backend (schema 3 records it per world).
 LEGACY_FLOOR_Z = {'gz': 0.0, 'isaac': 0.05}

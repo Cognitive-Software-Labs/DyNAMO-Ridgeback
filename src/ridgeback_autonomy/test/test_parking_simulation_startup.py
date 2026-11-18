@@ -371,7 +371,7 @@ def test_initial_planning_uses_clock_time_tf_without_accepting_future_data(manag
 def test_the_ward_no_feasible_bed_leaves_a_passage_at_any_heading():
     # Between the bed behind G1 and the ward's corridor wall the robot must pass however
     # it is turned: its footprint is 1.05 m across its diagonal, and a 1.10 m strip
-    # wedged it sideways on 2026-11-18. Collision boxes from parking_demo.sdf and the
+    # wedged it sideways on 2026-11-17. Collision boxes from parking_demo.sdf and the
     # asset catalog (the bed is 0.9 m deep).
     bed = next(s for s in specs_for('gz', 'no_feasible') if s.name.endswith('rear_bed'))
     world = ET.parse(ROOT / 'src/ridgeback_autonomy_gz/sim/worlds/parking_demo.sdf').getroot()

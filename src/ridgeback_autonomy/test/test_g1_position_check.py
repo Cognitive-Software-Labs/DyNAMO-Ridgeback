@@ -6,12 +6,12 @@ workstation runs. ``table_in_front`` is the gz_no_feasible view whose detector s
 estimate (-5.673, -1.031) was a worktable's edge 1.25 m in front of G1, after which the
 mission parked beside that estimate and reported MISSION_COMPLETE; ``panel_beside`` is
 the gz_left_blocked view whose estimate was a panel's end. A second fixture holds three
-views of the hospital ward captured on 2026-11-18 by the same tool: ``ward_occluded`` at
+views of the hospital ward captured on 2026-11-17 by the same tool: ``ward_occluded`` at
 the robot's ground-truth pose when the 2026-11-17 no_feasible run localized G1 0.57 m off
 (its recorded surface estimate and the same detection box), where the near panel hides
 most of G1; two clear views of that pen from in front of and behind G1; and
 ``ward_close``, the standard scene 0.7 m from G1, at the pose and with the surface
-estimate of a 2026-11-18 run whose head region measured the wall 5.25 m away. G1's
+estimate of a later 2026-11-17 run whose head region measured the wall 5.25 m away. G1's
 ground truth is used only to measure the error.
 """
 
@@ -33,7 +33,7 @@ from test_mission_manager import (  # noqa: F401 (fixture)
 )
 
 DATA = np.load(os.path.join(os.path.dirname(__file__), 'data', 'g1_views_2026-11-09.npz'))
-WARD = np.load(os.path.join(os.path.dirname(__file__), 'data', 'g1_views_2026-11-18.npz'))
+WARD = np.load(os.path.join(os.path.dirname(__file__), 'data', 'g1_views_2026-11-17.npz'))
 VIEWS = ('table_in_front', 'panel_beside', 'clear_view', 'side_view_close')
 WARD_VIEWS = ('ward_occluded', 'ward_front', 'ward_behind', 'ward_close')
 # Error to G1's ground truth that a usable position must stay within: the planner's
@@ -126,7 +126,7 @@ def test_a_half_hidden_g1_leaves_its_head_region_on_the_panel_behind_it():
     reseeded = to.head_axis(head(v), camera)
     assert math.dist(reseeded, v['g1_truth']) > 0.8                      # the far panel
     assert error(v, v['surface']) < 0.30                                # the detector saw G1's hands
-    # The check used until 2026-11-18 verified that panel: torso-height points stand there.
+    # The check used until 2026-11-17 verified that panel: torso-height points stand there.
     assert to.torso_confirmed([to.torso_points(points(v), corrected(v, tuple(v['surface'])))] * 3)
     assert to.points_above_g1(points(v), reseeded) >= to.MIN_ABOVE_G1_POINTS
 
@@ -204,7 +204,7 @@ def test_the_mission_refuses_the_panel_it_planned_around_on_2026_11_17(manager_f
 
 def test_a_head_region_on_the_wall_behind_g1_keeps_the_surface_estimate(manager_factory):
     # Close and oblique, G1's head sits off the box's middle columns: the head region
-    # measured the wall behind G1, 4.7 m off, until 2026-11-18.
+    # measured the wall behind G1, 4.7 m off, until 2026-11-17.
     v = view('ward_close')
     camera = v['camera_translation'][:2]
     assert math.dist(to.head_axis(head(v), camera), v['g1_truth']) > 4.0
