@@ -1,7 +1,7 @@
 # Parking in the hospital ward: both simulators on one world
 
 Recorded dates: 2026-11-17, 2026-11-18
-Tested revisions: `9400c10036f10b660f26ed451d3b4b3df0473c15`, `5b5133cff7a2152d04d28f2526cf2b0d53fb0df2`, `f5687890a4cb91aeff836f241d49e2b73418ae17`, `f6ade2f7e8b58e844eef6b05b8c053135120d112`, `b519ab01214b447f0df6f1eef315aa522a872ce5`, `544ead1998dae8dd7ee786718afa96e79cdb78a5`
+Tested revisions: `9400c10036f10b660f26ed451d3b4b3df0473c15`, `5b5133cff7a2152d04d28f2526cf2b0d53fb0df2`, `f5687890a4cb91aeff836f241d49e2b73418ae17`, `f6ade2f7e8b58e844eef6b05b8c053135120d112`, `b519ab01214b447f0df6f1eef315aa522a872ce5`, `544ead1998dae8dd7ee786718afa96e79cdb78a5`, `0890e137b0b78dc6c553e0bde47d0f4b6fbaa90c`
 Provenance: partial
 
 ## Question and conditions
@@ -26,8 +26,10 @@ simulator on the host, no other user's simulator running, `rviz_layout:=compact`
 Evidence is in the untracked `artifacts/exploration/hospital_2026-11-18/`, one folder
 per run with `commit.txt`, the console, a small bag (states, map, plans, detections,
 both scans; no depth), saved camera frames and screenshots. The folder name says
-2026-11-18, but every run in it except `gz_standard_final` was recorded on
-2026-11-17 by the host clock (CET). The tree's uncommitted documentation and its
+2026-11-18, but every run in it except `gz_standard_final` and `gz_no_feasible_final`
+was recorded on 2026-11-17 by the host clock (CET). `gz_no_feasible_final` ran while
+another user's single headless Isaac job ran (load average about 10-31); its
+uncommitted changes were page tools and documentation only. The tree's uncommitted documentation and its
 `--parallel` option in `start_parking_demo.sh` were present and unused. Gazebo
 errors are against ground truth sampled every 1-2.5 s and used only offline;
 Isaac runs have no ground-truth track.
@@ -90,6 +92,7 @@ gap.
 | `isaac_standard` | f6ade2f | `MISSION_FAILED`: localization timeout | the head region measured the south wall 10.25 m away from about 6.2 m; the wall re-seed was refused five times |
 | `isaac_standard_run2` | b519ab0 | `MISSION_COMPLETE` in 745 s | the head region at 10.65 m showed 242 points above G1: surface estimate kept, legs confirmed it (0.612, -4.553); relocalized at (0.605, -4.543), heading -86.8 deg; attempt 1 `g1_right`, arrival 0.020 m, LiDAR minimum 0.288 m; parked, five-second wait, returned. The estimates are 0.11-0.12 m from G1's configured pose, which includes the map's drift from the world frame |
 | `gz_standard_final` (2026-11-18) | 544ead1 (b519ab0's mission code; installed executables compared with the source before the run) | `MISSION_COMPLETE` in 696 s | search 553 s, no explorer stall; three localizations (from 4.4, 2.3 and 1.4 m), each accepted on its first try: G1 0.073-0.084 m off, headings -92.1, -96.0 and -83.8 deg (errors 2.1-6.2 deg); attempt 1 `g1_right` cancelled by the LiDAR check in the stopping path (nearest return 0.151 m, 0.416 m from G1); attempt 2 `g1_left` parked: reach 0.509 m, basket 0.118 m from G1's lower body, base 0.37 m from the worktable, LiDAR minimum 0.109 m; five-second wait completed; returned 0.22 m from the start |
+| `gz_no_feasible_final` (2026-11-18) | 0890e13 (b519ab0's mission code) | `MISSION_FAILED`, `no_valid_candidate`, as intended | search 635 s; G1 0.152 m off, heading error 10.0 deg; the detector's surface estimate lay 0.93 m beyond G1's head, on the worktable, and the head check moved the position onto G1's head, where its legs confirmed the axis (3320 torso points, none above G1's height); 0 of 258 poses valid (`footprint_occupied`), no attempt; nearest approach 0.67 m (base to worktable); returned 0.35 m from the start |
 
 Screenshots per run are in each `shots/` folder: RViz at the mission stages and
 server-rendered views (top-down workstation, close-up, angled) taken while parked
@@ -133,15 +136,21 @@ safety one.
 Both simulators load the same ward, and on the final code (`b519ab0`'s mission code)
 each completed `standard` once: Isaac parked at G1's right on attempt 1, Gazebo at
 G1's left-rear on attempt 2, reach 0.509 m, G1 0.073-0.084 m and 6 deg off. Gazebo
-`no_feasible` refused correctly on `f6ade2f`, whose mission code differs from the
-final code only in the surface fallback; it was not rerun on the final code. The
+`no_feasible` refused correctly on `f6ade2f` and again on the final code
+(`gz_no_feasible_final`, G1 0.152 m off): the pen leaves about 0.48 m beside G1's
+keep-out at each panel and 0.21 m behind it, against a 0.80 m wide footprint, so
+that error cannot make a pose fit. The
 earlier Gazebo `standard` completion on `f6ade2f` exceeded the reach band (0.607 m)
 after a 65 deg heading error. One run per scene shows behaviour, not a rate.
 
 Remaining limits: the head region misses G1's head in oblique, close and partly
 hidden views, and the surface fallback then depends on the legs agreeing; the
 65 deg heading from a 0.68 m view is unexplained; the LiDAR check still vetoes many
-Gazebo approaches beside G1; Gazebo's localization error in the ward (0.05-0.13 m)
+Gazebo approaches beside G1; Gazebo's localization error in the ward (0.05-0.15 m)
 is larger than in the warehouse (0.015-0.041 m on 2026-11-14); the ward's own exam
 table and chair stand 0.83 m from G1 in every scene; and narrow passages between
-0.80 and 1.05 m can still wedge the robot.
+0.80 and 1.05 m can still wedge the robot. The mission's "Target position
+stabilized" log line prints the raw stabilized sample, not the position the depth
+check verified and planning uses (in `gz_no_feasible_final` the line shows the
+surface estimate on the worktable); `g1_estimates` in the metrics and the G1 marker
+in RViz show the verified position.

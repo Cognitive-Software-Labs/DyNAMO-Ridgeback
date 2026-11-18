@@ -106,6 +106,11 @@ def side(task, g1, g1yaw):
 def run(d):
     log = open(f'{d}/console.log', errors='replace').read()
     res = open(f'{d}/result.txt').read().split()
+    if len(res) < 3:
+        # A run stopped by hand records only that word; run_scenario.sh names its folder
+        # BACKEND_SCENARIO.
+        backend, _, scenario = os.path.basename(os.path.normpath(d)).partition('_')
+        res = [scenario, backend, res[0] if res else 'stopped']
     name, backend = res[0], res[1]
     # The layout that actually ran: definitions changed during testing.
     own = f'{d}/scenarios.yaml'

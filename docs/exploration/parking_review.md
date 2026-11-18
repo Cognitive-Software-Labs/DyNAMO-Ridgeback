@@ -51,9 +51,11 @@ Every state, its limit and its measured duration are in
 
 Both simulators run one shared autonomy stack in the same hospital ward
 (`parking_demo`); Gazebo's warehouse remains available with `world:=depot`. The
-[results page](autonomous_parking_results.html) lists the recorded runs with their
-code version; the [scenarios page](autonomous_parking_scenarios.html) shows the eight
-scenes. Neither page shows the ward runs below yet.
+[results page](autonomous_parking_results.html) features the ward runs below and lists
+every recorded run with its code version and measurements; the
+[scenarios page](autonomous_parking_scenarios.html) shows the eight scenes in the ward.
+Both pages show hospital-ward images only; warehouse runs keep their measurements in
+the results table and their screenshots in their evidence folders.
 
 Latest ward runs (Gazebo errors against ground truth, used only offline; Isaac
 estimated):
@@ -62,7 +64,7 @@ estimated):
 |---|---|---|
 | `standard` | Gazebo | `MISSION_COMPLETE` on the final code: G1 0.073-0.084 m and 2-6 deg off; G1's right vetoed by the LiDAR check; parked behind G1's left hip on attempt 2 (reach 0.509 m, basket 0.118 m from G1's lower body), waited, returned |
 | `standard` | Isaac | `MISSION_COMPLETE` on the final code: parked at G1's right on attempt 1, waited, returned |
-| `no_feasible` | Gazebo | `MISSION_FAILED` as intended, on the code before the surface fallback: G1 0.125 m off, none of 255 poses fit, no attempt, returned |
+| `no_feasible` | Gazebo | `MISSION_FAILED` as intended on the final code: G1 0.152 m and 10 deg off, none of 258 poses fit, no attempt, returned (also on the code before the surface fallback: G1 0.125 m off, none of 255) |
 
 An earlier Gazebo `standard` completion in the ward, before the surface fallback,
 estimated G1's heading 65 degrees off from a 0.68 m view and parked with a reach of

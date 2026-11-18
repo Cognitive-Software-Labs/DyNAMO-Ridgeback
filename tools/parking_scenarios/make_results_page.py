@@ -2,9 +2,11 @@
 
 Usage: make_results_page.py [RUN_DIR ...]   (default: the runs in results_runs.txt)
 
-Sections: an overview of the post-merge runs (the final code), Gazebo against Isaac,
-three featured experiments with their own screenshots and timelines, charts drawn from
-recorded measurements, and every recorded run in a filterable table.
+Sections: an overview of the hospital-ward validation runs, Gazebo against Isaac on the
+final code, three featured experiments with their own screenshots and timelines, charts
+drawn from recorded measurements, and every recorded run in a filterable table. Only
+captures of runs that loaded the hospital ward are shown; warehouse runs keep their
+measurements in the table, and their screenshots stay in their evidence folders.
 
 Every number comes from scenario_metrics.py (the run's console log; Gazebo ground truth
 sampled every 1-2.5 s) or the run's mission-state transitions; nothing is estimated.
@@ -16,6 +18,7 @@ import datetime
 import glob
 import html
 import json
+import math
 import os
 import re
 import sys
@@ -55,14 +58,45 @@ CODE = {'fe60a88': ('P7 scenarios', 'fe60a88 plus the changes committed as 28769
         '99387ae': ('After merging dev (P8)', '99387ae', '2026-11-14-parking-dev-integration.md'),
         '5b5133c': ('After merging dev (P8)', '5b5133c', '2026-11-14-parking-dev-integration.md'),
         '822ae6d': ('Hospital ward trial', '822ae6d', '2026-11-17-parking-gazebo-hospital-ward.md'),
-        '23b70ff': ('Hospital ward trial', '23b70ff', '2026-11-17-parking-gazebo-hospital-ward.md')}
+        '23b70ff': ('Hospital ward trial', '23b70ff', '2026-11-17-parking-gazebo-hospital-ward.md'),
+        '9400c10': ('Hospital ward validation', '9400c10', '2026-11-18-parking-hospital-validation.md'),
+        'f568789': ('Hospital ward validation', 'f568789', '2026-11-18-parking-hospital-validation.md'),
+        'f6ade2f': ('Hospital ward validation', 'f6ade2f', '2026-11-18-parking-hospital-validation.md'),
+        'b519ab0': ('Hospital ward validation', 'b519ab0', '2026-11-18-parking-hospital-validation.md'),
+        '544ead1': ('Hospital ward validation', '544ead1 (the mission code of b519ab0; comments changed)',
+                    '2026-11-18-parking-hospital-validation.md'),
+        '0890e13': ('Hospital ward validation', '0890e13 (the mission code of b519ab0; documentation changed)',
+                    '2026-11-18-parking-hospital-validation.md')}
 # The 2026-11-17 trial: Gazebo in the hospital ward Isaac uses (parking_demo), same mission
-# code. It is reported as its own experiments; Gazebo kept the warehouse afterwards.
+# code as the post-merge runs. Gazebo kept the warehouse after it until the validation below.
 WARD_TRIAL = ('822ae6d', '23b70ff')
-# The post-merge runs of 2026-11-14 (merged code 64b3176 and its three fixes): the set
-# every overview number on the page is computed from.
-FINAL_SET = ('64b3176', 'c1435d9', '99387ae', '5b5133c')
-FINAL_CODE = '5b5133c'
+# The post-merge warehouse runs of 2026-11-14 (merged code 64b3176 and its three fixes).
+POST_MERGE = ('64b3176', 'c1435d9', '99387ae', '5b5133c')
+# The hospital-ward validation of 2026-11-17/18, both simulators in the ward: the set every
+# overview number on the page is computed from. Its runs span the localization fixes; the
+# final mission code is b519ab0's (544ead1 and 0890e13 changed comments and documentation).
+FINAL_SET = ('9400c10', 'f568789', 'f6ade2f', 'b519ab0', '544ead1', '0890e13')
+FINAL_CODE = ('b519ab0', '544ead1', '0890e13')
+# Runs that need a cause the log alone does not give, by evidence folder.
+CAUSES = {
+    'artifacts/exploration/hospital_2026-11-18/gz_standard':
+        'The robot parked behind G1 on attempt 3, but three Gazebo view cameras created on arrival stalled the '
+        'server and the stop was not confirmed within its 10 s limit. The views are taken after the stop is '
+        'confirmed since f568789. The installed mission node was still 5b5133c\'s.',
+    'artifacts/exploration/hospital_2026-11-18/gz_no_feasible':
+        'G1 was never seen: the robot wedged sideways in the 1.10 m strip between the pen\'s bed and the corridor '
+        'wall (its footprint is 1.05 m across the diagonal) and the operator stopped the run. The bed was moved '
+        'closer to G1 in f6ade2f, leaving a 1.40 m strip.',
+    'artifacts/exploration/hospital_2026-11-18/gz_standard_run2':
+        'Parked 0.607 m from G1\'s axis, 7 mm outside the required band: the plan measured 0.517 m from G1\'s '
+        'estimate, and the 0.053 m localization error and the robot\'s map-pose error added the rest. G1\'s '
+        'heading was estimated 65 deg off from a 0.68 m view (unexplained; not reproduced), so the bin stood '
+        'behind G1\'s right shoulder rather than at its front right.',
+    'artifacts/exploration/hospital_2026-11-18/isaac_standard':
+        'The head region measured the south wall behind G1, and the position re-seeded onto the wall was '
+        'refused five times until the localization deadline. The surface fallback (b519ab0) keeps the '
+        'detector\'s estimate in this case.',
+}
 TRANSITION = re.compile(r'\[(\d+\.\d+)\] \[[^\]]*mission_manager_node\]: '
                         r'Mission state transition: (\w+) -> (\w+); reason=([^\n]*)')
 ATTEMPT_FAIL = re.compile(r'\[(\d+\.\d+)\] \[[^\]]*mission_manager_node\]: Parking attempt (\d)/\d '
@@ -70,73 +104,99 @@ ATTEMPT_FAIL = re.compile(r'\[(\d+\.\d+)\] \[[^\]]*mission_manager_node\]: Parki
 VETO_DETAIL = re.compile(r'Parking LiDAR veto in \w+: \w+ \(nearest return ([\d.]+) m, G1 gap ([\d.]+) m\)')
 PHASES = (('search', 'Search for G1'), ('locate', 'Localize, map and plan'),
           ('park', 'Parking attempts'), ('wait', 'Parked wait'), ('return', 'Return home'))
+REACH_OUTSIDE = 'Parked outside the reach band'
+STOP_UNCONFIRMED = 'Parked, stop not confirmed'
+OPERATOR_STOP = 'Stopped by the operator'
 SHORT = {MISSED_LOCALIZATION: 'refusal missed (G1 mislocalized)', 'Refusal missed': 'refusal missed', 'Complete': 'complete', 'Safe refusal': 'safe refusal', 'Perception failure': 'G1 not localized',
-         'Planning gate': 'plan expired (fixed)', STALE_LIDAR: 'stale LiDAR (fixed)'}
+         'Planning gate': 'plan expired (fixed)', STALE_LIDAR: 'stale LiDAR (fixed)',
+         REACH_OUTSIDE: 'reach outside band', STOP_UNCONFIRMED: 'stop not confirmed (fixed)',
+         OPERATOR_STOP: 'robot wedged, stopped (fixed)'}
 VETO_TEXT = {'lidar_obstacle_on_route': 'a LiDAR return lay on the planned route',
              'lidar_obstacle_in_stopping_path': 'a LiDAR return lay in the stopping path',
              'g1_protected_region': "the robot reached G1's protected region"}
 
-# The three featured experiments (Isaac side parking, the Gazebo hospital-ward trial's parked
-# run, the warehouse safety test), the ward trial's failed safety scene and the archived
-# warehouse card: the run, and the captures shown for it. Each capture is a file in the run's shots folder (or a frame of the run's recording), the mission states
-# it must have been taken in, the crop shown on the page (x, y, width, height in source
-# pixels; the enlarged view shows the whole capture), and labels drawn over the crop as a
-# separate layer (text, the point labelled, and where the label sits, in crop pixels;
-# no position means the label sits on the object). Labels never alter the image.
-OVERVIEW_CROP = (220, 170, 1080, 640)
+# The three featured experiments, all in the hospital ward on the final mission code (Isaac
+# side parking, Gazebo parking, the Gazebo safety test), and the formerly featured cards kept
+# in the archive section: the run, and the captures shown for it. Each capture is a file in
+# the run's shots folder (or a frame of the run's recording), the mission states it must have
+# been taken in, the crop shown on the page (x, y, width, height in source pixels; the
+# enlarged view shows the whole capture), and labels drawn over the crop as a separate layer
+# (text, the point labelled, and where the label sits, in crop pixels; no position means the
+# label sits on the object). Labels never alter the image. Only hospital-ward captures are
+# shown: a featured run must have loaded the ward (WARD_WORLD), and the warehouse runs appear
+# in the table with their measurements, their screenshots kept in their evidence folders.
+WARD_WORLD = 'parking_demo'
+RVIZ_CROP = (560, 120, 700, 360)
 FEATURED = [
-    {'key': 'isaac_side', 'run': 'artifacts/exploration/p8_2026-11-14/isaac_standard/run',
-     'letter': 'A', 'title': 'Side parking in Isaac Sim',
+    {'key': 'isaac_side', 'run': 'artifacts/exploration/hospital_2026-11-18/isaac_standard_run2',
+     'letter': 'A', 'title': 'Side parking in Isaac Sim (hospital ward)',
      'images': [
+         {'kind': 'simview', 'ref': 'isaac_standard_parked_closeup.png', 'states': {'PARKED'},
+          'crop': (380, 170, 1150, 830),
+          'caption': 'Close-up while parked: Ridgeback at G1\'s right, its basket beside G1 at the worktable',
+          'labels': [('G1', (520, 330), (300, 560)), ('Basket', (750, 400), (760, 120)),
+                     ('Worktable', (320, 230), None)]},
          {'kind': 'simview', 'ref': 'isaac_standard_parked_workstation.png', 'states': {'PARKED'},
-          'crop': (370, 150, 760, 640),
-          'caption': 'Top-down view while parked: Ridgeback beside G1\'s left, its basket toward G1',
-          'labels': [('Worktable', (430, 120), None), ('G1', (427, 345), (610, 330)),
-                     ('Ridgeback', (370, 520), (610, 560))]},
-         {'kind': 'frame', 'ref': 'isometric', 'states': {'PARKED'}, 'crop': (1150, 110, 520, 325),
-          'caption': 'Angled view from the run\'s recording while parked', 'labels': []},
-         {'kind': 'rviz', 'ref': 'PARKED', 'states': {'PARKED'}, 'crop': (640, 120, 620, 360),
-          'caption': 'RViz while parked: the parking donut (one ray per degree; green = a valid pose) '
-                     'and the selected pose', 'labels': []}]},
+          'crop': (500, 150, 700, 640),
+          'caption': 'Top-down view while parked: G1 facing its worktable, Ridgeback at G1\'s right',
+          'labels': [('Worktable', (300, 140), None), ('G1', (295, 345), (130, 470)),
+                     ('Ridgeback', (475, 450), (520, 600))]},
+         {'kind': 'rviz', 'ref': 'PARKED', 'states': {'RETURNING_TO_START'}, 'crop': RVIZ_CROP,
+          'caption': 'RViz as the five-second wait ended, the robot still at its parking pose: the parking '
+                     'donut (one ray per degree; green = a valid pose) and the state machine entering '
+                     'RETURNING_TO_START', 'labels': []}]},
+    {'key': 'gazebo_ward', 'run': 'artifacts/exploration/hospital_2026-11-18/gz_standard_final',
+     'letter': 'B', 'title': 'Parking in Gazebo Sim (hospital ward)',
+     'images': [
+         {'kind': 'simview', 'ref': 'gz_standard_parked_angled.png', 'states': {'PARKED'},
+          'crop': (250, 100, 1000, 720),
+          'caption': 'Angled view while parked: Ridgeback behind G1\'s left hip, its basket toward G1 at the '
+                     'worktable',
+          'labels': [('G1', (455, 140), (640, 70)), ('Basket', (465, 345), (790, 330)),
+                     ('Ridgeback', (500, 560), (800, 600)), ('Worktable', (290, 170), None)]},
+         {'kind': 'simview', 'ref': 'gz_standard_parked_workstation.png', 'states': {'PARKED'},
+          'crop': (420, 150, 760, 680),
+          'caption': 'Top-down view while parked: G1 facing its worktable, Ridgeback behind its left hip',
+          'labels': [('Worktable', (380, 140), None), ('G1', (377, 345), (600, 330)),
+                     ('Ridgeback', (250, 500), (560, 600))]},
+         {'kind': 'rviz', 'ref': 'PARKED', 'states': {'PARKED'}, 'crop': RVIZ_CROP,
+          'caption': 'RViz while parked: the parking donut around G1, the robot footprint at the selected '
+                     'pose and the state machine in PARKED', 'labels': []}]},
+    {'key': 'gazebo_refusal', 'run': 'artifacts/exploration/hospital_2026-11-18/gz_no_feasible_final',
+     'letter': 'C', 'title': 'Safety test: no feasible parking position (Gazebo Sim, hospital ward)',
+     'compact': True,
+     'images': [
+         {'kind': 'simview', 'ref': 'gz_no_feasible_end_angled.png', 'states': {'MISSION_FAILED'},
+          'crop': (230, 0, 1050, 900),
+          'caption': 'Angled view after the mission: G1 at its worktable inside the pen, two panels beside it '
+                     'and the bed behind it',
+          'labels': [('G1', (475, 250), (150, 120)), ('Bed', (680, 640), None)]},
+         {'kind': 'simview', 'ref': 'gz_no_feasible_end_workstation.png', 'states': {'MISSION_FAILED'},
+          'crop': (420, 150, 760, 760),
+          'caption': 'Top-down view of the pen after the mission: the worktable in front of G1, panels on '
+                     'both sides and the bed behind; Ridgeback had driven back to its start',
+          'labels': [('Worktable', (380, 140), None), ('G1', (377, 345), (377, 450)), ('Bed', (380, 640), None),
+                     ('Panel', (103, 350), None), ('Panel', (657, 350), None)]},
+         {'kind': 'rviz', 'ref': 'END_MISSION_FAILED', 'states': {'MISSION_FAILED'}, 'crop': (440, 120, 820, 360),
+          'caption': 'RViz at the end: every ray of the parking donut around G1 red (no valid pose, '
+                     'no_valid_candidate) and Ridgeback back at its start', 'labels': []}]},
+]
+# Formerly featured, kept with their captures in the archive section: the 2026-11-17
+# hospital-ward trial on the post-merge mission code (both hospital ward).
+ARCHIVED_FEATURED = [
     {'key': 'ward_standard', 'run': 'artifacts/exploration/hospital_2026-11-17/gz_standard',
-     'letter': 'B', 'title': 'Gazebo Sim — Hospital Ward Trial', 'trial': True,
+     'letter': 'D', 'title': 'Hospital-ward trial: rear parking in Gazebo Sim (17 Nov)',
      'images': [
          {'kind': 'simview', 'ref': 'gz_standard_parked_workstation.png', 'states': {'PARKED'},
           'crop': (420, 150, 760, 720),
           'caption': 'Top-down view while parked: G1 facing its worktable, Ridgeback behind G1',
           'labels': [('Worktable', (380, 140), None), ('G1', (380, 340), (610, 330)),
                      ('Ridgeback', (520, 560), (640, 660))]},
-         {'kind': 'simview', 'ref': 'gz_standard_end_overview.png', 'states': {'MISSION_COMPLETE'},
-          'crop': (380, 60, 880, 640),
-          'caption': 'Top-down view of the ward after the mission: Ridgeback back in the corridor, G1 at its '
-                     'worktable in the south room',
-          'labels': [('Corridor', (230, 60), None), ('Ridgeback', (245, 445), (245, 590)),
-                     ('G1', (620, 420), (620, 570))]},
          {'kind': 'rviz', 'ref': 'PARKED', 'states': {'PARKED'}, 'crop': (640, 120, 620, 360),
           'caption': 'RViz while parked: the parking donut and the robot footprint behind G1',
           'labels': []}]},
-    {'key': 'gazebo_refusal', 'run': 'artifacts/exploration/p8_2026-11-14/gz_no_feasible',
-     'letter': 'C', 'title': 'Safety test: no feasible parking position (Gazebo Sim, warehouse)', 'compact': True,
-     'images': [
-         {'kind': 'rviz', 'ref': 'END_MISSION_FAILED', 'states': {'MISSION_FAILED'},
-          'crop': (450, 62, 475, 270),
-          'caption': 'RViz at the end: the parking donut red, no valid pose around G1 (no_valid_candidate)',
-          'labels': []},
-         {'kind': 'simview', 'ref': 'gz_no_feasible_end_workstation.png', 'states': {'MISSION_FAILED'},
-          'crop': (360, 170, 880, 800),
-          'caption': 'Top-down view of the scene after the mission: G1 boxed in by two panels, its '
-                     'worktable and a bed; Ridgeback had already driven back to its start',
-          'labels': [('Worktable', (440, 120), None), ('Bed', (440, 650), None),
-                     ('G1', (437, 330), (437, 450)), ('Panel', (205, 300), (75, 190)),
-                     ('Panel', (675, 300), (805, 190))]},
-         {'kind': 'simview', 'ref': 'gz_no_feasible_end_overview.png', 'states': {'MISSION_FAILED'},
-          'crop': OVERVIEW_CROP,
-          'caption': 'After the mission: Ridgeback back in its start area, G1 in its pen',
-          'labels': [('Ridgeback', (360, 354), (360, 530)), ('G1', (870, 290), (870, 120))]}]},
-]
-WARD_FEATURED = [
     {'key': 'ward_no_feasible', 'run': 'artifacts/exploration/hospital_2026-11-17/gz_no_feasible',
-     'letter': 'D', 'title': 'Hospital ward trial: no feasible position — localization failure',
+     'letter': 'E', 'title': 'Hospital-ward trial: no feasible position, localization failure (17 Nov)',
      'images': [
          {'kind': 'simview', 'ref': 'gz_no_feasible_end_workstation.png', 'states': {'MISSION_FAILED'},
           'crop': (380, 150, 840, 830),
@@ -148,29 +208,7 @@ WARD_FEATURED = [
          {'kind': 'rviz', 'ref': 'NAVIGATING_TO_PARKING', 'states': {'NAVIGATING_TO_PARKING'},
           'crop': (640, 140, 620, 340),
           'caption': 'RViz during the attempt: the pose planned from the wrong G1 position, beside the '
-                     'panel; the LiDAR check cancelled this leg 3 s later', 'labels': []},
-         {'kind': 'simview', 'ref': 'gz_no_feasible_end_closeup.png', 'states': {'MISSION_FAILED'},
-          'crop': (500, 0, 1100, 1000),
-          'caption': 'Close-up after the mission: G1 at its worktable between the two panels',
-          'labels': []}]},
-]
-# Formerly featured, kept with its captures in the archive section.
-ARCHIVED_FEATURED = [
-    {'key': 'gazebo_rear', 'run': 'artifacts/exploration/p8_2026-11-14/gz_standard_run5',
-     'letter': 'E', 'title': 'Rear parking in Gazebo Sim (warehouse)',
-     'images': [
-         {'kind': 'simview', 'ref': 'gz_standard_parked_workstation.png', 'states': {'PARKED'},
-          'crop': (450, 150, 700, 700),
-          'caption': 'Top-down view while parked: G1 facing its worktable, Ridgeback behind G1',
-          'labels': [('Worktable', (350, 140), None), ('G1', (347, 340), (565, 330)),
-                     ('Ridgeback', (460, 545), (590, 610))]},
-         {'kind': 'rviz', 'ref': 'PARKED', 'states': {'PARKED'}, 'crop': (650, 62, 605, 268),
-          'caption': 'RViz while parked: the robot footprint behind G1 inside the parking donut',
-          'labels': []},
-         {'kind': 'simview', 'ref': 'gz_standard_end_overview.png', 'states': {'MISSION_COMPLETE'},
-          'crop': OVERVIEW_CROP,
-          'caption': 'After the mission: Ridgeback back in its start area, G1 at its worktable',
-          'labels': [('Ridgeback', (355, 345), (355, 520)), ('G1', (875, 290), (875, 140))]}]},
+                     'panel; the LiDAR check cancelled this leg 3 s later', 'labels': []}]},
 ]
 SIDE_NAME = {'g1_left': "G1's left", 'g1_right': "G1's right", 'g1_rear': 'behind G1',
              'g1_front': 'in front of G1'}
@@ -201,6 +239,7 @@ def load(run):
     return {'path': path, 'rel': os.path.relpath(path, ROOT), 'name': run_name(path), 'm': m,
             'log': log, 'transitions': transitions, 'campaign': campaign, 'code': code,
             'record': record, 'start': start, 'final': m['commit'] in FINAL_SET,
+            'cause': CAUSES.get(os.path.relpath(path, ROOT)),
             'vetoes': [(float(t), int(n), r.strip()) for t, n, r in ATTEMPT_FAIL.findall(log)],
             'veto_detail': [(float(a), float(b)) for a, b in VETO_DETAIL.findall(log)]}
 
@@ -215,8 +254,13 @@ def classify(r):
         reach = m.get('reach_truth_m')
         if reach is not None and not REACH[0] - 0.10 <= reach <= REACH[1] + 0.10:
             return 'bad', 'False completion: incorrect G1 localization (historical bug)', FALSE_COMPLETION
+        if reach is not None and not REACH[0] <= reach <= REACH[1]:
+            return ('warn', f'Parked and returned, but the reach of {reach:.3f} m (ground truth) is outside the '
+                            f'required {REACH[0]:.2f}-{REACH[1]:.2f} m', REACH_OUTSIDE)
         return 'ok', ('Parked and returned' if attempts <= 1 else
                       f'Parked on attempt {attempts} and returned'), 'Complete'
+    if m['outcome'] == 'stopped':
+        return 'bad', 'Stopped by the operator during the search: the robot was wedged; G1 not seen', OPERATOR_STOP
     if 'lidar_stale' in reason:
         return ('warn', f'Stopped: stale LiDAR scans while the mission node was overloaded (fixed in '
                         f'5b5133c); {back}', STALE_LIDAR)
@@ -234,6 +278,9 @@ def classify(r):
                            f'looked feasible; the LiDAR check stopped the attempt; {back}', MISSED_LOCALIZATION)
         return ('bad', f'Refusal missed: a parking attempt in a scene with no safe pose, stopped by the LiDAR '
                        f'check; {back}', 'Refusal missed')
+    if 'PARKED deadline' in reason:
+        return ('warn', f'Parked, but the stop was not confirmed before the PARKED deadline; {back}',
+                STOP_UNCONFIRMED)
     if 'localization' in reason or 'not relocalized' in reason:
         return 'bad', f'Perception: G1 not localized; {back}', 'Perception failure'
     if 'observation pose' in reason:
@@ -495,10 +542,11 @@ def axis(x0, x1, y, ticks, scale, text, title):
 
 
 def sim_name(r):
-    """The simulator, and for Gazebo the world: the warehouse, or the hospital-ward trial."""
+    """The simulator, and for Gazebo the world: the hospital ward or the warehouse (Isaac
+    has only the ward)."""
     if r['m']['simulator'] != 'gz':
         return 'Isaac'
-    return 'Gazebo ward' if r['m']['commit'] in WARD_TRIAL else 'Gazebo warehouse'
+    return 'Gazebo ward' if ward_run(r) else 'Gazebo warehouse'
 
 
 def run_label(r):
@@ -602,9 +650,13 @@ def reach_chart(runs):
                         f'<text x="{scale(hi) + 8:.1f}" y="{y + 5}" class="value bad">{reach:.2f} m: false '
                         f'completion</text>')
         else:
+            outside = not REACH[0] <= reach <= REACH[1]
+            note = '; outside the required band' if outside else ''
+            text = f'{reach:.3f} m: outside the band' if outside else f'{reach:.2f}'
             body.append(f'<circle cx="{scale(reach):.1f}" cy="{y}" r="7" class="dot-gz">'
-                        f'<title>{esc(r["name"])}: {reach:.3f} m (ground truth)</title></circle>'
-                        f'<text x="{scale(reach) + 12:.1f}" y="{y + 5}" class="value">{reach:.2f}</text>')
+                        f'<title>{esc(r["name"])}: {reach:.3f} m (ground truth){note}</title></circle>'
+                        f'<text x="{scale(reach) + 12:.1f}" y="{y + 5}" class="value{" bad" if outside else ""}">'
+                        f'{text}</text>')
     y_axis = top + len(rows) * row_h - 8
     body.insert(1, axis(x0, x1, y_axis, [0, 0.15, 0.30, 0.45, 0.60, 0.75, 0.90], scale, lambda v: f'{v:.2f}',
                      'distance from G1\'s axis to the basket centre (m), Gazebo ground truth'))
@@ -617,17 +669,19 @@ def overview(final, scenario_count):
     groups = [('Complete', 'ok', 'completed missions', 'parked, waited and returned to start'),
               ('Safe refusal', 'safe', 'correct safe refusal', 'no_feasible: no pose fits, no attempt, returned'),
               (None, 'bad', 'failed or incomplete runs', ''),
-              ('all', 'neutral', 'evaluated post-merge runs', '14 Nov 2026, Gazebo and Isaac')]
+              ('all', 'neutral', 'hospital-ward validation runs', '17-18 Nov 2026, Gazebo and Isaac')]
     complete = [r for r in final if classify(r)[2] == 'Complete']
     refusals = [r for r in final if classify(r)[2] == 'Safe refusal']
     others = [r for r in final if r not in complete and r not in refusals]
-    defects = sum(classify(r)[2] in ('Planning gate', STALE_LIDAR) for r in others)
+    causes = {}
+    for r in others:
+        category = SHORT.get(classify(r)[2], classify(r)[2])
+        causes[category] = causes.get(category, 0) + 1
     counts = {'Complete': complete, 'Safe refusal': refusals, None: others, 'all': final}
     cards = []
     for key, cls, label, detail in groups:
         if key is None:
-            detail = (f'{defects} integration defects, each fixed before the next run; '
-                      f'{len(others) - defects} G1 not localized')
+            detail = '; '.join(f'{n} {c}' for c, n in causes.items())
         cards.append(f'<div class="kpi {cls}"><div class="v">{len(counts[key])}</div>'
                      f'<div class="l">{esc(label)}</div><div class="d">{esc(detail)}</div></div>')
     pips = ''.join(
@@ -652,16 +706,18 @@ def overview(final, scenario_count):
             f'<tr><th>Simulator</th><th>Parked</th><th>Attempts</th><th>Duration (min:s)</th>'
             f'<th>Parked reach (required {REACH[0]:.2f}-{REACH[1]:.2f} m)</th></tr>{"".join(rows)}</table></div></div>'
             f'<p class="caveat"><b>How to read these numbers.</b> The {len(final)} runs span {len(commits)} '
-            f'commits ({", ".join(commits)}): the merged code, then three fixes for defects these runs exposed. '
-            f'Each count describes these runs only; they do not establish a general success rate. '
-            f'{len({r["m"]["scenario"] for r in final})} of the {scenario_count} scenarios were run after the '
-            f'merge; earlier runs are in the <a href="#history">records</a>. The later Gazebo trial in the '
-            f'hospital ward (<a href="#ward_standard">B</a>, <a href="#ward">D</a>) is not counted here.</p>'
+            f'commits ({", ".join(commits)}): the ward as both simulators\' world, then fixes for the defects '
+            f'these runs exposed, each run under the code it ran. Only the runs on {FINAL_CODE[0]}\'s mission code '
+            f'({", ".join(FINAL_CODE)}) show the final code; the rest show why it changed. Each count '
+            f'describes these runs only; they do not establish a general success rate. '
+            f'{len({r["m"]["scenario"] for r in final})} of the {scenario_count} scenarios were run in the ward; '
+            f'the post-merge warehouse runs (14 Nov), the hospital-ward trial (17 Nov) and earlier runs are in the '
+            f'<a href="#history">records</a>.</p>'
             f'</div></section>')
 
 
 def comparison(by_key, refusal):
-    isaac, gz = by_key['isaac_side'], by_key['gazebo_rear']
+    isaac, gz = by_key['isaac_side'], by_key['gazebo_ward']
 
     def arrival(r):
         found = re.findall(r'Arrived at parking: error xy=([\d.]+) m', r['log'])
@@ -678,6 +734,10 @@ def comparison(by_key, refusal):
         ('of which: search for G1', phase(isaac, 'search'), phase(gz, 'search'), log),
         ('Arrival error at the parking pose', arrival(isaac), arrival(gz), est),
         ('G1 localization error', na, f'{span(gm["localization_errors_m"])} m', gt),
+        ('G1 heading estimate', f'{im["g1_heading_log"]} deg', f'{gm["g1_heading_log"]} deg (error '
+         f'{gm["heading_error_deg"]:.1f} deg)', est),
+        ('Parked', side_name(im['selected_sides'][-1]) + f', attempt {im["attempts"]}',
+         side_name(gm['selected_sides'][-1]) + f', attempt {gm["attempts"]}', log),
         ('Parked reach (required 0.30-0.60 m)', na, f'{gm["reach_truth_m"]:.3f} m', gt),
         ('Basket to G1\'s lower body', na, f'{gm["parked_truth_clearance_m"]:.3f} m', gt),
         ('Final distance from the start', na, f'{gm["final_distance_from_start_m"]:.2f} m', gt),
@@ -685,26 +745,37 @@ def comparison(by_key, refusal):
     table = ''.join(f'<tr><th>{esc(k)}</th><td>{a}</td><td>{b}</td><td>{src}</td></tr>' for k, a, b, src in rows)
     errs = refusal['m'].get('localization_errors_m') or []
     return (f'<section id="compare"><h2>Gazebo Sim and Isaac Sim</h2>'
-            f'<p class="lead">The same autonomy code, scene and parking priorities in both simulators. One run '
-            f'each: a demonstration, not a rate.</p>'
+            f'<p class="lead">The same autonomy code, hospital ward, scene and parking priorities in both '
+            f'simulators. One run each on the final mission code: a demonstration, not a rate.</p>'
             f'<div class="cmp"><div class="col isaac"><h3>Isaac Sim</h3><p class="sub"><code>{esc(isaac["name"])}</code>'
             f' · code {esc(im["commit"])}</p>{ladder(isaac, True)}</div>'
-            f'<div class="col gz"><h3>Gazebo Sim (warehouse)</h3><p class="sub"><code>{esc(gz["name"])}</code> · code '
+            f'<div class="col gz"><h3>Gazebo Sim</h3><p class="sub"><code>{esc(gz["name"])}</code> · code '
             f'{esc(gm["commit"])}</p>{ladder(gz, True)}</div></div>'
-            f'<div class="wrap"><table class="measures"><tr><th>Measurement</th><th>Isaac Sim</th><th>Gazebo Sim (warehouse)</th>'
+            f'<div class="wrap"><table class="measures"><tr><th>Measurement</th><th>Isaac Sim</th><th>Gazebo Sim</th>'
             f'<th>Source</th></tr>{table}</table></div>'
             f'<p class="note">Gazebo samples the true poses of the robot and G1; Isaac records only what the '
             f'mission itself estimated, so its ground-truth cells are empty rather than estimated.</p>'
             f'<div class="col safety"><h3>Safety test: no feasible parking position (Gazebo)</h3>'
-            f'<p class="sub"><code>{esc(refusal["name"])}</code> · code {esc(refusal["m"]["commit"])} · G1 '
-            f'localized {", ".join(f"{e:.3f}" for e in errs)} m from its true position (ground truth)</p>'
-            f'{ladder(refusal)}</div>'
+            f'<p class="sub"><code>{esc(refusal["name"])}</code> · code {esc(refusal["m"]["commit"])} · '
+            f'{esc(SHORT.get(classify(refusal)[2], classify(refusal)[2]))}'
+            + (f' · G1 localized {", ".join(f"{e:.3f}" for e in errs)} m from its true position (ground truth)'
+               if errs else '') + f'</p>{ladder(refusal)}</div>'
             f'<details class="more"><summary>Why the two simulators parked differently</summary>'
             f'<p>Each parking leg is checked live against both LiDAR scans; a return on the route ahead or in '
             f'the stopping path cancels the leg before contact, and the mission tries the next direction in its '
-            f'priority order (G1\'s sides, then behind, then in front). In Isaac the check rejected G1\'s right '
-            f'and the left succeeded. In Gazebo it rejected both sides, so the mission parked behind G1. '
-            f'{esc(veto_sentence(gz))}</p></details></section>')
+            f'priority order (G1\'s sides, then behind, then in front). {esc(parking_story(isaac, "Isaac"))} '
+            f'{esc(parking_story(gz, "Gazebo"))} {esc(veto_sentence(gz))}</p></details></section>')
+
+
+def parking_story(r, sim):
+    m = r['m']
+    sides = [side_name(s) for s in m.get('selected_sides') or []]
+    if not sides:
+        return ''
+    if len(sides) == 1:
+        return f'In {sim} the first approach, to {sides[0]}, passed the check and parked.'
+    return (f'In {sim} the check rejected {", ".join(sides[:-1])} and the approach to {sides[-1]} '
+            f'parked (attempt {m["attempts"]}).')
 
 
 def veto_sentence(r):
@@ -733,6 +804,8 @@ def kpis(r, key):
         items.append(('Parked reach', f'{m["reach_truth_m"]:.3f} m', 'ground truth; required 0.30-0.60'))
     if m.get('localization_errors_m'):
         items.append(('G1 localization error', f'{span(m["localization_errors_m"])} m', 'ground truth'))
+    if heading_errors(r):
+        items.append(('G1 heading error', f'{deg_span(heading_errors(r))} deg', 'ground truth'))
     if m.get('final_distance_from_start_m') is not None:
         items.append(('Back at start', f'{m["final_distance_from_start_m"]:.2f} m away', 'ground truth'))
     elif m.get('returned_to_start'):
@@ -748,9 +821,16 @@ def kpis(r, key):
                    f'{f"<span class=d>{esc(d)}</span>" if d else ""}</div>' for l, v, d in items)
 
 
+def ward_run(r):
+    """Whether the run loaded the hospital ward: only its captures are shown on this page."""
+    return r['m'].get('world') == WARD_WORLD or r['m']['commit'] in WARD_TRIAL
+
+
 def featured(r, spec, summary, details, note=''):
     figs = []
-    for i, image in enumerate(spec['images']):
+    if not ward_run(r):
+        print(f'{spec["key"]} images excluded: {r["rel"]} did not load the hospital ward')
+    for i, image in enumerate(spec['images'] if ward_run(r) else []):
         html_, why = featured_image(r, image, f'{spec["key"]}_{i}')
         if html_ is None:
             print(f'{spec["key"]} image {image["ref"]} excluded: {why}')
@@ -773,21 +853,63 @@ def featured(r, spec, summary, details, note=''):
             f'</summary><div class="factlist">{facts}</div>{event_list(r)}</details></article>')
 
 
+def heading_errors(r):
+    """Every G1 heading the mission estimated, against Gazebo ground truth (deg); [] in Isaac."""
+    truth = r['m'].get('g1_truth')
+    if not truth:
+        return []
+    out = []
+    for value in re.findall(r'G1 heading (-?[\d.]+) deg from depth', r['log']):
+        diff = (float(value) - math.degrees(truth[2]) + 180.0) % 360.0 - 180.0
+        out.append(abs(diff))
+    return out
+
+
+def deg_span(values):
+    lo, hi = min(values), max(values)
+    return f'{lo:.1f}' if f'{lo:.1f}' == f'{hi:.1f}' else f'{lo:.1f}-{hi:.1f}'
+
+
 def explanations(by_key):
     """(one-sentence summary, detail rows) per featured experiment, from the runs' records."""
-    a, b, c = by_key['isaac_side'], by_key['gazebo_rear'], by_key['gazebo_refusal']
+    a, b, c = by_key['isaac_side'], by_key['gazebo_ward'], by_key['gazebo_refusal']
     d, e = by_key['ward_standard'], by_key['ward_no_feasible']
     am, bm, cm, dm, em = a['m'], b['m'], c['m'], d['m'], e['m']
-    n, ok = candidates(c)
     reseed = re.findall(r'position re-seeded on the head \((-?[\d.]+), (-?[\d.]+)\)', e['log'])
-    return {
+    out = {
+        'isaac_side': (
+            f'Ridgeback searched the ward, found and localized G1, parked at '
+            f'{side_name(am["selected_sides"][-1])} on attempt {am["attempts"]}, waited five seconds and drove '
+            f'back to its start.',
+            [('First localization', 'The head region measured the wall behind G1; depth there stands taller than '
+                                    'G1, so the detector\'s estimate on G1 was kept and G1\'s legs confirmed it '
+                                    '(the surface fallback of b519ab0)'),
+             ('G1 heading estimate', f'{am["g1_heading_log"]} deg (configured -90 deg)'),
+             ('Return', 'Ended within the shared 0.40 m goal tolerance of the start, any heading (mission estimate)'),
+             ('Ground truth', 'Isaac records none: positions and distances here are the mission\'s own estimates'),
+             ('Evidence', f'<code>{esc(a["rel"])}</code>, outside the repository')]),
+        'gazebo_ward': (
+            f'Ridgeback searched the ward, found and localized G1; the LiDAR check rejected the approach to '
+            f'{side_name(bm["selected_sides"][0])}, and it parked on attempt {bm["attempts"]}, '
+            f'{bm["reach_truth_m"]:.3f} m from G1\'s axis (ground truth; required {REACH[0]:.2f}-{REACH[1]:.2f} m), '
+            f'waited five seconds and drove back to {bm["final_distance_from_start_m"]:.2f} m from its start.',
+            [('Why not the first side', esc(veto_sentence(b))),
+             ('Where it parked', f'Planned as {side_name(bm["selected_sides"][-1])}; by ground truth the bin stood '
+                                 f'{abs(bm["bearing_from_g1_heading_deg"]):.0f} deg from G1\'s heading, behind its '
+                                 f'left hip, just past the 45 deg side sector (sectors only order the checks)'),
+             ('G1 heading error', f'{deg_span(heading_errors(b))} deg over its {len(heading_errors(b))} '
+                                  f'localizations (ground truth)'),
+             ('Basket to G1', f'{bm["parked_truth_clearance_m"]:.3f} m from G1\'s lower body (ground truth)'),
+             ('Earlier ward completion', 'gz_standard_run2 (f6ade2f, before the surface fallback) parked 0.607 m from '
+                                         'G1, outside the required band, after a 65 deg heading error; see the table'),
+             ('Return', f'Ended {bm["final_distance_from_start_m"]:.2f} m from the true start (ground truth)'),
+             ('Evidence', f'<code>{esc(b["rel"])}</code>, outside the repository')]),
         'ward_standard': (
             f'Ridgeback searched the ward, found and localized G1, and the LiDAR check rejected both sides of G1; '
             f'it parked behind G1 on attempt {dm["attempts"]}, {dm["reach_truth_m"]:.3f} m from G1\'s axis '
             f'(ground truth; required {REACH[0]:.2f}-{REACH[1]:.2f} m), waited five seconds and drove back to '
             f'{dm["final_distance_from_start_m"]:.2f} m from its start.',
-            [('World', 'Gazebo <code>parking_demo</code> of commit 822ae6d: the hospital ward Isaac uses, with G1 at '
-                       'Isaac\'s workstation; reverted afterwards, so not the current Gazebo world'),
+            [('World', 'Gazebo <code>parking_demo</code> of trial commit 822ae6d, on the post-merge mission code'),
              ('Why not beside G1', esc(veto_sentence(d))),
              ('Basket to G1', f'{dm["parked_truth_clearance_m"]:.3f} m from G1\'s lower body (ground truth)'),
              ('G1 heading error', f'{dm["heading_error_deg"]:.1f} deg (ground truth)'),
@@ -797,42 +919,47 @@ def explanations(by_key):
             f'The safety scene did not refuse as intended: G1 was localized {span(em["localization_errors_m"])} m '
             f'from its true position, so a pose beside the panel looked feasible. The live LiDAR check cancelled '
             f'that attempt before contact; G1 was not relocalized, and the robot drove back to its start.',
-            [('What went wrong', 'The depth check placed G1\'s head 4.11 m from the camera and re-seeded G1 at '
+            [('What went wrong', 'The head region measured the far panel behind the half-hidden G1, and the check '
+                                 're-seeded G1 at '
                                  + (f'({float(reseed[-1][0]):.2f}, {float(reseed[-1][1]):.2f})' if reseed else '?')
-                                 + ', between G1 and its right panel; the planned pose lay beyond that panel'),
+                                 + ', on that panel; the planned pose lay beyond the near panel'),
              ('Safety', f'LiDAR check cancelled the final leg in the stopping path; minimum ground-truth clearance '
                         f'{em["min_truth_clearance_m"]:.3f} m ({esc(em.get("min_truth_clearance_pair") or "")})'),
              ('Final reason', f'<code>{esc((em.get("final_reason") or "")[:140])}</code>'),
-             ('Consequence', 'Gazebo kept the warehouse as its parking world, and the warehouse run (C) remains '
-                             'the safety demonstration'),
+             ('Consequence', 'A position with depth above G1\'s height is now refused, with the surface fallback; '
+                             'both simulators then moved to the ward (C is the rerun)'),
              ('Evidence', f'<code>{esc(e["rel"])}</code>, outside the repository')]),
-        'isaac_side': (
-            f'The LiDAR check rejected the approach to {side_name(am["selected_sides"][0])}; Ridgeback parked at '
-            f'{side_name(am["selected_sides"][-1])} on attempt {am["attempts"]}, waited and drove back to its start.',
-            [('G1 heading estimate', f'{am["g1_heading_log"]} deg (configured -90 deg)'),
-             ('Return', 'Ended within the shared 0.40 m goal tolerance of the start, any heading (mission estimate)'),
-             ('Ground truth', 'Isaac records none: positions and distances here are the mission\'s own estimates'),
-             ('Evidence', f'<code>{esc(a["rel"])}</code> and the run\'s recording, outside the repository')]),
-        'gazebo_rear': (
-            f'The LiDAR check rejected both sides of G1; Ridgeback parked behind G1 on its third attempt, '
-            f'{bm["reach_truth_m"]:.3f} m from G1\'s axis (ground truth), and drove back to its start.',
-            [('Why not beside G1', esc(veto_sentence(b))),
-             ('Why behind G1', 'After both sides were rejected, the rear is the next class in the priority order'),
-             ('G1 heading error', f'{bm["heading_error_deg"]:.1f} deg (ground truth)'),
-             ('Basket to G1', f'{bm["parked_truth_clearance_m"]:.3f} m from G1\'s lower body (ground truth)'),
-             ('Return', f'Ended {bm["final_distance_from_start_m"]:.2f} m from the true start (ground truth); the '
-                        f'mission\'s own estimate was within its 0.40 m tolerance'),
-             ('Evidence', f'<code>{esc(b["rel"])}</code>, outside the repository')]),
-        'gazebo_refusal': (
-            f'Two panels, the worktable and a bed leave no room for Ridgeback near G1: none of the {n} candidate '
-            f'poses was valid, so the mission made no parking attempt, drove back to its start and reported why.',
-            [('Scene', 'G1 at its worktable inside a pen: panels 0.8 m to each side and a 0.5 m bed 1.25 m behind'),
-             ('Planner result', f'<code>no_valid_candidate</code>: {ok} of {n} candidate poses valid; the '
-                                f'footprints overlap the panels, table or bed'),
-             ('G1 heading error', f'{cm["heading_error_deg"]:.1f} deg (ground truth)'),
-             ('Return', f'Ended {cm["final_distance_from_start_m"]:.2f} m from the true start (ground truth)'),
-             ('Evidence', f'<code>{esc(c["rel"])}</code>, outside the repository')]),
     }
+    n, ok = candidates(c) or (0, 0)
+    if classify(c)[2] == 'Safe refusal':
+        summary = (f'Two panels, the worktable and a bed leave no room for Ridgeback near G1: G1 was localized '
+                   f'{span(cm["localization_errors_m"])} m from its true position, none of the {n} candidate poses '
+                   f'was valid, so the mission made no parking attempt, drove back to its start and reported why.')
+    else:
+        summary = (f'This run did not show a safe refusal: {esc(classify(c)[1])}. It is reported as it ended.')
+    reseeded = re.findall(r'lies ([+-][\d.]+) m (?:in front of|behind) G1\'s head at ([\d.]+) m', c['log'])
+    verified = re.findall(r'G1 verified in depth: head [\d.]+ m from the camera, torso points \[(\d+)[^\]]*\], '
+                          r'points above G1 \[(\d+)', c['log'])
+    checks = ('The detector\'s surface estimate lay ' + f'{abs(float(reseeded[-1][0])):.2f} m beyond G1\'s head '
+              'on the worktable; the head check moved the position onto G1\'s head and its legs confirmed the axis'
+              if reseeded else 'The surface estimate agreed with G1\'s head')
+    if verified:
+        checks += (f'; depth showed {verified[-1][0]} torso points and {verified[-1][1]} above G1\'s height. '
+                   'Planning used that verified position')
+    out['gazebo_refusal'] = (summary, [
+        ('Localization checks', checks),
+        ('Scene', 'G1 at its worktable inside a pen: panels 0.8 m to each side and a 0.5 m high bed 0.95 m behind'),
+        ('Planner result', f'<code>{esc((cm.get("final_reason") or "-")[:160])}</code>'
+                           + (f'; {ok} of {n} candidate poses valid' if n else '')),
+        ('G1 localization error', f'{span(cm["localization_errors_m"])} m (ground truth)'
+                                  if cm.get('localization_errors_m') else 'G1 not localized'),
+        ('G1 heading error', f'{deg_span(heading_errors(c))} deg (ground truth)' if heading_errors(c) else '-'),
+        ('Return', f'Ended {cm["final_distance_from_start_m"]:.2f} m from the true start (ground truth)'
+                   if cm.get('final_distance_from_start_m') is not None else '-'),
+        ('Earlier refusals', 'gz_no_feasible_run2 (ward, f6ade2f) and the post-merge warehouse run (5b5133c) also '
+                             'refused with no attempt; both are in the table'),
+        ('Evidence', f'<code>{esc(c["rel"])}</code>, outside the repository')])
+    return out
 
 
 def history(runs, archived=''):
@@ -863,6 +990,8 @@ def history(runs, archived=''):
             details.append(('Cause', 'Both LiDARs published at 29.5 Hz (largest gap 0.15 s); the parking LiDAR '
                                      'check, 14 ms per scan after the merge, held the mission node back so it '
                                      'judged fresh scans stale. Not an obstacle. Fixed in 5b5133c.'))
+        if r['cause']:
+            details.append(('Cause', r['cause']))
         if category == FALSE_COMPLETION:
             details.append(('Cause', 'A worktable edge in G1\'s detection box became G1\'s position (1.25 m off); '
                                      'the mission parked beside it. Fixed by the G1 position check (3becd27).'))
@@ -926,9 +1055,13 @@ def history(runs, archived=''):
             f'<p class="note">Evidence folders live under <code>artifacts/</code> outside the repository; the '
             f'dated records explain each campaign. Gazebo measurements are ground truth sampled every '
             f'1-2.5 s; Isaac runs record the mission\'s own estimates only.</p>'
-            f'<h3 class="archived">Formerly featured: the post-merge warehouse rear-parking run</h3>'
-            f'<p class="note">Gazebo\'s standard scene in the warehouse, the current Gazebo world, with its '
-            f'captures and measurements as featured until 17 November.</p>{archived}</details>{script}</section>')
+            f'<p class="note">Warehouse runs (Gazebo <code>depot</code>, still available with '
+            f'<code>world:=depot</code>) keep their measurements, outcomes and code versions here; their '
+            f'screenshots stay in their evidence folders and are not shown on this page.</p>'
+            f'<h3 class="archived">Formerly featured: the hospital-ward trial of 17 November</h3>'
+            f'<p class="note">Gazebo\'s first runs in the ward, on the post-merge mission code. Its safety scene '
+            f'mislocalized G1, which led to the localization changes the validation runs above tested.</p>'
+            f'{archived}</details>{script}</section>')
 
 
 def span(values):
@@ -1148,59 +1281,38 @@ def main():
     scenario_count = len(yaml.safe_load(open(SCENARIO_FILE))['scenarios'])
     by_key = {spec['key']: next(r for r in runs if os.path.normpath(r['path']) ==
                                 os.path.normpath(os.path.join(ROOT, spec['run'])))
-              for spec in FEATURED + WARD_FEATURED + ARCHIVED_FEATURED}
+              for spec in FEATURED + ARCHIVED_FEATURED}
     explain = explanations(by_key)
     ward = [r for r in runs if r['m']['commit'] in WARD_TRIAL]
-    record = '<a href="../../archive/engineering/2026-11-17-parking-gazebo-hospital-ward.md">dated record</a>'
-    gz_final = [e for r in final if r['m']['simulator'] == 'gz' for e in r['m'].get('localization_errors_m') or []]
-    ward_errors = by_key['ward_standard']['m']['localization_errors_m']
-    rear_errors = by_key['gazebo_rear']['m']['localization_errors_m']
-    trial_note = (
-        f'<div class="caveat trial"><b>A trial world, not the current Gazebo default.</b> Gazebo\'s parking scenes '
-        f'run in Clearpath\'s warehouse, and every other Gazebo result on this page comes from it. This single run '
-        f'(17 Nov) used the hospital ward Isaac uses, with unchanged mission code; it shows the mission can '
-        f'complete there, not that it is reliable there, and the ward\'s <code>no_feasible</code> run failed '
-        f'(<a href="#ward">D</a>). G1 was localized {span(ward_errors)} m from its true position, against '
-        f'{span(rear_errors)} m in the warehouse run that parked behind G1 (E, in the archive) and '
-        f'{min(gz_final):.3f}-{max(gz_final):.3f} m across all post-merge warehouse runs. The run\'s captures are '
-        f'top-down and RViz only: no angled view was recorded, and no run was repeated to add one. See the '
-        f'{record}.</div>')
-    notes = {'ward_standard': trial_note}
-    featured_html = ''.join(featured(by_key[spec['key']], spec, *explain[spec['key']], notes.get(spec['key'], ''))
-                            for spec in FEATURED)
-    ward_html = (
-        '<section id="ward"><h2>Hospital-ward trial: the safety scene</h2><div class="caveat trial"><b>A '
-        'localization failure in the trial world.</b> In the same hospital-ward trial as B, the '
-        '<code>no_feasible</code> scene did not refuse as intended: G1 was placed '
-        f'{max(by_key["ward_no_feasible"]["m"]["localization_errors_m"]):.2f} m from its true position, a pose '
-        'beside a panel looked feasible, and only the live LiDAR check stopped the attempt. Gazebo therefore '
-        f'kept the warehouse, whose verified refusal (C) remains the safety demonstration. See the {record}.</div>'
-        + ''.join(featured(by_key[spec['key']], spec, *explain[spec['key']]) for spec in WARD_FEATURED)
-        + '</section>')
+    post_merge = [r for r in runs if r['m']['commit'] in POST_MERGE]
+    record = '<a href="../../archive/engineering/2026-11-18-parking-hospital-validation.md">dated record</a>'
+    featured_html = ''.join(featured(by_key[spec['key']], spec, *explain[spec['key']]) for spec in FEATURED)
     archived_html = ''.join(featured(by_key[spec['key']], spec, *explain[spec['key']]) for spec in ARCHIVED_FEATURED)
     since = by_key['isaac_side']['start'] - 6 * 86400        # the G1 position check, 9 November
 
     def card(title, shows, body, note=''):
         return (f'<div class="chartcard"><h3>{title}</h3><p class="q"><b>What it shows:</b> {shows}</p>{body}'
                 f'{f"<p class=note>{note}</p>" if note else ""}</div>')
-    gz_errors = gz_final
+    charted = post_merge + ward + final
+    gz_errors = [e for r in post_merge if r['m']['simulator'] == 'gz' for e in r['m'].get('localization_errors_m') or []]
     charts = (
         '<div class="charts">'
         + card('Mission duration by phase',
-               'how long each post-merge run, and each hospital-ward trial run, spent searching for G1, '
-               'localizing and planning, parking, waiting and returning. Searching dominates every run; hover a '
-               'segment for its duration.',
-               duration_chart(final + ward),
+               'how long each post-merge warehouse run, hospital-ward trial run and hospital-ward validation run '
+               'spent searching for G1, localizing and planning, parking, waiting and returning. Searching '
+               'dominates every run; hover a segment for its duration.',
+               duration_chart(charted),
                'Times from the mission\'s logged state changes (mission log), not from ground truth.')
         + card('G1 localization error',
                'how far each G1 position the mission planned with was from G1\'s true position, in the '
-               'post-merge Gazebo runs and the hospital-ward trial (one dot per localization; an arrow marks a '
-               'value off the scale).',
-               localization_chart(final + ward),
-               f'Warehouse runs: {len(gz_errors)} localizations, {min(gz_errors):.3f}-{max(gz_errors):.3f} m. '
-               f'Hospital-ward trial: ' + '; '.join(f'{r["m"]["scenario"]} {span(r["m"]["localization_errors_m"])} m'
-                                                   for r in ward) + '. Gazebo ground truth only; Isaac records '
-               'no ground truth, so it has no points here.')
+               'post-merge Gazebo warehouse runs, the hospital-ward trial and the hospital-ward validation '
+               '(one dot per localization; an arrow marks a value off the scale).',
+               localization_chart(charted),
+               f'Post-merge warehouse runs: {len(gz_errors)} localizations, {min(gz_errors):.3f}-{max(gz_errors):.3f} m. '
+               f'Hospital ward: ' + '; '.join(f'{r["name"]} ({r["m"]["commit"]}) {span(r["m"]["localization_errors_m"])} m'
+                                              for r in ward + final if r['m']['simulator'] == 'gz'
+                                              and r['m'].get('localization_errors_m'))
+               + '. Gazebo ground truth only; Isaac records no ground truth, so it has no points here.')
         + card('Parking attempts in completed missions',
                'every completed mission since the G1 position check (9 November): each attempt in order, '
                'whether the live LiDAR check rejected it and why. A mission makes at most three attempts.',
@@ -1210,11 +1322,11 @@ def main():
                'campaigns, against the required 0.30-0.60 m band.',
                reach_chart(runs),
                'Gazebo ground truth only; Isaac records no ground truth and is not shown. The historical false '
-               'completion parked 1.72 m away, off the scale.')
+               'completion parked 1.72 m away, off the scale; a red value lies outside the required band.')
         + '</div>')
     jump = ''.join(f'<a href="#{k}">{v}</a>' for k, v in (
         ('overview', 'Overview'), ('compare', 'Gazebo and Isaac'), ('featured', 'Featured experiments'),
-        ('ward', 'Ward safety trial'), ('performance', 'Performance'), ('history', 'All runs')))
+        ('performance', 'Performance'), ('history', 'All runs')))
     intro = ('<p class="subtitle">Evaluation in Gazebo Sim and NVIDIA Isaac Sim</p>'
              '<p>Ridgeback searches a room for a Unitree G1 standing at its worktable, localizes it, parks '
              'with its basket within reach of G1, waits five seconds and drives back to its start. This page '
@@ -1225,12 +1337,13 @@ def main():
             f'{overview(final, scenario_count)}'
             f'{comparison(by_key, by_key["gazebo_refusal"])}'
             f'<section id="featured"><h2>Featured experiments</h2><p class="lead">Side parking in Isaac Sim (A), '
-            f'rear parking in the Gazebo hospital-ward trial (B) and the safety test in Gazebo\'s warehouse (C), '
-            f'all on the merged mission code. Each shows captures from that run only, cropped to the robot and G1. '
+            f'parking in Gazebo Sim (B) and the Gazebo safety test (C), all in the hospital ward on the final '
+            f'mission code ({FINAL_CODE[0]}). Each shows captures from that run only, cropped to the robot and G1. '
             f'Labels are drawn over the images and can be switched off; click an image to see the whole capture. '
-            f'The warehouse rear-parking run featured earlier is in the <a href="#history">archive</a>.</p>'
+            f'Earlier runs, including every warehouse run, are in the <a href="#history">records</a> with their '
+            f'measurements; see the {record}.</p>'
             f'{featured_html}</section>'
-            f'{ward_html}<section id="performance"><h2>Performance</h2>{charts}</section>'
+            f'<section id="performance"><h2>Performance</h2>{charts}</section>'
             f'{history(runs, archived_html)}</main>{RESULTS_JS}')
     with open(OUT, 'w') as stream:
         stream.write(pages.page('Autonomous Parking — Experimental Results', pages.RESULTS_PAGE, intro, body,
@@ -1239,7 +1352,7 @@ def main():
     used = set(re.findall(r'assets/parking_results/([^"]+)', open(OUT).read()))
     for name in sorted(set(os.listdir(ASSETS)) - used):
         os.remove(os.path.join(ASSETS, name))
-    print('wrote', OUT, len(runs), 'runs,', len(final), 'post-merge,', len(used), 'images')
+    print('wrote', OUT, len(runs), 'runs,', len(final), 'hospital-ward validation runs,', len(used), 'images')
 
 
 if __name__ == '__main__':

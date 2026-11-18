@@ -158,7 +158,7 @@ tools/parking_scenarios/run_scenario.sh gz right_blocked artifacts/exploration/s
 python3 tools/parking_scenarios/scenario_metrics.py artifacts/exploration/scenarios/gz_right_blocked
 # Scene views, then the two pages (CODE in make_results_page.py labels each recorded HEAD):
 tools/parking_scenarios/preview_scenario.sh gz right_blocked artifacts/exploration/scenes
-python3 tools/parking_scenarios/make_scenarios_page.py artifacts/exploration/scenes
+python3 tools/parking_scenarios/make_scenarios_page.py artifacts/exploration/scenes_* artifacts/exploration/scenes
 python3 tools/parking_scenarios/make_results_page.py      # the runs in results_runs.txt
 ```
 
@@ -169,7 +169,10 @@ workstation, a close-up of G1 and its table, an oblique view, an angled view fro
 above of the robot and G1, a close angled view of the workstation (`angled`), and
 one frame of the robot's own camera. The scenarios
 page leads each scenario with Isaac Sim's top-down, close-up and angled views and
-keeps the Gazebo views of the same layout in a collapsed section.
+keeps Gazebo's views of the same scene in a collapsed section. Both show the
+hospital ward only: `make_scenarios_page.py` skips captures of another world (the
+manifest records it) and captures whose recorded commit placed G1 or an object
+differently from the current scenario file, and shows a missing view as missing.
 `capture_scene_views.py` renders them in the simulator itself, so a locked or
 disconnected desktop cannot blank them: Gazebo through temporary camera sensors
 that are removed afterwards, Isaac through the runner's opt-in view cameras
@@ -186,10 +189,13 @@ with the robot parked. Gazebo renders the requested views together, so a top-dow
 a close-up and an angled view fit within the wait. `make_scenarios_page.py` and
 `make_results_page.py` build the two pages. The results page reads the runs listed
 in `results_runs.txt` (or the run folders given as arguments, such as
-`artifacts/exploration/scenarios/*/`): its overview,
-comparison and charts use the post-merge runs (`FINAL_SET`), its featured
-experiments name their run and captures in `FEATURED`, and every run appears in its
-filterable table. Each featured capture is shown only if it is not blank and was
+`artifacts/exploration/scenarios/*/`): its overview counts the hospital-ward
+validation runs (`FINAL_SET`), its comparison and featured experiments use the
+runs and captures named in `FEATURED`, its charts add the post-merge warehouse runs
+and the 2026-11-17 ward trial, and every run appears in its filterable table with
+its measurements. Only captures of runs that loaded the hospital ward are shown;
+warehouse runs keep their measurements in the table and their screenshots in their
+evidence folders. Each featured capture is shown only if it is not blank and was
 taken in the mission state its caption names; the page shows the crop named in
 `FEATURED`, draws any labels as a separate layer over it, and enlarges to the whole
 capture. It keeps only the images it uses in `assets/parking_results/`.

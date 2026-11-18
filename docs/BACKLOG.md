@@ -255,7 +255,7 @@ depth above G1's height is now refused, and when the head region shows such an
 object the surface estimate is kept if G1's legs agree
 ([G1 position check](exploration/architecture.md#g1-position-check)). Both
 simulators now load the ward. On that code each completed `standard` once and
-Gazebo `no_feasible` refused as intended, with G1 0.05-0.13 m from ground truth in
+Gazebo `no_feasible` refused as intended, with G1 0.05-0.15 m from ground truth in
 Gazebo against 0.015-0.041 m in the warehouse. Open: the head region still misses
 G1's head in oblique, close and partly hidden views; one Gazebo run estimated G1's
 heading 65 degrees off from a view 0.68 m from G1 (14589 points on the forearm

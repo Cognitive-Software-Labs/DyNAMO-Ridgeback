@@ -51,3 +51,11 @@ artifacts/exploration/p8_2026-11-14/gz_no_feasible
 artifacts/exploration/p8_2026-11-14/isaac_standard/run
 artifacts/exploration/hospital_2026-11-17/gz_standard
 artifacts/exploration/hospital_2026-11-17/gz_no_feasible
+artifacts/exploration/hospital_2026-11-18/gz_standard
+artifacts/exploration/hospital_2026-11-18/gz_no_feasible
+artifacts/exploration/hospital_2026-11-18/gz_standard_run2
+artifacts/exploration/hospital_2026-11-18/gz_no_feasible_run2
+artifacts/exploration/hospital_2026-11-18/isaac_standard
+artifacts/exploration/hospital_2026-11-18/isaac_standard_run2
+artifacts/exploration/hospital_2026-11-18/gz_standard_final
+artifacts/exploration/hospital_2026-11-18/gz_no_feasible_final
