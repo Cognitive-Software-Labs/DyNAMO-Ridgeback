@@ -282,9 +282,12 @@ heading after the step back needs a second viewpoint at another bearing.
 ([G1 heading](exploration/architecture.md#g1-heading)), with a fixed 15° heading
 margin. The heading estimator reports no per-estimate uncertainty, so the margin
 cannot follow a weaker or stronger estimate, and G1's position error, which also
-turns a pose's bearing, is not in it. The strict order is checked offline only: no
-simulator run has used it yet, and a right class larger than the route-check budget
-fails planning rather than falling to the left.
+turns a pose's bearing, is not in it. One Isaac run has used the strict order
+(2026-11-19), with valid poses on G1's right only; no run has yet chosen between both
+sides or used the batches or budget, and a right class larger than the route-check
+budget fails planning rather than falling to the left. In Gazebo, at 0.8-1.2 s a
+check, the 10 s batch timeout ends a search after about 12 checks with the terminal
+`planner_timeout`, which neither explores nor returns to the start.
 
 **Completion criteria.** Run the order live in both simulators; decide whether the
 estimator should report an uncertainty (for example from the spread of the frames'

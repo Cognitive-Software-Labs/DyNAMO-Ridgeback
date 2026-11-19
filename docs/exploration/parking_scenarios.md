@@ -261,3 +261,4 @@ those views, the RViz screen and the mission state at the same moment of that ru
 - [Parking in the hospital ward](../../archive/engineering/2026-11-18-parking-hospital-validation.md) — both simulators on the ward, the panel and wall behind G1 in the head region, the bed strip, and the ward runs.
 - [G1 heading quality gate and step back](../../archive/engineering/2026-11-19-parking-g1-reobservation.md) — why the final Isaac demonstration had no heading, the limits from every recorded G1 view, and the live run on the gated code.
 - [G1-relative parking order](../../archive/engineering/2026-11-19-parking-g1-relative-order.md) — the strict right, left, front, rear order replayed offline on the ward maps against the old order.
+- [G1-relative parking order, first Isaac run](../../archive/engineering/2026-11-19-parking-g1-relative-order-isaac.md) — the strict order live: right selected, route search logged per class.
