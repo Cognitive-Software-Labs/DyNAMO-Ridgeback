@@ -127,8 +127,9 @@ def convex_hull(points):
 def parking_footprint(nav2_footprint, attachments=BASKET_CORNERS_BASE):
     """The outline parking plans and checks with: Nav2's body outline and the basket.
 
-    Nav2's shared outline is the robot body only; the basket's rear corners reach up to
-    0.035 m beyond its angled rear ends. The hull keeps every planned pose and route
-    check, and the parking LiDAR check, around the whole robot.
+    The basket's rear-wall corners reach up to 0.029 m past the body's angled rear ends.
+    Nav2's outline already includes them (it equals this hull); the hull keeps every
+    planned pose and route check, and the parking LiDAR check, around the whole robot
+    whatever outline Nav2 is given.
     """
     return tuple(convex_hull(list(nav2_footprint) + list(attachments)))

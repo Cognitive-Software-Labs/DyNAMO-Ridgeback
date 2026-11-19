@@ -112,14 +112,25 @@ def test_full_mission_parks_waits_and_returns_to_start(manager_factory, monkeypa
     m.tick()
     assert m.state == MissionState.PARKED   # no stop evidence yet
 
+    from test_parking_clearance import feed
+    m.tf_buffer.x, m.tf_buffer.y, m.tf_buffer.yaw = sel.base_x, sel.base_y, sel.yaw   # parked there
     hold_still(m)
     m.tick()
-    m.test_ros_ns += 4_900_000_000
+    hold_still(m, 4.9)
     m.tick()
     assert m.state == MissionState.PARKED and len(nav.calls) == 2
-    m.test_ros_ns += 200_000_000
+    for _ in range(3):                        # the wait runs out, the robot still at rest
+        m.test_ros_ns += 100_000_000
+        m._monotonic.value += 0.1
+        m.motion.observe((0.,) * 6, m.test_ros_ns, m.test_ros_ns, m._monotonic())
+    m.test_ros_ns += 50_000_000
+    feed(m)                                   # fresh scans for the departure's LiDAR check
     m.tick()
+    # The departure: straight out to the pre-parking pose with the parking legs' checker.
     assert m.state == MissionState.RETURNING_TO_START
+    assert answer(params) == {'general_goal_checker.xy_goal_tolerance': 0.08,
+                              'general_goal_checker.yaw_goal_tolerance': 0.12}
+    assert navigation_result(nav) == pytest.approx(preparking_pose(sel.base_x, sel.base_y, sel.yaw, 0.5))
     xy, yaw = shared_goal_checker(Path(__file__).resolve().parents[1] / 'config' / 'nav2_params.yaml')
     assert answer(params) == {'general_goal_checker.xy_goal_tolerance': xy,
                               'general_goal_checker.yaw_goal_tolerance': yaw}
@@ -129,7 +140,7 @@ def test_full_mission_parks_waits_and_returns_to_start(manager_factory, monkeypa
     payload = json.loads(published['state'][-1].data)
     assert payload['parking_navigation_enabled'] is True
     assert set(payload['parking_mission_navigation']['arrival_errors']) == {
-        'preparking', 'parking', 'start'}
+        'preparking', 'parking', 'departure', 'start'}
 
 
 def test_failed_leg_returns_to_start_and_reports_failure(manager_factory, monkeypatch):

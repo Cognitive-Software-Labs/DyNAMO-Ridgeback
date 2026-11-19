@@ -148,10 +148,10 @@ transient-local JSON state on `parking_mission/state`. After a stabilized
 target estimate it plans parking candidates and checks their paths with
 `ComputePathToPose`. With `parking_navigation_enabled` off it stops in
 `PARKING_PATH_FEASIBLE`; with it on (simulation launch only) it drives the
-mission tail through its own `NavigateToPose` client: pre-parking pose, final
-parking pose, the parking wait, then return to the saved start pose and
-`MISSION_COMPLETE`. When unknown space around G1 could still change the choice of
-pose, it first maps the floor around G1 and relocalizes it
+mission tail through its own `NavigateToPose` client: pre-parking pose, final pose,
+the wait, a LiDAR-checked [departure](parking_mission_states.md) to the pre-parking
+pose, the return and `MISSION_COMPLETE`. When unknown space around G1 could still
+change the choice of pose, it first maps the floor around G1 and relocalizes it
 ([G1-centred exploration](#g1-centred-exploration)).
 
 A parking attempt that fails for a reason specific to that attempt (a LiDAR veto

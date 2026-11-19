@@ -10,21 +10,22 @@ import yaml
 PARAMS = Path(__file__).resolve().parents[1] / 'config/nav2_params.yaml'
 # Robot body: the Clearpath r100 collision meshes widened by the Isaac origin
 # offset and mirrored, enclosed along 24 support directions with 5.1 mm
-# margin (95.2 x 80.1 cm, angled ends). Its hardware basis is open; see
+# margin (95.2 x 80.1 cm, angled ends); the two rear vertices are the
+# provisional deck basket's rear-wall corners. Its hardware basis is open; see
 # docs/robot/collision_model.md.
 EXPECTED_OUTLINE = [
     [0.475762, 0.073265], [0.409768, 0.319557], [0.393065, 0.348488],
     [0.367198, 0.374355], [0.339166, 0.390539], [0.302752, 0.400297],
     [-0.302752, 0.400297], [-0.339166, 0.390539], [-0.367198, 0.374355],
-    [-0.393065, 0.348488], [-0.409768, 0.319557], [-0.475762, 0.073265],
-    [-0.475762, -0.073265], [-0.409768, -0.319557], [-0.393065, -0.348488],
+    [-0.393065, 0.348488], [-0.409768, 0.319557], [-0.48, 0.17],
+    [-0.48, -0.17], [-0.409768, -0.319557], [-0.393065, -0.348488],
     [-0.367198, -0.374355], [-0.339166, -0.390539], [-0.302752, -0.400297],
     [0.302752, -0.400297], [0.339166, -0.390539], [0.367198, -0.374355],
     [0.393065, -0.348488], [0.409768, -0.319557], [0.475762, -0.073265],
 ]
 
 
-def test_costmaps_and_collision_monitor_share_the_body_outline():
+def test_costmaps_and_collision_monitor_share_the_body_and_basket_outline():
     params = yaml.safe_load(PARAMS.read_text())
     local = params['local_costmap']['local_costmap']['ros__parameters']
     global_ = params['global_costmap']['global_costmap']['ros__parameters']
@@ -69,3 +70,16 @@ def test_outline_encloses_the_clearpath_meshes_in_both_simulators():
     offsets = [(sx * 0.004408, sy * 0.000201) for sx in (1, -1) for sy in (1, -1)]
     assert min(_inside_margin(EXPECTED_OUTLINE, x + dx, y + dy)
                for x, y in points for dx, dy in offsets) >= 0.005
+
+
+def test_the_outline_encloses_the_basket_and_equals_the_parking_footprint():
+    # The provisional basket's colliders (camera_support.urdf.xacro) reach past the body's
+    # angled rear ends; Nav2, the collision monitor and the parking checks use one outline.
+    from ridgeback_autonomy.mission.parking_geometry import BASKET_CORNERS_BASE, parking_footprint
+    from ridgeback_autonomy.mission.parking_planner import points_in_polygon, points_to_polygon_distance
+    outline = [tuple(p) for p in EXPECTED_OUTLINE]
+    xs, ys = zip(*BASKET_CORNERS_BASE)
+    inside = points_in_polygon(list(xs), list(ys), outline)
+    on_edge = points_to_polygon_distance(list(xs), list(ys), outline) < 1e-9
+    assert all(i or e for i, e in zip(inside, on_edge))
+    assert sorted(parking_footprint(outline)) == sorted(outline)

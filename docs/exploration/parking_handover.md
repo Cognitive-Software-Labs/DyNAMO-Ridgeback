@@ -73,7 +73,9 @@ the parking poses. Ground truth is never an input. Details:
   leg, and the mission tries the next direction (at most three attempts).
 - **Goal ownership, wait and return.** The mission owns at most one Nav2 goal and
   releases it only on a terminal result; it waits five seconds after the stop is
-  confirmed, then drives back within 0.40 m of the start (any heading).
+  confirmed, departs straight back to the pre-parking pose under the same LiDAR check
+  (a blocked or failed departure stops the robot and fails the mission), then drives
+  back within 0.40 m of the start (any heading).
 
 The [technical review](parking_review.md) summarizes the design for review.
 

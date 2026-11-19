@@ -265,7 +265,8 @@ _ALLOWED_TRANSITIONS = {
     MissionState.NAVIGATING_TO_PARKING: {
         MissionState.PARKED, MissionState.RETURNING_TO_OBSERVATION,
         MissionState.RETURNING_TO_START, MissionState.MISSION_CANCELED},
-    MissionState.PARKED: {MissionState.RETURNING_TO_START, MissionState.MISSION_CANCELED},
+    MissionState.PARKED: {MissionState.RETURNING_TO_START, MissionState.MISSION_FAILED,
+                          MissionState.MISSION_CANCELED},
     MissionState.RETURNING_TO_START: {
         MissionState.MISSION_COMPLETE, MissionState.MISSION_FAILED,
         MissionState.MISSION_CANCELED},
@@ -709,6 +710,13 @@ class MissionManagerNode(Node):
         self._step_back_g1_gap_m = None
         self._step_back_stopping = False
         self.g1_reobservation = None
+        # The departure after the parked wait: its checked straight route to the pre-parking
+        # pose (LiDAR-watched while set), goal and G1 gap, whether it is stopping after
+        # ending early, and what came of it (published in the mission state).
+        self._departure_route = self._departure_goal = self._departure_g1_gap_m = None
+        self._departure_stopping = False
+        self._departure_wait_deadline_s = None
+        self.departure = None
         self.target_heading_quality = None
         self._g1_exploration_deadline_s = None
         self._g1_explorer_resumed = False
@@ -1325,6 +1333,10 @@ class MissionManagerNode(Node):
             self._step_back_route = self._step_back_g1_gap_m = None
             self._step_back_stopping = False
             self.g1_reobservation = self.target_heading_quality = None
+            self._departure_route = self._departure_goal = self._departure_g1_gap_m = None
+            self._departure_stopping = False
+            self._departure_wait_deadline_s = None
+            self.departure = None
             self.target_committed = False
             self.target_position = None
             self.approach_pose = None
@@ -2019,6 +2031,7 @@ class MissionManagerNode(Node):
                 'status': self.target_heading_quality.status,
                 'detail': self.target_heading_quality.detail},
             'g1_reobservation': self.g1_reobservation,
+            'departure': self.departure,
             'parking_mission_navigation': {
                 'enabled': self.parking_navigation_enabled,
                 'failure': self._parking_failure,
@@ -2961,7 +2974,8 @@ class MissionManagerNode(Node):
         self.get_logger().info(f'Cancelled NavigateToPose released by Nav2: {detail}')
         self._publish_state(f'cancelled navigation goal released: {detail}',
                             event='navigation_released')
-        if self.state == MissionState.RETURNING_TO_START and self._return_after_stop:
+        if self.state == MissionState.RETURNING_TO_START and (
+                self._return_after_stop or self._departure_stopping):
             self._settle_before_return()
         if self.state == MissionState.RETURNING_TO_OBSERVATION and (
                 self._retry_after_stop or self._step_back_stopping):
@@ -3045,6 +3059,8 @@ class MissionManagerNode(Node):
             self._parked_settled_ns = None
             self._nav_deadline_s = self._monotonic() + self.motion_settlement_timeout_s
             self._transition(MissionState.PARKED, 'final parking pose reached; waiting for stop')
+        elif self.state == MissionState.RETURNING_TO_START and self._departure_route is not None:
+            self._end_departure(ok, detail)
         elif self.state == MissionState.RETURNING_TO_START:
             if ok:
                 start = self.start_pose.pose
@@ -3065,6 +3081,12 @@ class MissionManagerNode(Node):
     def _poll_parking_navigation(self, now_s):
         if self.state in _PARKING_LEGS and self._check_parking_clearance():
             return
+        if self.state == MissionState.RETURNING_TO_START and self._departure_stopping:
+            self._poll_departure_stop(now_s)
+            return
+        if (self.state == MissionState.RETURNING_TO_START and self._departure_route is not None
+                and self._nav_cancel_deadline_s is None and self._check_departure_clearance()):
+            return
         if self.state == MissionState.RETURNING_TO_START and self._return_after_stop:
             if self._nav_goal_generation is not None:
                 return   # the cancelled leg has not been released by Nav2 yet
@@ -3083,7 +3105,16 @@ class MissionManagerNode(Node):
         if self.state == MissionState.PARKED and self._parked_settled_ns is not None:
             now_ns = self.get_clock().now().nanoseconds
             if (now_ns - self._parked_settled_ns) * 1e-9 >= self.parking_wait_s:
-                self._start_return('parking wait completed')
+                # Leave only on current stop evidence; a restarted interval gets the settlement
+                # timeout to complete, as after planning.
+                if self.motion.ready(now_ns, now_s):
+                    self._departure_wait_deadline_s = None
+                    self._start_departure()
+                elif self._departure_wait_deadline_s is None:
+                    self._departure_wait_deadline_s = now_s + self.motion_settlement_timeout_s
+                elif now_s >= self._departure_wait_deadline_s:
+                    self._departure_wait_deadline_s = None
+                    self._start_departure()      # fails it: the stop is not confirmed
             return
         if self.state == MissionState.PARKED and self.motion.ready(
                 self.get_clock().now().nanoseconds, now_s):
@@ -3221,6 +3252,116 @@ class MissionManagerNode(Node):
         self._transition(MissionState.RETURNING_TO_START, reason)
         self._set_goal_tolerance(self._shared_goal_tolerance, self._send_return_goal)
 
+    def _start_departure(self):
+        """After the parked wait: drive straight out to the plan's pre-parking pose, away from
+        G1, before the return. Checked like the step back (swept planning footprint, basket
+        included, on the current map; never nearer G1; fresh scans and odometry, nothing on
+        the route) and watched by the parking legs' LiDAR check. If any of that cannot be
+        shown now, nothing moves: the mission fails with the robot stopped where it parked."""
+        plan, target = self.parking_plan, self.target_position
+        sel = None if plan is None else plan.selected
+        robot = self._current_robot_pose()
+        problem, route = None, None
+        if not self.motion.ready(self.get_clock().now().nanoseconds, self._monotonic()):
+            problem = f'stop not confirmed: {self.motion.reason}'
+        elif robot is None or sel is None or target is None:
+            problem = 'robot pose, parking plan or G1 position unavailable'
+        else:
+            goal = preparking_pose(sel.base_x, sel.base_y, sel.yaw,
+                                   self.execution.limits.preparking_offset_m)
+            route = self._straight_step(robot, goal)
+            polygon = rotated_footprint_vertices(self.planner_config.footprint, *robot[:3])
+            gap = float(points_to_polygon_distance([target.map_x_m], [target.map_y_m], polygon)[0])
+            # Never nearer G1 than now; otherwise the parking legs' G1 limits.
+            route_gap = min(plan.keepout_radius_m, gap - _STEP_BACK_GAP_TOLERANCE_M)
+            live_gap = min(plan.keepout_radius_m - self.final_xy_tolerance_m,
+                           gap - _STEP_BACK_GAP_TOLERANCE_M)
+            problem = self._step_back_route_problem(route, target, route_gap)
+            if problem is None:
+                check = self._lidar_clearance(lambda _robot: route,
+                                              (target.map_x_m, target.map_y_m), live_gap)
+                reason = check.reason if isinstance(check, ClearanceResult) else check
+                problem = None if reason is None else f'lidar_clearance: {reason}'
+        if problem is not None:
+            self.departure = {'outcome': f'not started: {problem}'}
+            self.last_issue = MissionIssue(FailureClass.TERMINAL, 'departure_not_safe', problem)
+            self.get_logger().error(f'Departure from G1 not started: {problem}; '
+                                    'the robot stays stopped at the parking pose')
+            self._transition(MissionState.MISSION_FAILED,
+                             f'departure from G1 not safe: {problem}; remaining stopped')
+            return
+        distance = math.hypot(goal[0] - robot[0], goal[1] - robot[1])
+        self._departure_route, self._departure_goal, self._departure_g1_gap_m = route, goal, live_gap
+        self.departure = {'outcome': None, 'distance_m': round(distance, 2)}
+        if self._transition(MissionState.RETURNING_TO_START,
+                            f'parking wait completed; departing {distance:.2f} m straight away from '
+                            'G1 to the pre-parking pose before the return'):
+            limits = self.execution.limits
+            self._set_goal_tolerance((limits.xy_tolerance_m, limits.yaw_tolerance_rad),
+                                     self._send_departure_goal)
+
+    def _send_departure_goal(self, ok):
+        if not ok:
+            self._end_departure(False, 'departure goal tolerance not applied')
+            return
+        self._send_navigation_goal(self._departure_goal, self.parking_navigation_timeout_s)
+
+    def _check_departure_clearance(self):
+        """The parking legs' LiDAR check on the departure; on a veto the move is cancelled and
+        the mission ends once the robot has stopped. True then."""
+        target = self.target_position
+        result = self._lidar_clearance(lambda _robot: self._departure_route,
+                                       (target.map_x_m, target.map_y_m), self._departure_g1_gap_m)
+        reason = result
+        if isinstance(result, ClearanceResult):
+            reason = result.reason
+            self._clearance = result
+            leg = self._clearance_legs.setdefault('departure', {
+                'checks': 0, 'min_nearest_m': None, 'min_g1_gap_m': None})
+            leg['checks'] += 1
+            for key, value in (('min_nearest_m', result.nearest_m), ('min_g1_gap_m', result.g1_gap_m)):
+                if value is not None and (leg[key] is None or value < leg[key]):
+                    leg[key] = round(value, 3)
+        if reason is None:
+            return False
+        self.get_logger().error(f'Departure LiDAR veto: {reason}')
+        self._cancel_navigation_goal()
+        self._end_departure(False, f'lidar_clearance: {reason}')
+        return True
+
+    def _end_departure(self, ok, detail):
+        """Reached: the existing return follows. Otherwise stop, and fail once the stop is
+        confirmed: the robot is not driven again near G1."""
+        self._departure_route = None
+        self.get_logger().info(f'LiDAR clearance during the departure: {self._clearance_legs.get("departure")}')
+        if ok:
+            self.departure['outcome'] = 'reached'
+            self._record_arrival('departure', self._departure_goal)
+            self._set_goal_tolerance(self._shared_goal_tolerance, self._send_return_goal)
+            return
+        self.departure['outcome'] = f'ended early: {detail}'
+        self.get_logger().error(f'Departure from G1 ended early: {detail}; stopping')
+        self._departure_stopping = True
+        if self._nav_goal_generation is None:
+            self._settle_before_return()
+
+    def _poll_departure_stop(self, now_s):
+        if self._nav_goal_generation is not None:
+            return   # the cancelled departure has not been released by Nav2 yet
+        if self.motion.ready(self.get_clock().now().nanoseconds, now_s):
+            self._departure_stopping = False
+            self._nav_deadline_s = None
+            self.last_issue = MissionIssue(FailureClass.TERMINAL, 'departure_failed',
+                                           self.departure['outcome'])
+            self._transition(MissionState.MISSION_FAILED,
+                             f'departure from G1 {self.departure["outcome"]}; stopped there')
+        elif self._nav_deadline_s is not None and now_s >= self._nav_deadline_s:
+            self._departure_stopping = False
+            self._nav_deadline_s = None
+            self.last_issue = MissionIssue(FailureClass.TERMINAL, 'stop_not_confirmed', self.motion.reason)
+            self._transition(MissionState.MISSION_FAILED,
+                             f'no confirmed stop after the departure ended early: {self.motion.reason}')
+
     def _settle_before_return(self):
         self.motion.reset()
         self._nav_deadline_s = self._monotonic() + self.motion_settlement_timeout_s
@@ -3235,6 +3376,9 @@ class MissionManagerNode(Node):
             elif (self.state == MissionState.RETURNING_TO_OBSERVATION
                   and self._step_back_route is not None and self._nav_cancel_deadline_s is None):
                 self._check_step_back_clearance()
+            elif (self.state == MissionState.RETURNING_TO_START
+                  and self._departure_route is not None and self._nav_cancel_deadline_s is None):
+                self._check_departure_clearance()
 
     def _laser_pose(self, frame):
         if frame not in self._laser_in_base:
@@ -3371,8 +3515,8 @@ class MissionManagerNode(Node):
         self.get_logger().error(f'Navigation goal ownership unresolved: {detail}')
         self.last_issue = MissionIssue(FailureClass.TERMINAL, 'navigation_cancel_unresolved', detail)
         if self.state in (MissionState.RETURNING_TO_START, MissionState.RETURNING_TO_OBSERVATION):
-            self._retry_after_stop = self._step_back_stopping = False
-            self._step_back_route = None
+            self._retry_after_stop = self._step_back_stopping = self._departure_stopping = False
+            self._step_back_route = self._departure_route = None
             self._transition(MissionState.MISSION_FAILED, detail)
         else:
             self._publish_state(detail, event='navigation_ownership')

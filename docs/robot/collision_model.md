@@ -15,8 +15,11 @@ An image of one does not establish the others.
 
 ## Configured navigation footprint
 
-Both costmaps and the collision monitor use one outline, the robot body. It
-takes the Clearpath r100 collision meshes (`body-collision.stl` and `top.stl`),
+Both costmaps and the collision monitor use one outline, the robot body with the
+provisional deck basket's two rear-wall corners (x -0.48 m, y ±0.17 m;
+[geometry](geometry.md#photographed-payload-and-the-provisional-basket)), which reach
+0.015-0.029 m past the body's angled rear ends; the parking checks use the same
+outline. The body part takes the Clearpath r100 collision meshes (`body-collision.stl` and `top.stl`),
 widens them by the 4.408 mm longitudinal and 0.201 mm lateral Isaac origin
 offset, mirrors them front to rear and left to right, and encloses the result
 along 24 support directions with 5.1 mm margin: 95.2 × 80.1 cm, angled ends
@@ -39,7 +42,11 @@ check stopped MPPI's sideways and turning commands inside doorways.
 
 The containment policy is: the outline must enclose every raw simulator
 collision projection with at least 5 mm clearance. Inflation remains an
-obstacle-cost policy and does not count toward that margin.
+obstacle-cost policy and does not count toward that margin. The basket's
+colliders do not meet it: their rear-wall corners lie on the outline, without
+margin, because the basket itself is unmeasured. The figure shows the body outline
+before the basket corners were added (2026-11-19); the inscribed (0.400 m) and
+circumscribed (0.525 m) radii are unchanged.
 
 **Open hardware basis.** The outline treats `r100_0160` as having the Clearpath
 mesh shape, a decision made on 2026-10-30. Two tape surveys of 2026-10-16 bear
