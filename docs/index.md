@@ -72,6 +72,8 @@ troubleshooting, planning, and historical documentation.
 - [Exploration evaluation](exploration/evaluation.md)
 - [Simulation parking demonstration](exploration/parking_demo.md) — `start_parking_demo.sh`
   modes, spawned G1 scene, startup gates and the parking RViz display
+- [Autonomous parking supervisor handover](exploration/parking_handover.md) — objective,
+  architecture, commands, final results and limitations in one page
 - [Autonomous parking technical review](exploration/parking_review.md) — what the
   mission does, its safety design, validation, limits and what a real robot still needs
 - [Parking mission states and timing](exploration/parking_mission_states.md) — every

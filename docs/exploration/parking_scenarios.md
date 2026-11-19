@@ -189,8 +189,10 @@ with the robot parked. Gazebo renders the requested views together, so a top-dow
 a close-up and an angled view fit within the wait. `make_scenarios_page.py` and
 `make_results_page.py` build the two pages. The results page reads the runs listed
 in `results_runs.txt` (or the run folders given as arguments, such as
-`artifacts/exploration/scenarios/*/`): its overview counts the hospital-ward
-validation runs (`FINAL_SET`), its comparison and featured experiments use the
+`artifacts/exploration/scenarios/*/`): its overview shows the runs on the final mission
+code (`FINAL_CODE`) as demonstrations, not statistics, and keeps the other hospital-ward
+validation runs (`FINAL_SET`) in a collapsed development history with their causes,
+follow-ups and open questions (`FOLLOW_UP`); its comparison and featured experiments use the
 runs and captures named in `FEATURED`, its charts add the post-merge warehouse runs
 and the 2026-11-17 ward trial, and every run appears in its filterable table with
 its measurements. Only captures of runs that loaded the hospital ward are shown;
@@ -199,6 +201,10 @@ evidence folders. Each featured capture is shown only if it is not blank and was
 taken in the mission state its caption names; the page shows the crop named in
 `FEATURED`, draws any labels as a separate layer over it, and enlarges to the whole
 capture. It keeps only the images it uses in `assets/parking_results/`.
+
+`make_demo_storyboard.py OUT_DIR` assembles a stills storyboard and slideshow of the
+final-code Gazebo runs from their own captures, each checked against the mission state
+its caption names; it is not real time, and no final-code run was recorded as video.
 
 `FRAMES=1` also saves a camera frame every `FRAMES_PERIOD` seconds (default 1;
 `FRAMES_EXT=png` is lossless and about 0.4 MB a frame).

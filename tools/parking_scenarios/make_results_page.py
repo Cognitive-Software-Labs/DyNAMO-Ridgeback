@@ -665,55 +665,136 @@ def reach_chart(runs):
 
 # Page sections ------------------------------------------------------------------------
 
-def overview(final, scenario_count):
-    groups = [('Complete', 'ok', 'completed missions', 'parked, waited and returned to start'),
-              ('Safe refusal', 'safe', 'correct safe refusal', 'no_feasible: no pose fits, no attempt, returned'),
-              (None, 'bad', 'failed or incomplete runs', ''),
-              ('all', 'neutral', 'hospital-ward validation runs', '17-18 Nov 2026, Gazebo and Isaac')]
-    complete = [r for r in final if classify(r)[2] == 'Complete']
-    refusals = [r for r in final if classify(r)[2] == 'Safe refusal']
-    others = [r for r in final if r not in complete and r not in refusals]
-    causes = {}
-    for r in others:
-        category = SHORT.get(classify(r)[2], classify(r)[2])
-        causes[category] = causes.get(category, 0) + 1
-    counts = {'Complete': complete, 'Safe refusal': refusals, None: others, 'all': final}
-    cards = []
-    for key, cls, label, detail in groups:
-        if key is None:
-            detail = '; '.join(f'{n} {c}' for c, n in causes.items())
-        cards.append(f'<div class="kpi {cls}"><div class="v">{len(counts[key])}</div>'
-                     f'<div class="l">{esc(label)}</div><div class="d">{esc(detail)}</div></div>')
-    pips = ''.join(
-        f'<li class="{ {"Complete": "done", "Safe refusal": "safe"}.get(classify(r)[2], "fail") }">'
-        f'<b>{ {"Complete": "✓", "Safe refusal": "⊘"}.get(classify(r)[2], "✗") }</b>'
-        f'<span>{esc(sim_name(r) + " " + r["name"].replace("gz_", "").replace("isaac_", ""))}'
-        f'<small>{esc(r["m"]["commit"])} · {esc(SHORT.get(classify(r)[2], classify(r)[2]))}</small></span></li>'
-        for r in sorted(final, key=lambda r: r['start']))
-    rows = []
-    for r in complete:
+# What each earlier hospital-ward validation run led to, and what later evidence shows about it.
+# Status says "addressed" only where a later run exercised the change; nothing here is a rate.
+FOLLOW_UP = {
+    'artifacts/exploration/hospital_2026-11-18/gz_standard': (
+        'f568789 takes the parked views only after the mission confirms the stop',
+        'Addressed in the later runs: both later Gazebo standard runs confirmed the stop with views taken '
+        'during the wait'),
+    'artifacts/exploration/hospital_2026-11-18/gz_no_feasible': (
+        'f6ade2f moved the scene\'s bed 0.3 m closer to G1 (a scenario change; navigation unchanged)',
+        'Scenario addressed: the two later no_feasible runs did not wedge. Orientation-aware navigation '
+        'through narrow passages is not implemented (backlog)'),
+    'artifacts/exploration/hospital_2026-11-18/gz_standard_run2': (
+        'No change for the heading; b519ab0 changed the first-localization case this run met',
+        'Unresolved: the 65 deg heading error was neither reproduced nor explained. The final run\'s headings '
+        'were within 6.2 deg and its reach 0.509 m, which does not show the error cannot recur'),
+    'artifacts/exploration/hospital_2026-11-18/gz_no_feasible_run2': (
+        'None needed', 'Correct refusal on the code before the surface fallback; repeated on the final code'),
+    'artifacts/exploration/hospital_2026-11-18/isaac_standard': (
+        'b519ab0 keeps the surface estimate when the head region shows something taller than G1, if G1\'s legs '
+        'agree',
+        'Addressed in one later run: Isaac\'s final run used the fallback and completed; the case is also '
+        'reproduced in tests from Gazebo views'),
+}
+# One verified capture per earlier run where one shows the problem (full frame, no labels).
+DEV_IMAGES = {
+    'artifacts/exploration/hospital_2026-11-18/gz_standard': {
+        'kind': 'simview', 'ref': 'gz_standard_parked_workstation.png', 'states': {'PARKED'}, 'crop': (0, 0, 1600, 1000),
+        'caption': 'gz_standard: parked behind G1 on attempt 3; the stop was then not confirmed in time', 'labels': []},
+    'artifacts/exploration/hospital_2026-11-18/gz_standard_run2': {
+        'kind': 'simview', 'ref': 'gz_standard_parked_workstation.png', 'states': {'PARKED'}, 'crop': (0, 0, 1600, 1000),
+        'caption': 'gz_standard_run2: parked behind G1\'s right shoulder, reach 0.607 m (ground truth), after a '
+                   '65 deg heading error', 'labels': []},
+    'artifacts/exploration/hospital_2026-11-18/gz_no_feasible_run2': {
+        'kind': 'rviz', 'ref': 'END_MISSION_FAILED', 'states': {'MISSION_FAILED'}, 'crop': (0, 60, 1280, 440),
+        'caption': 'gz_no_feasible_run2: no valid pose around G1 and the robot back at its start', 'labels': []},
+    'artifacts/exploration/hospital_2026-11-18/isaac_standard': {
+        'kind': 'rviz', 'ref': 'END_MISSION_FAILED', 'states': {'MISSION_FAILED'}, 'crop': (0, 60, 1280, 440),
+        'caption': 'isaac_standard: the mission ended without a localized G1 (the head region measured the wall)',
+        'labels': []},
+}
+
+
+def demonstration_card(r):
+    m = r['m']
+    cls, _, category = classify(r)
+    if category == 'Complete':
+        value = f'Parked at {side_name(m["selected_sides"][-1])}'
+    elif category == 'Safe refusal':
+        value = 'Refused safely'
+    else:
+        value = SHORT.get(category, category)
+    facts = [f'<code>{esc(m["outcome"])}</code>']
+    if m['outcome'] == 'MISSION_COMPLETE':
+        vetoed = len(r['vetoes'])
+        facts.append(f'{m["attempts"]} attempt{"s" if m["attempts"] > 1 else ""}'
+                     + (f' ({vetoed} cancelled by the LiDAR check)' if vetoed else ''))
+        facts.append('waited 5 s, returned')
+    elif candidates(r):
+        n, ok = candidates(r)
+        facts.append(f'{ok} of {n} poses valid, no attempt, returned')
+    if m.get('reach_truth_m') is not None:
+        facts.append(f'reach {m["reach_truth_m"]:.3f} m')
+    if m.get('side_truth') and m.get('selected_sides') and m['side_truth'] != m['selected_sides'][-1]:
+        facts.append(f'by ground truth the bin stood {abs(m["bearing_from_g1_heading_deg"]):.0f} deg from G1\'s '
+                     f'heading, just outside the side sector')
+    if m.get('localization_errors_m'):
+        facts.append(f'G1 {span(m["localization_errors_m"])} m and {deg_span(heading_errors(r))} deg off')
+    if m.get('final_distance_from_start_m') is not None:
+        facts.append(f'{m["final_distance_from_start_m"]:.2f} m from the start')
+    if m['simulator'] != 'gz':
+        facts.append('no ground truth in Isaac')
+    sim = 'Gazebo' if m['simulator'] == 'gz' else 'Isaac Sim'
+    return (f'<div class="kpi {cls}"><div class="v demo">{esc(value)}</div>'
+            f'<div class="l">{sim} · {esc(m["scenario"])}</div>'
+            f'<div class="d">{" · ".join(facts)}</div>'
+            f'<div class="d"><code>{esc(r["name"])}</code> · code {esc(r["m"]["commit"])} · '
+            f'{clock(m["mission_s"])} min:s</div></div>')
+
+
+def development_history(earlier):
+    rows, figs = [], []
+    for r in sorted(earlier, key=lambda r: r['start']):
         m = r['m']
-        sim = sim_name(r)
-        side = side_name((m.get('selected_sides') or ['?'])[-1])
-        reach = (f'{m["reach_truth_m"]:.3f} m <span class="src gt">ground truth</span>'
-                 if m.get('reach_truth_m') is not None else '<span class="na">not measured (no ground truth)</span>')
-        rows.append(f'<tr><td>{sim}</td><td>{esc(side)}</td><td>{m["attempts"]}</td>'
-                    f'<td>{clock(m["mission_s"])}</td><td>{reach}</td></tr>')
-    commits = list(dict.fromkeys(r['m']['commit'] for r in sorted(final, key=lambda r: r['start'])))
-    return (f'<section id="overview"><div class="kpis-main">{"".join(cards)}</div>'
-            f'<ol class="pips">{pips}</ol>'
-            f'<div class="secondary"><div><h3>Completed missions</h3><div class="wrap"><table class="compact">'
-            f'<tr><th>Simulator</th><th>Parked</th><th>Attempts</th><th>Duration (min:s)</th>'
-            f'<th>Parked reach (required {REACH[0]:.2f}-{REACH[1]:.2f} m)</th></tr>{"".join(rows)}</table></div></div>'
-            f'<p class="caveat"><b>How to read these numbers.</b> The {len(final)} runs span {len(commits)} '
-            f'commits ({", ".join(commits)}): the ward as both simulators\' world, then fixes for the defects '
-            f'these runs exposed, each run under the code it ran. Only the runs on {FINAL_CODE[0]}\'s mission code '
-            f'({", ".join(FINAL_CODE)}) show the final code; the rest show why it changed. Each count '
-            f'describes these runs only; they do not establish a general success rate. '
-            f'{len({r["m"]["scenario"] for r in final})} of the {scenario_count} scenarios were run in the ward; '
-            f'the post-merge warehouse runs (14 Nov), the hospital-ward trial (17 Nov) and earlier runs are in the '
-            f'<a href="#history">records</a>.</p>'
-            f'</div></section>')
+        cls, outcome, category = classify(r)
+        follow, status = FOLLOW_UP.get(r['rel'], ('-', '-'))
+        meas = []
+        if m.get('localization_errors_m'):
+            meas.append(f'G1 {span(m["localization_errors_m"])} m')
+        if m.get('reach_truth_m') is not None:
+            meas.append(f'reach {m["reach_truth_m"]:.3f} m')
+        if heading_errors(r):
+            meas.append(f'heading {deg_span(heading_errors(r))} deg')
+        if m.get('attempts'):
+            meas.append(f'{m["attempts"]} attempt{"s" if m["attempts"] > 1 else ""}')
+        rows.append(
+            f'<tr><td><code>{esc(r["name"])}</code><br>{esc(sim_name(r))}</td><td><code>{esc(r["code"])}</code></td>'
+            f'<td><span class="badge {cls}">{esc(category)}</span><br><small>{esc(outcome)}</small></td>'
+            f'<td>{esc(", ".join(meas)) or "-"}</td><td>{esc(r["cause"] or outcome)}</td>'
+            f'<td>{esc(follow)}</td><td>{esc(status)}</td></tr>')
+        image = DEV_IMAGES.get(r['rel'])
+        if image and ward_run(r):
+            html_, why = featured_image(r, image, f'dev_{r["name"]}')
+            if html_ is None:
+                print(f'development image of {r["name"]} excluded: {why}')
+            else:
+                figs.append(html_)
+    return (f'<details class="archive dev"><summary><h2>Development and debugging history</h2>'
+            f'<span class="note">{len(earlier)} earlier hospital-ward runs (17 Nov), each on the code it ran: what '
+            f'failed, why, what changed afterwards, and what is still open</span></summary>'
+            f'<div class="wrap"><table class="devtable"><tr><th>Run</th><th>Code</th><th>Outcome</th>'
+            f'<th>Measurements (Gazebo ground truth)</th><th>What happened</th><th>What changed afterwards</th>'
+            f'<th>Status</th></tr>{"".join(rows)}</table></div>'
+            f'<p class="note">gz_no_feasible was stopped by the operator during its search; no capture shows the '
+            f'wedged robot. The 2026-11-17 hospital-ward trial and every warehouse run are in the '
+            f'<a href="#history">records</a>.</p><div class="media row">{"".join(figs)}</div></details>')
+
+
+def overview(final, scenario_count):
+    demos = [r for r in final if r['m']['commit'] in FINAL_CODE]
+    earlier = [r for r in final if r not in demos]
+    order = {'standard': 0, 'no_feasible': 1}
+    demos.sort(key=lambda r: (order.get(r['m']['scenario'], 2), r['m']['simulator'] != 'gz'))
+    return (f'<section id="overview"><h2>Final implementation: demonstrated behaviours</h2>'
+            f'<p class="caveat"><b>Demonstrations, not reliability statistics.</b> One run of each behaviour in the '
+            f'hospital ward on the final mission code ({FINAL_CODE[0]}; {", ".join(FINAL_CODE[1:])} changed only '
+            f'comments and documentation). Each shows that the behaviour happens, not how often: no success rate is '
+            f'computed from these {len(demos)} runs. Gazebo measurements are ground truth used only for evaluation; '
+            f'Isaac records the mission\'s own estimates.</p>'
+            f'<div class="kpis-main three">{"".join(demonstration_card(r) for r in demos)}</div>'
+            f'{development_history(earlier)}</section>')
 
 
 def comparison(by_key, refusal):
@@ -1097,6 +1178,10 @@ RESULTS_CSS = """
          border-radius: 10px; padding: 1rem 1.2rem 1.1rem; }
   .kpi.ok { border-top-color: var(--done); } .kpi.safe { border-top-color: var(--safe-c); }
   .kpi.bad { border-top-color: var(--fail); } .kpi.neutral { border-top-color: var(--now); }
+  .kpis-main.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .kpi .v.demo { font-size: 1.55rem; }
+  details.dev { margin-top: 1.2rem; }
+  .devtable td { font-size: .86rem; vertical-align: top; }
   .kpi .v { color: var(--ink); font-size: 2.6rem; font-weight: 650; line-height: 1.05; }
   .kpi .l { color: var(--ink); font-size: 1.02rem; font-weight: 600; margin-top: .25rem; }
   .kpi .d { color: var(--faint); font-size: .86rem; margin-top: .3rem; }
@@ -1243,7 +1328,7 @@ RESULTS_CSS = """
   .rowdetail b { color: var(--ink); font-weight: 600; }
   #runs td { vertical-align: top; }
   @media (max-width: 1100px) {
-    .kpis-main { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .kpis-main, .kpis-main.three { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .secondary, .media { grid-template-columns: minmax(0, 1fr); }
     .aside { grid-template-columns: 1fr 1fr; }
   }
@@ -1254,7 +1339,7 @@ RESULTS_CSS = """
     .exp > header .meta { margin-left: 0; }
     .tl-bar .seg span { display: none; }
   }
-  @media (max-width: 480px) { .kpis-main { grid-template-columns: 1fr 1fr; } .kpi .v { font-size: 2rem; } }
+  @media (max-width: 480px) { .kpis-main { grid-template-columns: 1fr 1fr; } .kpis-main.three { grid-template-columns: 1fr; } .kpi .v { font-size: 2rem; } .kpi .v.demo { font-size: 1.4rem; } }
 """
 
 RESULTS_JS = """<script>

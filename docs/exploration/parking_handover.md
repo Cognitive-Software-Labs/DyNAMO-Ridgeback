@@ -1,0 +1,201 @@
+# Autonomous parking beside a G1: supervisor handover
+
+A Clearpath Ridgeback searches a hospital ward for a Unitree G1 standing at a worktable,
+localizes it, parks so that the basket on its deck is within the G1's reach, waits five
+seconds and drives back to its start. If no safe parking position exists, it refuses and
+returns. Everything runs in simulation: Gazebo Sim and NVIDIA Isaac Sim, with the same
+autonomy code. This page is the entry point; the linked references hold the details.
+
+## System architecture
+
+One ROS 2 Jazzy workspace drives either simulator through backend packages
+(`ridgeback_autonomy_gz`, `ridgeback_autonomy_isaac`). Application behaviour lives in
+`ridgeback_autonomy`; detection and depth-based localization in `ridgeback_localization`;
+shared messages in `ridgeback_interfaces`. The robot and its sensors (two planar
+Hokuyo UST LiDARs, a RealSense D455 on a mast) are declared once in
+`clearpath/robot.yaml`. [Exploration architecture](architecture.md) and the
+[repository map](../project/PROJECT_CONTEXT.md#repository-map) give the layout.
+
+| Node | Responsibility |
+|---|---|
+| `mission_manager_node.py` | The parking mission: state machine, G1 localization and depth checks, parking planning, Nav2 goals, the live LiDAR check, wait and return |
+| `frontier_explorer_node.py` | Frontier exploration; its MissionGuard, a latched safety and ownership interlock around its Nav2 client, lets the mission pause it and take over navigation |
+| `target_detector_node` | OWLv2 open-vocabulary detection of the G1 in the camera image |
+| `async_slam_toolbox_node` | 2D SLAM; the parking demo feeds it both LiDARs merged by `scan_merger_node` (`slam_source:=merged`) |
+| Nav2 (`planner_server`, `controller_server` with MPPI, `bt_navigator`, `behavior_server`, `smoother_server`, `velocity_smoother`, `collision_monitor`) | Route planning and execution with the robot's outline; the collision monitor stays in front of the wheels |
+| `stationary_mission_guard` | Stand-in for the explorer in the non-driving `--plan-only` mode; not MissionGuard |
+| `parking_simulation_startup` | Spawns the scenario's G1 and objects through the simulator's scene services and gates startup on them |
+| `hud_node`, overlay nodes, RViz | Operator display: state machine, parking donut, selected pose |
+
+## Mission state machine
+
+The mission moves through `SEARCH_G1`, `STOPPING_EXPLORATION`,
+`RETURNING_TO_OBSERVATION`, `SETTLING_MOTION`, `LOCALIZE_G1`, `G1_LOCALIZED`,
+`EXPLORING_AROUND_G1` (only when unmapped floor could change the choice),
+`PARKING_CANDIDATES_READY`, `EVALUATING_PARKING_PATHS`, `PARKING_PATH_FEASIBLE`,
+`NAVIGATING_TO_PREPARKING`, `NAVIGATING_TO_PARKING`, `PARKED`, `RETURNING_TO_START`
+and `MISSION_COMPLETE`. A rejected or failed parking leg returns to the observation
+pose for the next of at most three attempts; a refusal or an unrecoverable failure
+returns home and ends `MISSION_FAILED` with its reason. Every state, its exit
+condition, its configured limit and its measured duration are in
+[states and timing](parking_mission_states.md).
+
+## Perception and localization
+
+The detector confirms G1 when three of five frames score at least 0.50. The robot
+turns toward the detection, waits for stationary odometry, and takes five consistent
+position samples from depth in the detection box. A position is accepted only when
+depth shows G1 there: at least 20 points at torso and head height within 0.25 m in
+three frames, and fewer than 20 points at 1.45-2.20 m (G1 stands at most 1.33 m).
+The body axis comes from G1's legs; the head region of the box re-seeds the position
+when the surface estimate lies on something else, and is itself ignored when it shows
+an object taller than G1. G1's heading is estimated from its forearms and only orders
+the parking poses. Ground truth is never an input. Details:
+[G1 position check](architecture.md#g1-position-check) and
+[G1 heading](architecture.md#g1-heading).
+
+## Parking candidates, priority and safety
+
+- **Candidates.** A 360-ray donut around G1: each pose puts the rear-bin task point,
+  0.28 m behind the robot's centre, 0.30-0.60 m from G1's axis.
+- **Geometry.** Poses are checked with the hull of Nav2's robot outline and the
+  provisional basket, a 0.29 m keep-out around G1, 0.08 m from mapped obstacles;
+  unknown cells count as unsafe; tabletops the LiDARs pass under are marked from depth.
+- **Priority.** G1's left and right first, then behind, then in front, then the rest
+  (sectors of 45, 30 and 30 degrees around G1's estimated heading). Sectors only order
+  the checks; they never make a pose valid.
+- **Route.** Each ranked pose is checked with a Nav2 route before driving; the robot
+  drives to a pre-parking pose 0.5 m before the parking pose, then a tight final leg.
+- **Live LiDAR check.** During both legs, both raw scans are checked against the
+  stopping path and the route ahead with a 0.05 m margin; a return there cancels the
+  leg, and the mission tries the next direction (at most three attempts).
+- **Goal ownership, wait and return.** The mission owns at most one Nav2 goal and
+  releases it only on a terminal result; it waits five seconds after the stop is
+  confirmed, then drives back within 0.40 m of the start (any heading).
+
+The [technical review](parking_review.md) summarizes the design for review.
+
+## Simulation environments
+
+Both simulators load the same hospital ward (`parking_demo`), `initial_test_world`
+without its own G1: Gazebo through `parking_demo.sdf`, Isaac through a USD layer, with
+identical collision boxes. The robot starts in the corridor at the world origin; G1
+stands at (0.5, -4.5) m in the south room, facing its worktable, out of the camera's
+sight. Eight scenarios change what stands around G1 and which way it faces
+([scenarios](parking_scenarios.md)). Gazebo's earlier world, Clearpath's warehouse,
+stays available with `world:=depot` to reproduce the runs recorded there.
+
+## Installation and launch
+
+Install ROS 2 Jazzy, import the dependencies, build, and create the perception
+environment as in the [root README](../../README.md#installation); Isaac Sim 6.1 is
+optional (README section 4). In short, from the checkout:
+
+```bash
+vcs import < dependencies/core.repos
+vcs import < dependencies/gz.repos        # Gazebo hosts
+vcs import < dependencies/viz.repos       # hosts that run RViz
+tools/check_dependencies --apply --profile all
+rosdep install --from-paths src --ignore-src -r -y
+colcon build --symlink-install --base-paths src
+source install/setup.bash
+```
+
+Run one simulator at a time. Each command runs the full mission in the ward:
+
+```bash
+export RIDGEBACK_PERCEPTION_VENV=/path/to/perception_venv
+bash start_parking_demo.sh gz rviz_layout:=compact                            # standard scene
+bash start_parking_demo.sh gz rviz_layout:=compact demo_scenario:=no_feasible # safety scene
+bash start_parking_demo.sh isaac rviz_layout:=compact                         # Isaac Sim
+```
+
+`--plan-only` and `--planning-only` stop before driving
+([modes and startup gates](parking_demo.md)).
+
+## Reproducing and evaluating a scenario
+
+`run_scenario.sh` runs one scenario in its own session with a time limit, records a
+small bag, samples Gazebo ground truth, and saves screenshots; `scenario_metrics.py`
+computes the measurements:
+
+```bash
+export RIDGEBACK_PERCEPTION_VENV=/path/to/perception_venv DISPLAY=:0
+DEMO_ARGS="rviz_layout:=compact" PARKED_VIEWS=workstation,closeup,angled \
+  END_VIEWS=overview,workstation,closeup,angled FRAMES=1 FRAMES_PERIOD=2 LIMIT=1800 \
+  tools/parking_scenarios/run_scenario.sh gz standard artifacts/exploration/OUT_standard
+python3 tools/parking_scenarios/scenario_metrics.py artifacts/exploration/OUT_standard
+# The same for no_feasible, or isaac instead of gz (Isaac has no ground truth).
+```
+
+The [parking scenarios reference](parking_scenarios.md#evaluating-a-run) explains the
+measurements and how the two pages are rebuilt.
+
+## The two galleries
+
+```bash
+firefox docs/exploration/autonomous_parking_scenarios.html
+firefox docs/exploration/autonomous_parking_results.html
+```
+
+The scenarios page shows all eight scenes in both simulators. The results page leads
+with the three final-code demonstrations, keeps the development runs in a collapsed
+history with their causes, and lists every one of the 61 recorded runs with its code
+version and measurements. Both pages show hospital-ward images only.
+
+## Final results
+
+One run of each behaviour on the final mission code (`b519ab0`; the later commits
+`544ead1` and `0890e13` changed only comments and documentation), on 2026-11-17 and
+2026-11-18. Gazebo values are ground truth, used only for evaluation.
+
+| Run | Outcome | Measurements |
+|---|---|---|
+| Gazebo `standard` (`gz_standard_final`) | `MISSION_COMPLETE` | attempt 1 at G1's right cancelled by the LiDAR check; parked on attempt 2 at G1's left (by ground truth 137 deg from G1's heading, behind its left hip); reach 0.509 m; G1 0.073-0.084 m and 2.1-6.2 deg off; basket 0.118 m from G1's lower body; waited 5 s; back 0.22 m from the start |
+| Isaac `standard` (`isaac_standard_run2`) | `MISSION_COMPLETE` | parked at G1's right on attempt 1, arrival error 0.020 m (mission estimate), waited 5 s, returned; Isaac records no ground truth |
+| Gazebo `no_feasible` (`gz_no_feasible_final`) | `MISSION_FAILED`, `no_valid_candidate` (intended) | G1 0.152 m and 10.0 deg off; 0 of 258 poses valid; no attempt; nearest approach 0.67 m; back 0.35 m from the start |
+
+These are demonstrations, not reliability statistics. Five earlier ward runs on
+earlier code exposed the problems addressed during validation, and one of them, the
+heading error below, is still open; the results page's development history and the
+dated record under archived evidence hold them.
+
+A stills storyboard of the final-code Gazebo runs (search, detection, localization,
+donut, the rejected attempt, parking, wait, return, refusal) is built by
+`tools/parking_scenarios/make_demo_storyboard.py` into `artifacts/exploration/final_demo_2026-11-19/`
+(`storyboard.mp4`, 10 stills of 4 s each: not real time). No final-code run was
+recorded as video. The complete video recordings are Isaac runs on earlier mission
+code in the same ward: `artifacts/exploration/p8_2026-11-14/isaac_standard/demo.mp4`
+(a vetoed attempt, then G1's left) and
+`artifacts/exploration/demo_2026-11-11/isaac_standard_run3/demo.mp4` (G1's right).
+Evidence and recordings are kept untracked under `artifacts/`, not in Git.
+
+## Known limitations
+
+- **Few final-code runs.** One run per behaviour on the final code; no success rate
+  can be stated, and search time depends on the explorer's frontier order.
+- **Reach violation on earlier code.** A Gazebo `standard` run (`gz_standard_run2`,
+  `f6ade2f`) completed with a reach of 0.607 m, outside 0.30-0.60 m: the localization
+  and map-pose errors added to a plan of 0.517 m.
+- **Heading error.** That run estimated G1's heading 65 degrees off from a 0.68 m view.
+  It was not reproduced or explained; the final Gazebo runs' headings were within
+  10 degrees, which does not show it cannot recur.
+- **Viewpoint-dependent localization.** Gazebo's G1 error in the ward was 0.05-0.15 m
+  (0.015-0.041 m in the warehouse); the head region can measure what stands behind a
+  partly hidden or obliquely seen G1, and the fallback then depends on the legs.
+- **LiDAR vetoes beside G1.** The reach band leaves 0.12-0.17 m between the robot and
+  G1's legs, so the live LiDAR check cancels many Gazebo approaches beside G1 and the
+  mission moves to another side ([backlog](../BACKLOG.md#parking-clearance-beside-g1)).
+- **Narrow passages.** Nothing chooses the heading at which the robot enters a passage
+  between its width (0.80 m) and its diagonal (1.05 m); orientation-aware navigation is
+  not implemented ([backlog](../BACKLOG.md#orientation-aware-navigation-through-narrow-passages)).
+- **No physical validation.** Parking, the basket's dimensions and G1's reach to the
+  basket have not been tested on the real robot or the real G1; the
+  [technical review](parking_review.md#before-a-real-robot) lists what must come first.
+
+Future improvements are tracked in the [backlog](../BACKLOG.md#g1-detection-in-parking-scenes)
+and its neighbouring parking items.
+
+## Archived evidence
+
+- [Parking in the hospital ward](../../archive/engineering/2026-11-18-parking-hospital-validation.md) — every ward validation run, the localization and scenario problems they exposed, and the final-code runs.

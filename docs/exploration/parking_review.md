@@ -1,7 +1,8 @@
 # Autonomous parking: technical review
 
 A summary for review of the simulated autonomous parking mission: what it does, how
-it stays safe, what has been shown and what is not. Details live in the linked
+it stays safe, what has been shown and what is not. The
+[supervisor handover](parking_handover.md) adds the commands, nodes and final results. Details live in the linked
 references; dated evidence lives in the archive records.
 
 ## What the mission does
@@ -79,6 +80,10 @@ right, five-second wait, return): `artifacts/exploration/demo_2026-11-11/isaac_s
 kept outside the repository; `artifacts/exploration/p8_2026-11-14/isaac_standard/demo.mp4`
 records the merged code's Isaac run (a vetoed attempt, then G1's left).
 `tools/parking_scenarios/record_demo_run.sh isaac standard OUT_DIR` records another.
+Both videos ran earlier mission code; no final-code run was recorded as video. A stills
+storyboard of the final-code Gazebo runs (`make_demo_storyboard.py`, in
+`artifacts/exploration/final_demo_2026-11-19/`) shows each stage from those runs'
+captures, 4 s per still, not real time.
 
 ## Known limitations
 
