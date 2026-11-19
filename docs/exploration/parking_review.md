@@ -17,7 +17,7 @@ camera's sight, and:
    head and torso there ([G1 position check](architecture.md#g1-position-check));
 3. estimates G1's heading from its forearms ([G1 heading](architecture.md#g1-heading));
 4. plans parking poses whose rear-bin task point is 0.30-0.60 m from G1's axis,
-   ranked G1-left and G1-right, then behind, then in front, then other; maps the
+   ranked G1-right, G1-left, front, rear, then other; maps the
    floor around G1 first when undecided poses could change the choice
    ([G1-centred exploration](architecture.md#g1-centred-exploration));
 5. checks each pose's route with Nav2, drives to a pre-parking pose and the parking

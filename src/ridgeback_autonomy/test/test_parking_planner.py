@@ -813,29 +813,29 @@ def test_left_side_is_selected_when_the_right_is_blocked():
     assert selected_label(blocked(NORTH)) == 'g1_left'
 
 
-def test_both_sides_are_equal_and_the_existing_criteria_choose():
-    # Turning G1 by 180 degrees swaps its left and right but not the poses beside it:
-    # the same pose must win, so neither side is favoured.
+def test_right_wins_over_left_whichever_way_g1_faces():
+    # Turning G1 by 180 degrees swaps its left and right: the selection follows its right.
     g = grid()
     looking_west = plan_parking(g, facing(WEST), CONFIG, APPROACH_FROM_WEST)
     looking_east = plan_parking(g, facing(EAST), CONFIG, APPROACH_FROM_WEST)
-    assert looking_west.selected.preference_label in ('g1_left', 'g1_right')
-    assert (looking_west.selected.task_x, looking_west.selected.task_y) == (
-        looking_east.selected.task_x, looking_east.selected.task_y)
-    assert looking_west.selected.preference_label != looking_east.selected.preference_label
-    # A map obstacle moves the choice to the side with the better clearance, not by name.
+    assert looking_west.selected.preference_label == looking_east.selected.preference_label == 'g1_right'
+    assert bearing(looking_west.selected) > 0 > bearing(looking_east.selected)   # north, then south
+    # An obstacle that lowers the right's clearance (0.04 m against 0.16 m on the left)
+    # does not hand the choice to the left; one that blocks the right does.
+    g = grid()
+    fill(g, 2.4, 4.2, 3.6, 4.3, 100)          # north of G1: its right while it faces west
+    assert selected_label(g, WEST) == 'g1_right'
     g = grid()
     fill(g, 2.4, 3.95, 3.6, 4.05, 100)
-    assert selected_label(g, WEST) == selected_label(g, EAST).replace('right', 'x').replace(
-        'left', 'right').replace('x', 'left')
+    assert selected_label(g, WEST) == 'g1_left'
 
 
-def test_both_sides_blocked_consider_behind_g1():
-    assert selected_label(blocked(NORTH, SOUTH)) == 'g1_rear'
+def test_both_sides_blocked_consider_the_front():
+    assert selected_label(blocked(NORTH, SOUTH)) == 'g1_front'
 
 
-def test_sides_and_rear_blocked_consider_the_front():
-    assert selected_label(blocked(NORTH, SOUTH, EAST)) == 'g1_front'
+def test_sides_and_front_blocked_consider_behind_g1():
+    assert selected_label(blocked(NORTH, SOUTH, WEST)) == 'g1_rear'
 
 
 def test_preferred_sectors_blocked_leave_the_remaining_directions():
@@ -861,17 +861,48 @@ def test_sectors_rotate_with_g1_and_ignore_the_approach(heading_deg):
         a = heading + math.radians(offset_deg)
         return preference(3.0 + 0.5 * math.cos(a), 3.0 + 0.5 * math.sin(a), t, approach)
     # Left is counter-clockwise from the heading: G1's own left, seen from above.
-    assert label(90) == (0, 'g1_left') and label(-90) == (0, 'g1_right')
-    assert label(180) == (1, 'g1_rear') and label(0) == (2, 'g1_front')
-    assert label(37) == (3, 'g1_other') and label(-143) == (3, 'g1_other')
-    assert label(90, (9.0, -7.0, 1.0)) == (0, 'g1_left')
+    assert label(-90) == (0, 'g1_right') and label(90) == (1, 'g1_left')
+    assert label(0) == (2, 'g1_front') and label(180) == (3, 'g1_rear')
+    assert label(37) == (4, 'g1_other') and label(-143) == (4, 'g1_other')
+    assert label(90, (9.0, -7.0, 1.0)) == (1, 'g1_left')
 
 
 def test_sector_widths_are_configurable():
-    t = replace(facing(EAST), facing_sectors_rad=(math.radians(20), math.radians(70), math.radians(70)))
+    t = replace(facing(EAST), facing_sectors_rad=(math.radians(20), math.radians(70), math.radians(70)),
+                heading_margin_rad=0.0)
     at = lambda deg: preference(3 + 0.5 * math.cos(math.radians(deg)),
                                 3 + 0.5 * math.sin(math.radians(deg)), t, None)[1]
     assert at(60) == 'g1_front' and at(75) == 'g1_left' and at(120) == 'g1_rear'
+
+
+def at_bearing(t, deg):
+    a = (t.facing_yaw_rad or 0.0) + math.radians(deg)
+    return preference(3.0 + 0.5 * math.cos(a), 3.0 + 0.5 * math.sin(a), t, None)
+
+
+@pytest.mark.parametrize('deg,label', [
+    (-90, 'g1_right'), (-60, 'g1_right'), (-120, 'g1_right'), (-135, 'g1_right'),   # right-front/-rear
+    (-136, 'g1_other'), (-149, 'g1_other'), (-40, 'g1_other'),                      # diagonal gaps
+    (-152, 'g1_rear'), (165, 'g1_rear'), (10, 'g1_front'), (120, 'g1_left')])
+def test_diagonal_positions_have_an_explicit_class(deg, label):
+    # The default sectors: sides 45-135 deg from G1's facing direction, front within 30,
+    # rear beyond 150; the 15-degree gaps between them are diagonal, checked last.
+    assert at_bearing(facing(WEST), deg)[1] == label
+
+
+def test_a_position_a_heading_error_could_move_into_another_sector_is_not_named():
+    # Sectors without gaps: any position near a boundary is ambiguous within the margin.
+    wide = replace(facing(EAST), facing_sectors_rad=(math.radians(50), math.radians(40), math.radians(40)))
+    assert at_bearing(wide, -90)[1] == 'g1_right'
+    assert at_bearing(wide, -135)[1] == 'g1_other'      # right, or behind G1 with 5 deg of error
+    assert at_bearing(wide, -45)[1] == 'g1_other'       # right, or in front of it
+    assert at_bearing(replace(wide, heading_margin_rad=0.0), -135)[1] == 'g1_right'
+    # A larger margin narrows what is confidently a side; the default gaps already hold 15 deg.
+    larger = replace(facing(EAST), heading_margin_rad=math.radians(20))
+    assert at_bearing(larger, -132)[1] == 'g1_other' and at_bearing(larger, -128)[1] == 'g1_right'
+    assert at_bearing(facing(EAST), -132)[1] == 'g1_right'
+    # Conservative only: a diagonal position is never promoted into a side.
+    assert at_bearing(larger, -140)[1] == 'g1_other' and at_bearing(larger, 0)[1] == 'g1_front'
 
 
 def test_unknown_heading_keeps_the_original_undirected_ranking():
@@ -900,11 +931,19 @@ def test_g1_legs_lower_the_clearance_score_of_poses_beside_them_without_rejectin
     assert beside and all(after[k] < before[k] for k in beside)
 
 
-def test_path_checks_visit_the_sides_then_rear_then_front_then_the_rest():
+def test_path_checks_visit_right_left_front_rear_then_the_rest():
     plan = plan_parking(grid(), facing(WEST), CONFIG, APPROACH_FROM_WEST)
     groups = candidate_groups(plan, APPROACH_FROM_WEST)
     labels = [{preference(c.task_x, c.task_y, plan.target, None)[1] for c in group} for group in groups]
-    assert labels == [{'g1_left', 'g1_right'}, {'g1_rear'}, {'g1_front'}, {'g1_other'}]
+    assert all(len(group) == 1 for group in labels)
+    order = [next(iter(group)) for group in labels]
+    assert list(dict.fromkeys(order)) == ['g1_right', 'g1_left', 'g1_front', 'g1_rear', 'g1_other']
+    assert order == sorted(order, key=['g1_right', 'g1_left', 'g1_front', 'g1_rear', 'g1_other'].index)
+    # Every valid pose of a class is queued, in batches no larger than the class batch.
+    valid = [c for c in plan.candidates if c.status in ('valid', 'selected')]
+    queued = [c for group in groups for c in group]
+    assert len(queued) == len(valid) and {id(c) for c in queued} == {id(c) for c in valid}
+    assert all(len(group) <= 6 for group in groups)
 
 
 def test_positions_at_least_as_good_as_the_best_valid_one_are_worth_exploring():

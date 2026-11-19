@@ -103,7 +103,7 @@ from ridgeback_autonomy.mission.parking_clearance import (
 )
 from ridgeback_autonomy.mission.parking_feasibility import (
     PlanningSnapshot, _start_footprint_known, candidate_groups, driven_poses, path_rejection,
-    path_length, pose_xyyaw, select_path_candidate,
+    describe_route_search, path_length, pose_xyyaw, route_search_summary, select_path_candidate,
 )
 from ridgeback_autonomy.mission.parking_execution import (
     ExecutionContext, ExecutionLimits, ExecutionState, ParkingExecutor,
@@ -374,10 +374,13 @@ class MissionManagerNode(Node):
         self.declare_parameter('target_depth_topic', 'sensors/camera_0/depth/image')
         self.declare_parameter('target_camera_info_topic', 'sensors/camera_0/color/camera_info')
         self.declare_parameter('target_orientation_frames', 5)
-        # Half-widths around G1's left and right, rear and front, relative to its heading.
+        # Half-widths around G1's right and left, rear and front, relative to its heading.
         self.declare_parameter('parking_side_sector_half_deg', 45.0)
         self.declare_parameter('parking_rear_sector_half_deg', 30.0)
         self.declare_parameter('parking_front_sector_half_deg', 30.0)
+        # A position is ranked as a named side only if a heading error smaller than this
+        # cannot move it into another named sector (a planning margin, not an error bound).
+        self.declare_parameter('parking_heading_margin_deg', 15.0)
         # The legs' axis replaces the surface-based G1 position, unless it is this far off.
         self.declare_parameter('target_axis_max_shift_m', 0.25)
         # A localized position is used only when depth shows G1 there (head and torso);
@@ -409,6 +412,9 @@ class MissionManagerNode(Node):
         self.declare_parameter('parking_path_timeout_s', 3.0)
         self.declare_parameter('parking_path_batch_timeout_s', 10.0)
         self.declare_parameter('parking_path_candidates_per_class', 6)
+        # Routes checked per planning, over all classes; a lower class is reached only
+        # after every valid pose of the higher ones was checked.
+        self.declare_parameter('parking_path_check_budget', 16)
         self.declare_parameter('parking_max_frame_shift_m', 0.05)
         self.declare_parameter('parking_max_frame_yaw_rad', 0.03)
         self.declare_parameter('parking_execution_enabled', False)
@@ -513,6 +519,10 @@ class MissionManagerNode(Node):
         self.path_candidates_per_class = int(self.get_parameter('parking_path_candidates_per_class').value)
         if not 1 <= self.path_candidates_per_class <= 12:
             raise ValueError('parking_path_candidates_per_class must be within [1, 12]')
+        self.path_check_budget = int(self.get_parameter('parking_path_check_budget').value)
+        if not self.path_candidates_per_class <= self.path_check_budget <= 48:
+            raise ValueError('parking_path_check_budget must be within '
+                             '[parking_path_candidates_per_class, 48]')
         with open(str(self.get_parameter('nav2_params_path').value), encoding='utf-8') as stream:
             nav2_params = yaml.safe_load(stream)
         self.planner_id = nav2_params['planner_server']['ros__parameters']['planner_plugins'][0]
@@ -635,6 +645,10 @@ class MissionManagerNode(Node):
         self.facing_sectors_rad = tuple(math.radians(float(self.get_parameter(name).value)) for name in (
             'parking_side_sector_half_deg', 'parking_rear_sector_half_deg',
             'parking_front_sector_half_deg'))
+        margin_deg = float(self.get_parameter('parking_heading_margin_deg').value)
+        if not 0.0 <= margin_deg <= 45.0:
+            raise ValueError('parking_heading_margin_deg must be within [0, 45]')
+        self.heading_margin_rad = math.radians(margin_deg)
         self.target_axis_max_shift_m = float(self.get_parameter('target_axis_max_shift_m').value)
         self.target_body_check = bool(self.get_parameter('target_body_check').value)
         self.parking_max_attempts = int(self.get_parameter('parking_max_attempts').value)
@@ -726,6 +740,7 @@ class MissionManagerNode(Node):
         self._path_request_deadline = None
         self._path_batch_deadline = None
         self._path_groups = []
+        self._path_approach = None
         self._path_valid = []
         self._path_queue = []
         self._paths = {}
@@ -956,7 +971,8 @@ class MissionManagerNode(Node):
                 elif self.state == MissionState.EVALUATING_PARKING_PATHS:
                     if (now_s >= self._path_batch_deadline or
                             self._path_busy and now_s >= self._path_request_deadline):
-                        self._fail_planning('planner_timeout', 'ComputePathToPose deadline expired')
+                        self._fail_planning('planner_timeout', 'ComputePathToPose deadline expired; '
+                                            f'route search: {self._route_search_text()}')
                     elif not self._path_busy:
                         self._next_path()
                 return
@@ -2049,7 +2065,8 @@ class MissionManagerNode(Node):
                 x=position.map_x_m, y=position.map_y_m, frame_id=self.map_frame,
                 stamp_ns=position.last_stamp_ns, reference=position.reference,
                 is_foot_midpoint=position.is_foot_midpoint, source=position.source,
-                facing_yaw_rad=self._facing_yaw_rad(), facing_sectors_rad=self.facing_sectors_rad)
+                facing_yaw_rad=self._facing_yaw_rad(), facing_sectors_rad=self.facing_sectors_rad,
+                heading_margin_rad=self.heading_margin_rad)
             try:
                 grid = None if self.latest_map is None else self._planning_grid(self.latest_map)
             except ValueError as exc:
@@ -2084,6 +2101,7 @@ class MissionManagerNode(Node):
             # The rays follow on the next tick: planning must stay short of the odometry
             # age that restarts motion settlement, or the target expires before driving.
             plan = plan_parking(grid, target, self.planner_config, approach, rays=False)
+            self._path_approach = approach   # the classes of this plan's route search
             self._exclude_failed_directions(plan)
             self.parking_plan = plan
             self._plan_rays_grid = grid
@@ -2524,8 +2542,10 @@ class MissionManagerNode(Node):
         if reason:
             self._fail_planning('parking_plan_invalidated', reason)
             return
-        if not self._path_queue:
+        budget_spent = self.parking_plan.paths_checked >= self.path_check_budget
+        if not self._path_queue or budget_spent:
             if self._path_valid:
+                # Every higher class was checked in full; this is the best class with a route.
                 selected = select_path_candidate(self._path_valid, self.parking_plan.resolution_m)
                 plan = self.parking_plan
                 plan.selected, plan.selected_path, plan.ok = selected, self._paths[id(selected)], True
@@ -2539,10 +2559,16 @@ class MissionManagerNode(Node):
                     f'Path-feasible parking pose selected: x={selected.base_x:.3f}, '
                     f'y={selected.base_y:.3f}, yaw={selected.yaw:.3f}, '
                     f'path_length={selected.path_length_m:.3f} m, {selected.preference_label}')
+                self.get_logger().info(f'Route search by class: {self._route_search_text()}')
                 if selected.preference_label.startswith('g1_'):
                     self.get_logger().info(
                         f'Parking at {selected.preference_label}: within the reach band; nothing '
                         "here verifies that G1's hands can reach the rear bin from this side")
+                else:
+                    self.get_logger().info(
+                        f'Parking at {selected.preference_label}: G1-relative ranking unavailable '
+                        f'({self._heading_unavailable_reason()}); ranked by the approach '
+                        "direction, not labelled as G1's right or left")
                 self._transition(MissionState.PARKING_PATH_FEASIBLE,
                                  'path-feasible snapshot selected')
                 if not self.parking_navigation_enabled:
@@ -2550,9 +2576,16 @@ class MissionManagerNode(Node):
                 else:
                     self._begin_parking_when_stationary(now_ns)
                 return
+            if budget_spent:
+                # A class with goals left unchecked is not shown blocked, and lower
+                # classes were never compared with it: no pose is selected.
+                self._fail_planning('bounded_search_exhausted',
+                    f'route check budget of {self.path_check_budget} spent before any safe '
+                    f'route; untested poses remain: {self._route_search_text()}')
+                return
             if not self._path_groups:
                 self._fail_planning('bounded_search_exhausted',
-                    'No safe path among bounded candidates; untested poses may remain')
+                    f'no safe route to any valid pose: {self._route_search_text()}')
                 return
             self._path_queue = list(self._path_groups.pop(0))
         if not self.compute_path_client.server_is_ready():
@@ -2580,6 +2613,18 @@ class MissionManagerNode(Node):
             self._fail_planning('planner_transport', str(exc))
             return
         future.add_done_callback(lambda f: self._path_goal_response(f, generation, candidate, robot))
+
+    def _route_search_text(self):
+        plan = self.parking_plan
+        if plan is None:
+            return 'no plan'
+        return describe_route_search(route_search_summary(plan, self._path_approach))
+
+    def _heading_unavailable_reason(self):
+        if not self.target_orientation_enabled:
+            return 'target_orientation_enabled is false'
+        quality = self.target_heading_quality
+        return 'G1 heading unknown' if quality is None else f'G1 heading {quality.status}'
 
     def _start_footprint_poses(self):
         """The saved mission start: the robot stood there, so its footprint held no obstacle."""
@@ -3392,7 +3437,8 @@ class MissionManagerNode(Node):
         unknown = grid.data < 0
         target = TargetReference(position.map_x_m, position.map_y_m, self.map_frame, 0,
                                  position.reference, position.is_foot_midpoint, '',
-                                 self._facing_yaw_rad(), self.facing_sectors_rad)
+                                 self._facing_yaw_rad(), self.facing_sectors_rad,
+                                 self.heading_margin_rad)
         coverage = {
             'undecided_positions': undecided_parking_positions(grid, target, self.planner_config),
             'donut_cells': int(np.count_nonzero(donut)),
@@ -3527,7 +3573,8 @@ class MissionManagerNode(Node):
         target = TargetReference(position.map_x_m, position.map_y_m, self.map_frame,
                                  position.last_stamp_ns, position.reference,
                                  position.is_foot_midpoint, position.source,
-                                 self._facing_yaw_rad(), self.facing_sectors_rad)
+                                 self._facing_yaw_rad(), self.facing_sectors_rad,
+                                 self.heading_margin_rad)
         preview = plan_parking(grid, target, self.planner_config,
                                self.approach_pose or self._current_robot_pose())
         if preview.selected is not None:
@@ -3583,7 +3630,10 @@ class MissionManagerNode(Node):
         summary = {'ok': plan.ok, 'failure_reason': plan.failure_reason,
                    'keepout_radius_m': round(plan.keepout_radius_m, 3),
                    'target': [round(plan.target.x, 3), round(plan.target.y, 3)],
-                   'target_reference': plan.target.reference, 'counts': plan.counts()}
+                   'target_reference': plan.target.reference, 'counts': plan.counts(),
+                   'ranking': ('g1_relative' if plan.target.facing_yaw_rad is not None
+                               else 'approach_relative'),
+                   'route_search': route_search_summary(plan, self._path_approach)}
         if plan.selected is not None:
             sel = plan.selected
             summary['selected'] = {

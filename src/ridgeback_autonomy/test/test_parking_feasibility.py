@@ -169,8 +169,10 @@ def test_bounded_groups_preserve_priority_and_path_length_is_final_tier():
     from ridgeback_autonomy.mission.parking_planner import plan_parking
     plan = plan_parking(grid(), target(), CONFIG, APPROACH_FROM_WEST)
     groups = candidate_groups(plan, APPROACH_FROM_WEST, 3)
-    assert len(groups) == 3 and all(len(g) <= 3 for g in groups)
-    assert [g[0].preference_label for g in groups] == ['approach_side', 'approach_front', 'approach_back']
+    assert all(len(g) <= 3 for g in groups)
+    labels = [g[0].preference_label for g in groups]
+    assert list(dict.fromkeys(labels)) == ['approach_side', 'approach_front', 'approach_back']
+    assert labels == sorted(labels, key=['approach_side', 'approach_front', 'approach_back'].index)
     a, b = groups[0][:2]
     a.reach_error_m = b.reach_error_m = .05
     a.clearance_m = b.clearance_m = .5
@@ -437,7 +439,11 @@ def test_groups_take_each_sectors_best_reach_not_the_outer_edge():
     sector = lambda c: math.floor(math.atan2(c.task_y - t.y, c.task_x - t.x) / (math.pi / 4))
     rank = lambda c: preference(c.task_x, c.task_y, t, APPROACH_FROM_WEST)[0]
     valid = [c for c in plan.candidates if c.status in ('valid', 'selected')]
+    seen = set()
     for group in candidate_groups(plan, APPROACH_FROM_WEST):
+        if rank(group[0]) in seen:
+            continue            # a class's later batches hold what its first one left
+        seen.add(rank(group[0]))
         for key in {sector(c) for c in group}:
             picked = min(c.reach_error_m for c in group if sector(c) == key)
             best = min(c.reach_error_m for c in valid
@@ -647,3 +653,174 @@ def test_a_pose_closer_to_a_mapped_obstacle_than_the_lidar_margin_is_not_valid()
     valid = [c for c in after.candidates if c.status in ('valid', 'selected')]
     assert valid and all(clearance(c) >= 0.08 for c in valid)
     assert any(c.reason == 'obstacle_clearance' for c in after.candidates)
+
+
+# Strict G1-relative order through the mission's route checks: right, left, front, rear,
+# then diagonal positions. ``path_rejection`` stands in for the swept-route check (tested
+# above) and records the class of every route checked.
+from ridgeback_autonomy.mission.parking_planner import preference
+from test_mission_manager import FakeTfBuffer, enter_localization, localize
+
+WEST = math.pi
+ORDER = ['g1_right', 'g1_left', 'g1_front', 'g1_rear', 'g1_other']
+
+
+def facing_manager(manager_factory, monkeypatch, blocked_classes=(), yaw=WEST):
+    m = manager_factory(tf_buffer=FakeTfBuffer(stamp_ns=PLAN_NOW_NS),
+                        pause_client=FakePauseClient(trigger_response(True, 'safe')))
+    published = {'state': [], 'logs': []}
+    m.state_publisher.publish = published['state'].append
+    m.parking_marker_publisher.publish = lambda msg: None
+    m._on_map(occupancy_map())
+    enter_localization(m)
+    m.target_heading = SimpleNamespace(yaw_rad=yaw, support_points=200, inlier_fraction=1.0)
+    m._observe_target_body = lambda: None          # this heading, as if depth had shown it
+    localize(m)
+    assert m.parking_plan.target.facing_yaw_rad == pytest.approx(yaw)
+    checked = []
+
+    def route(path, candidate, *a, **k):
+        label = preference(candidate.task_x, candidate.task_y, m.parking_plan.target, None)[1]
+        checked.append(label)
+        return 'path_footprint_occupied' if label in blocked_classes else None
+    monkeypatch.setattr('ridgeback_autonomy.mission.mission_manager_node.path_rejection', route)
+    client = Client()
+    m.compute_path_client = client
+    info = m.get_logger().info
+    monkeypatch.setattr(m.get_logger(), 'info', lambda msg, *a, **k: (published['logs'].append(msg), info(msg)))
+    return m, client, checked, published
+
+
+def evaluate(m, client):
+    m._next_path(now_ns=PLAN_NOW_NS)
+    while m.state == MissionState.EVALUATING_PARKING_PATHS:
+        if m._path_busy:
+            finish(client)
+        m._next_path(now_ns=PLAN_NOW_NS)
+
+
+def search(m):
+    return {e['class']: e for e in m._plan_summary()['route_search']}
+
+
+def class_count(m, label):
+    return sum(c.status in ('valid', 'selected') and preference(
+        c.task_x, c.task_y, m.parking_plan.target, None)[1] == label for c in m.parking_plan.candidates)
+
+
+@pytest.mark.parametrize('blocked,expected', [
+    ((), 'g1_right'),                                         # both sides feasible: right
+    (('g1_right',), 'g1_left'),                               # right blocked: left
+    (('g1_right', 'g1_left'), 'g1_front'),                    # both sides blocked: front
+    (('g1_right', 'g1_left', 'g1_front'), 'g1_rear'),         # then behind G1
+    (('g1_right', 'g1_left', 'g1_front', 'g1_rear'), 'g1_other')])   # then a diagonal
+def test_routes_are_checked_in_strict_g1_relative_order(manager_factory, monkeypatch, blocked, expected):
+    m, client, checked, _ = facing_manager(manager_factory, monkeypatch, blocked)
+    m.path_check_budget = 100          # the whole order fits: this test is about the order
+    evaluate(m, client)
+    assert m.state == MissionState.PARKING_PATH_FEASIBLE
+    assert m.parking_plan.selected.preference_label == expected
+    # Classes in order, never back; every blocked class checked in full before the next.
+    assert checked == sorted(checked, key=ORDER.index)
+    # (the selected route is checked once more when the plan is revalidated)
+    for label in blocked:
+        assert checked.count(label) == class_count(m, label) > 0
+        assert search(m)[label]['outcome'] == 'none_feasible'
+    assert search(m)[expected]['outcome'] == 'feasible'
+    assert all(e['outcome'] == 'unchecked' for e in m._plan_summary()['route_search']
+               if ORDER.index(e['class']) > ORDER.index(expected))
+
+
+def test_a_lower_class_is_never_checked_while_a_right_route_exists(manager_factory, monkeypatch):
+    # Rear routes would be shorter here or not: they are never compared with a right one.
+    m, client, checked, published = facing_manager(manager_factory, monkeypatch)
+    evaluate(m, client)
+    assert set(checked) == {'g1_right'} and m.parking_plan.selected.preference_label == 'g1_right'
+    assert any(log.startswith('Route search by class: g1_right feasible') for log in published['logs'])
+
+
+def test_all_routes_blocked_is_refused_with_every_class_shown_checked(manager_factory, monkeypatch):
+    m, client, checked, _ = facing_manager(manager_factory, monkeypatch, tuple(ORDER))
+    m.path_check_budget = 100
+    evaluate(m, client)
+    assert m.state == MissionState.PARKING_PLANNING_FAILED
+    assert m.last_issue.code == 'bounded_search_exhausted'
+    assert m.last_issue.reason.startswith('no safe route to any valid pose')
+    assert m.parking_plan.selected is None
+    assert all(e['outcome'] == 'none_feasible' for e in m._plan_summary()['route_search'])
+
+
+def test_a_spent_budget_never_claims_an_unchecked_class_blocked(manager_factory, monkeypatch):
+    m, client, checked, _ = facing_manager(manager_factory, monkeypatch, tuple(ORDER))
+    right = class_count(m, 'g1_right')
+    assert right > m.path_candidates_per_class    # more right poses than one batch
+    m.path_check_budget = right - 1               # the budget runs out inside the right class
+    evaluate(m, client)
+    assert m.state == MissionState.PARKING_PLANNING_FAILED
+    assert m.last_issue.code == 'bounded_search_exhausted'
+    assert 'budget' in m.last_issue.reason and 'untested poses remain' in m.last_issue.reason
+    assert 'g1_right incomplete' in m.last_issue.reason
+    assert set(checked) == {'g1_right'} and len(checked) == right - 1
+    s = search(m)
+    assert s['g1_right']['outcome'] == 'incomplete'
+    assert all(s[label]['outcome'] == 'unchecked' for label in ORDER[1:] if label in s)
+
+
+def test_a_right_class_larger_than_one_batch_is_searched_before_the_left(manager_factory, monkeypatch):
+    # The first six right poses are blocked: the remaining right poses come before any left.
+    m, client, checked, _ = facing_manager(manager_factory, monkeypatch)
+    calls = {'n': 0}
+
+    def route(path, candidate, *a, **k):
+        label = preference(candidate.task_x, candidate.task_y, m.parking_plan.target, None)[1]
+        checked.append(label)
+        calls['n'] += 1
+        return 'path_footprint_occupied' if calls['n'] <= m.path_candidates_per_class else None
+    monkeypatch.setattr('ridgeback_autonomy.mission.mission_manager_node.path_rejection', route)
+    assert class_count(m, 'g1_right') > m.path_candidates_per_class
+    evaluate(m, client)
+    assert m.parking_plan.selected.preference_label == 'g1_right'
+    assert set(checked) == {'g1_right'} and len(checked) > m.path_candidates_per_class
+
+
+def test_a_spent_budget_with_a_route_found_selects_it(manager_factory, monkeypatch):
+    m, client, checked, _ = facing_manager(manager_factory, monkeypatch)
+    m.path_check_budget = 2
+    evaluate(m, client)
+    assert m.parking_plan.paths_checked == 2
+    assert m.parking_plan.selected.preference_label == 'g1_right'
+
+
+def test_an_unknown_heading_ranks_by_the_approach_and_says_so(manager_factory, monkeypatch):
+    m, client, _ = running(manager_factory, monkeypatch)
+    logs = []
+    original = m.get_logger().info
+    monkeypatch.setattr(m.get_logger(), 'info', lambda msg, *a, **k: (logs.append(msg), original(msg)))
+    assert m.parking_plan.target.facing_yaw_rad is None
+    assert m._plan_summary()['ranking'] == 'approach_relative'
+    evaluate(m, client)
+    assert m.parking_plan.selected.preference_label.startswith('approach_')
+    assert any('G1-relative ranking unavailable' in log and "not labelled as G1's right or left" in log
+               for log in logs)
+    assert all(e['class'].startswith('approach_') for e in m._plan_summary()['route_search'])
+
+
+def test_failed_direction_exclusions_still_apply_under_the_strict_order(manager_factory, monkeypatch):
+    m, _, _, _ = facing_manager(manager_factory, monkeypatch)
+    plan, approach = m.parking_plan, m._path_approach
+    label = lambda c: preference(c.task_x, c.task_y, plan.target, None)[1]
+    valid = lambda: [c for c in plan.candidates if c.status in ('valid', 'selected')]
+    # A failed attempt rules out the directions near it, whatever their class.
+    right = next(c for c in valid() if label(c) == 'g1_right')
+    failed = math.atan2(right.task_y - plan.target.y, right.task_x - plan.target.x)
+    m._failed_bearings = [failed]
+    m._exclude_failed_directions(plan)
+    near = [c for c in plan.candidates if c.reason == 'failed_attempt_direction']
+    assert near and all(abs(math.remainder(math.atan2(c.task_y - plan.target.y, c.task_x - plan.target.x)
+                                           - failed, math.tau)) <= m.parking_retry_exclusion_rad for c in near)
+    # A right side shown blocked as a whole leaves G1's left first in the route checks.
+    m._failed_sides = {'g1_right'}
+    m._exclude_failed_directions(plan)
+    assert not any(label(c) == 'g1_right' for c in valid())
+    groups = candidate_groups(plan, approach, m.path_candidates_per_class)
+    assert {label(c) for c in groups[0]} == {'g1_left'}

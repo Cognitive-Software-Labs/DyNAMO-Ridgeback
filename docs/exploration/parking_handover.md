@@ -61,9 +61,11 @@ the parking poses. Ground truth is never an input. Details:
 - **Geometry.** Poses are checked with the hull of Nav2's robot outline and the
   provisional basket, a 0.29 m keep-out around G1, 0.08 m from mapped obstacles;
   unknown cells count as unsafe; tabletops the LiDARs pass under are marked from depth.
-- **Priority.** G1's left and right first, then behind, then in front, then the rest
-  (sectors of 45, 30 and 30 degrees around G1's estimated heading). Sectors only order
-  the checks; they never make a pose valid.
+- **Priority.** G1's right, then its left, then in front, then behind, then diagonal
+  or ambiguous poses (sectors of 45, 30 and 30 degrees around G1's estimated heading);
+  a lower class is route-checked only after every pose of the higher ones. Sectors
+  only order the checks; they never make a pose valid. Without a heading, poses are
+  ranked by the approach direction and never called G1's right or left.
 - **Route.** Each ranked pose is checked with a Nav2 route before driving; the robot
   drives to a pre-parking pose 0.5 m before the parking pose, then a tight final leg.
 - **Live LiDAR check.** During both legs, both raw scans are checked against the

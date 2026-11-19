@@ -130,9 +130,19 @@ class GridSnapshot:
 # Outer surface of G1's shins beside its axis, seen by the LiDARs (measured, 2026-11-02). With
 # a heading the map's coarser leg cells are replaced by these for the clearance quality score.
 G1_LEG_LATERAL_M = 0.21
-# Half-widths around G1's left and right, rear and front: wider than the heading's error.
+# Half-widths around G1's right and left, rear and front. Between them lie 15-degree gaps
+# (45-30 deg and 135-150 deg from G1's facing direction): positions there are diagonal.
 DEFAULT_FACING_SECTORS_RAD = (math.radians(45.0), math.radians(30.0), math.radians(30.0))
-PREFERENCE_RANKS = 4
+# A heading error this large must not move a classified position into another named
+# sector (see preference). A planning margin, not an error bound: gated headings were
+# within 12.9 deg offline and 4.5 deg live (2026-11-19), and the estimator reports no
+# per-estimate uncertainty. With the default sectors it equals the gaps between them.
+DEFAULT_HEADING_MARGIN_RAD = math.radians(15.0)
+# With a heading: G1's right, left, front, rear, then diagonal or ambiguous positions.
+G1_CLASSES = ('g1_right', 'g1_left', 'g1_front', 'g1_rear', 'g1_other')
+# Without one: beside, in front of and behind the approach direction.
+APPROACH_CLASSES = ('approach_side', 'approach_front', 'approach_back')
+PREFERENCE_RANKS = len(G1_CLASSES)
 
 
 @dataclass(frozen=True)
@@ -148,6 +158,7 @@ class TargetReference:
     source: str
     facing_yaw_rad: float | None = None   # the direction G1 faces, when reliably observed
     facing_sectors_rad: tuple[float, float, float] = DEFAULT_FACING_SECTORS_RAD
+    heading_margin_rad: float = DEFAULT_HEADING_MARGIN_RAD
 
 
 @dataclass(frozen=True)
@@ -382,24 +393,38 @@ def preference(
 ) -> tuple[int, str]:
     """Preference class of a pose: only an order of checking, never a validity decision.
 
-    With a reliable G1 heading, by the task point's bearing from G1 relative to that
-    heading (positive to G1's left, as seen standing at G1 facing that way): beside G1,
-    left and right equally, then behind it, then in front of it, then what lies between
-    those sectors. Otherwise the original ``_parking_candidate_preference`` without a
-    heading: side, front, back of the approach.
+    With a reliable G1 heading, by the bearing of the task point (the basket's
+    interaction point) from G1 relative to that heading, positive to G1's left as seen
+    standing at G1 facing that way. In strict order (``G1_CLASSES``): G1's right
+    (90 deg to its right, +-side half), its left, its front (0 deg, +-front half), its
+    rear (180 deg, +-rear half), then ``g1_other``: diagonal positions between those
+    sectors, and positions whose sector a heading error of ``heading_margin_rad`` could
+    change into another named sector. Such positions are kept and checked last, never
+    labelled as a side.
+
+    Without a heading, the original ``_parking_candidate_preference``: side, front,
+    back of the approach (``APPROACH_CLASSES``), never G1's right or left.
     """
 
     task_angle = math.atan2(task_y - target.y, task_x - target.x)
     if target.facing_yaw_rad is not None:
         relative = normalize_angle(task_angle - target.facing_yaw_rad)
-        side_half, rear_half, front_half = target.facing_sectors_rad
-        if abs(abs(relative) - math.pi / 2.0) <= side_half:
-            return 0, 'g1_left' if relative > 0.0 else 'g1_right'
-        if abs(relative) >= math.pi - rear_half:
-            return 1, 'g1_rear'
-        if abs(relative) <= front_half:
-            return 2, 'g1_front'
-        return 3, 'g1_other'
+        nominal = _g1_sector(relative, target.facing_sectors_rad)
+        margin = target.heading_margin_rad
+        if nominal is not None and margin > 0.0:
+            # Conservative: the bearing under any heading error smaller than the margin
+            # (sampled at most one degree apart) must stay in this sector or the gaps
+            # beside it.
+            span = margin - 1e-6
+            steps = max(2, math.ceil(2.0 * span / math.radians(1.0)) + 1)
+            for k in range(steps):
+                other = _g1_sector(relative - span + 2.0 * span * k / (steps - 1),
+                                   target.facing_sectors_rad)
+                if other is not None and other != nominal:
+                    nominal = None
+                    break
+        label = nominal or 'g1_other'
+        return G1_CLASSES.index(label), label
     if approach_pose is None or math.hypot(approach_pose[0] - target.x,
                                            approach_pose[1] - target.y) < 0.10:
         return 1, 'front'
@@ -413,6 +438,19 @@ def preference(
     if front_error <= back_error:
         return 1, 'approach_front'
     return 2, 'approach_back'
+
+
+def _g1_sector(relative, sectors):
+    """The named sector of a bearing relative to G1's heading, or None in a gap."""
+    side_half, rear_half, front_half = sectors
+    relative = normalize_angle(relative)
+    if abs(abs(relative) - math.pi / 2.0) <= side_half:
+        return 'g1_left' if relative > 0.0 else 'g1_right'
+    if abs(relative) >= math.pi - rear_half:
+        return 'g1_rear'
+    if abs(relative) <= front_half:
+        return 'g1_front'
+    return None
 
 
 # A ray takes the first class any of its positions has. Uncertainty wins over a
@@ -443,7 +481,8 @@ def undecided_parking_positions(grid: GridSnapshot, target: TargetReference,
     parked footprint it would reject as unknown or outside the map. Occupied task cells
     and footprints that touch an obstacle are decided, so they do not count. With a
     known G1 heading, only positions ranked at least as high as the best valid one
-    count: both sides are evaluated, and nothing worse is worth mapping.
+    count: an unmapped right still counts beside a valid left, and nothing worse is
+    worth mapping.
     """
 
     keepout = keepout_radius_m(target, config)

@@ -295,21 +295,50 @@ where the views before the turn had scored 0.42-0.52.
 
 The heading only orders candidates, and only when planning runs; it never
 changes a footprint, keep-out, reach, route or LiDAR check, or a ray's colour,
-and a goal is never changed while driving. Without a heading, the ranking is the
-original undirected one. With one, by the task point's bearing from G1, relative
-to G1's heading and never to the robot's:
+and a goal is never changed while driving. With a heading, poses are classed by
+the bearing of the task point (the basket's interaction point) from G1, relative
+to G1's heading and never to the robot's, in this strict order:
 
-1. `g1_left` and `g1_right`, equally, within `parking_side_sector_half_deg` (45°)
-   of G1's own left and right. Left is counter-clockwise from the heading, seen
-   from above;
-2. `g1_rear`, within `parking_rear_sector_half_deg` (30°) of the opposite direction;
+1. `g1_right`, within `parking_side_sector_half_deg` (45°) of G1's own right
+   (90° clockwise from the heading, seen from above), so 45-135° from the way G1
+   faces: right-front and right-rear diagonals included;
+2. `g1_left`, the same on the counter-clockwise side;
 3. `g1_front`, within `parking_front_sector_half_deg` (30°) of the heading;
-4. `g1_other`, what lies between those sectors.
+4. `g1_rear`, within `parking_rear_sector_half_deg` (30°) of the opposite direction;
+5. `g1_other`: the diagonal gaps between those sectors (30-45° and 135-150° from
+   the heading with the defaults), and any pose a heading error smaller than
+   `parking_heading_margin_deg` (15°) could move into another named sector. These
+   poses stay candidates, checked last, and are never labelled as a side.
 
-Path checks run in that order, and the first class with a safe route is
-selected. Inside a class the existing reach, clearance and path-length tiers
-choose, so neither side is favoured and an unsafe preferred pose always loses to
-a safe alternative. With a heading, the clearance score also counts G1's legs,
+The margin is a planning margin, not an error bound: the estimator reports no
+per-estimate uncertainty, and gated headings were within 12.9° offline and 4.5°
+live (2026-11-19). With the default sectors the gaps are as wide as the margin, so
+it relabels no pose; it keeps a side label conservative if the sectors are widened.
+A wider margin would turn right-rear poses about 130° from the heading, the ones
+chosen in the ward, into `g1_other`. G1's position error also turns a pose's
+bearing (0.15 m at 0.45 m reach is about 18°) and is not part of the margin.
+
+Without a heading, the ranking is the original undirected one, by the approach
+direction (`approach_side`, `approach_front`, `approach_back`): no pose is labelled
+as G1's right or left, the selection log says the G1-relative ranking was
+unavailable and why, and the plan in the mission state reports
+`ranking: approach_relative`.
+
+Path checks run class by class, and a lower class is checked only after every
+valid pose of the higher ones (`candidate_groups`). A class is checked in batches
+of `parking_path_candidates_per_class` (6): the first covers its 45° bearing
+sectors, the rest follow in reach and clearance order. After a batch with a safe
+route, the existing reach, clearance and path-length tiers choose among its safe
+routes, so a shorter route in a lower class never outranks a safe route in a higher
+one, and an unsafe preferred pose always loses to a safe alternative. At most
+`parking_path_check_budget` (16) routes are checked per planning, within
+`parking_path_batch_timeout_s` (10 s); a path check took 0.2-0.8 s in the recorded
+runs. If the budget runs out with no safe route, planning fails
+(`bounded_search_exhausted`) and names the class left incomplete: a lower class is
+not selected over a higher one that was never fully checked. The mission state's
+`route_search` gives each class's valid, checked and feasible poses and its outcome
+(`feasible`, `none_feasible`, `incomplete` or `unchecked`), also logged at selection.
+With a heading, the clearance score also counts G1's legs,
 0.21 m to each side of its axis (`G1_LEG_LATERAL_M`). This affects quality only:
 the keep-out is a circle while G1 is wider than deep, and its mapped leg cells
 are too coarse to separate poses whose real leg clearance differs by centimetres.
@@ -357,9 +386,9 @@ unknown, or its parked footprint touches unknown cells or leaves the map
 blocked by obstacles are decided, and unknown floor that no parked footprint
 reaches is not required. A verified pose elsewhere therefore skips exploration,
 even if some directions stay orange. With a known G1 heading only positions
-ranked at least as high as the best valid one count: both sides are evaluated,
-a valid rear pose does not stop the mapping of G1's sides while they are
-unknown, and a side known to be blocked needs no more mapping.
+ranked at least as high as the best valid one count: an unmapped right counts
+beside a valid left, a valid rear pose does not stop the mapping of G1's sides
+while they are unknown, and a side known to be blocked needs no more mapping.
 
 Exploration resumes the shared explorer, focused on G1, for a round. While it
 runs, every new map (at most every `g1_exploration_refresh_s`, 2 s) redraws

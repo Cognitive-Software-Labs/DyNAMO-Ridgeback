@@ -276,6 +276,21 @@ Isaac and hardware depth over several ward runs, and check the parked reach agai
 ground truth over several ward runs; decide whether a view that still gives no
 heading after the step back needs a second viewpoint at another bearing.
 
+## G1-relative parking order under pose uncertainty
+
+**Gap.** Parking poses are ranked G1's right, left, front, rear, then diagonal
+([G1 heading](exploration/architecture.md#g1-heading)), with a fixed 15° heading
+margin. The heading estimator reports no per-estimate uncertainty, so the margin
+cannot follow a weaker or stronger estimate, and G1's position error, which also
+turns a pose's bearing, is not in it. The strict order is checked offline only: no
+simulator run has used it yet, and a right class larger than the route-check budget
+fails planning rather than falling to the left.
+
+**Completion criteria.** Run the order live in both simulators; decide whether the
+estimator should report an uncertainty (for example from the spread of the frames'
+headings) and whether the position error should widen the margin; measure how often
+the budget ends a search with a class incomplete.
+
 ## More than one G1 in a scene
 
 **Gap.** The detector reports every humanoid without an identity. Once a G1 is

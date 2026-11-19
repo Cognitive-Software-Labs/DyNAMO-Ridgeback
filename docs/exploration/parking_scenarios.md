@@ -108,8 +108,8 @@ front of a matching background still scores below 0.40 (see the
 Left and right are G1's, counter-clockwise and clockwise from the way it faces,
 as estimated from depth. The order, sectors and fallback without a heading are
 owned by the [G1 heading reference](architecture.md#g1-heading):
-left and right equally, then behind, then in front, then the rest, then a return
-to the start. Preference only orders safe candidates; it never relaxes a check.
+right, then left, then in front, then behind, then the rest, then a return to the
+start. Preference only orders safe candidates; it never relaxes a check.
 
 ## Robot height and the basket
 

@@ -28,13 +28,15 @@ def pose_xyyaw(pose):
 
 
 def candidate_groups(plan, approach, per_class=6):
-    """At most six spatially diverse geometrically valid goals per priority.
+    """Every geometrically valid goal, in batches of at most ``per_class``, class by class.
 
-    Use the existing reach/clearance tiers to order each class. Cover angular
-    sectors first with each sector's best-ranked candidate (the route is checked
-    via the pre-parking pose and a straight approach, so outer-reach poses gain
-    no turning room). Then fill spare slots in geometric order.
-    Exhaustion of this subset is not proof that the entire annulus is blocked.
+    Classes follow ``preference`` (with G1's heading: right, left, front, rear, other).
+    A class's first batch covers its angular sectors with each sector's best-ranked
+    candidate (the route is checked via the pre-parking pose and a straight approach,
+    so outer-reach poses gain no turning room), then fills spare slots in the
+    existing reach/clearance order; its later batches hold the rest in that order.
+    The caller moves to a lower class only after every batch of the higher one; how
+    far it got is ``route_search_summary``.
     """
     groups = []
     for rank in range(PREFERENCE_RANKS):
@@ -55,9 +57,41 @@ def candidate_groups(plan, approach, per_class=6):
             sectors.setdefault(math.floor(angle / (math.pi / 4)), []).append(c)
         chosen = [bucket[0] for bucket in sectors.values()][:per_class]
         chosen += [c for c in ordered if all(c is not a for a in chosen)][:per_class - len(chosen)]
-        if chosen:
-            groups.append(chosen)
+        rest = [c for c in ordered if all(c is not a for a in chosen)]
+        groups += [batch for batch in [chosen] + [rest[i:i + per_class]
+                                                  for i in range(0, len(rest), per_class)] if batch]
     return groups
+
+
+def route_search_summary(plan, approach):
+    """Per class, in checking order: its valid goals, how many routes were checked and
+    found feasible, and whether that settles the class.
+
+    ``feasible``: a route was found. ``none_feasible``: every valid goal was checked and
+    none had a safe route. ``incomplete``: checking stopped with goals unchecked, so the
+    class is not shown blocked. ``unchecked``: not reached.
+    """
+    classes = {}
+    for c in plan.candidates:
+        if c.status in ('valid', 'selected') or c.path_status != 'unchecked':
+            rank, label = preference(c.task_x, c.task_y, plan.target, approach)
+            entry = classes.setdefault(rank, {'class': label, 'valid': 0, 'checked': 0, 'feasible': 0})
+            entry['valid'] += 1
+            entry['checked'] += c.path_status != 'unchecked'
+            entry['feasible'] += c.path_status == 'valid'
+    summary = []
+    for rank in sorted(classes):
+        entry = classes[rank]
+        entry['outcome'] = ('feasible' if entry['feasible'] else 'unchecked' if not entry['checked']
+                            else 'none_feasible' if entry['checked'] == entry['valid'] else 'incomplete')
+        summary.append(entry)
+    return summary
+
+
+def describe_route_search(summary):
+    """One log line for ``route_search_summary``."""
+    return '; '.join(f"{e['class']} {e['outcome']} ({e['checked']}/{e['valid']} checked, "
+                     f"{e['feasible']} feasible)" for e in summary) or 'no valid goal'
 
 
 # NavFn starts a path at the robot's grid-snapped cell; poses this close are snapping.

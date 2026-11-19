@@ -701,7 +701,7 @@ def test_a_free_side_goes_straight_to_its_path_checks(manager_factory, monkeypat
     assert {m.parking_plan.target.facing_sectors_rad[0]} == {math.radians(45.0)}
     first = {preference(c.task_x, c.task_y, m.parking_plan.target, None)[1]
              for c in m._path_queue or m._path_groups[0]}
-    assert first == {'g1_left', 'g1_right'}
+    assert first == {'g1_right'}           # G1's right is checked first, before its left
 
 
 def test_unmapped_sides_are_explored_even_with_a_valid_rear(manager_factory, monkeypatch):
