@@ -145,14 +145,15 @@ version and measurements. Both pages show hospital-ward images only.
 
 ## Final results
 
-One run of each behaviour on the final mission code (`b519ab0`; the later commits
-`544ead1` and `0890e13` changed only comments and documentation), on 2026-11-17 and
-2026-11-18. Gazebo values are ground truth, used only for evaluation.
+Four runs on the final mission code (`b519ab0`; the later commits `544ead1`, `0890e13`
+and `2c6c5db` changed only comments, tools and documentation), on 2026-11-17 to
+2026-11-19. Gazebo values are ground truth, used only for evaluation.
 
 | Run | Outcome | Measurements |
 |---|---|---|
 | Gazebo `standard` (`gz_standard_final`) | `MISSION_COMPLETE` | attempt 1 at G1's right cancelled by the LiDAR check; parked on attempt 2 at G1's left (by ground truth 137 deg from G1's heading, behind its left hip); reach 0.509 m; G1 0.073-0.084 m and 2.1-6.2 deg off; basket 0.118 m from G1's lower body; waited 5 s; back 0.22 m from the start |
 | Isaac `standard` (`isaac_standard_run2`) | `MISSION_COMPLETE` | parked at G1's right on attempt 1, arrival error 0.020 m (mission estimate), waited 5 s, returned; Isaac records no ground truth |
+| Isaac `standard`, recorded on video (`final_demo_2026-11-19/isaac_standard`) | `MISSION_COMPLETE` | G1's heading was not estimated from its view, so poses were ranked by the approach side and the robot parked behind G1 on attempt 1 (bin about 0.46 m from G1's configured position by the mission's map pose; the scene expects G1's left or right); arrival error 0.028 m; waited 5 s; returned |
 | Gazebo `no_feasible` (`gz_no_feasible_final`) | `MISSION_FAILED`, `no_valid_candidate` (intended) | G1 0.152 m and 10.0 deg off; 0 of 258 poses valid; no attempt; nearest approach 0.67 m; back 0.35 m from the start |
 
 These are demonstrations, not reliability statistics. Five earlier ward runs on
@@ -160,20 +161,52 @@ earlier code exposed the problems addressed during validation, and one of them, 
 heading error below, is still open; the results page's development history and the
 dated record under archived evidence hold them.
 
-A stills storyboard of the final-code Gazebo runs (search, detection, localization,
-donut, the rejected attempt, parking, wait, return, refusal) is built by
-`tools/parking_scenarios/make_demo_storyboard.py` into `artifacts/exploration/final_demo_2026-11-19/`
-(`storyboard.mp4`, 10 stills of 4 s each: not real time). No final-code run was
-recorded as video. The complete video recordings are Isaac runs on earlier mission
-code in the same ward: `artifacts/exploration/p8_2026-11-14/isaac_standard/demo.mp4`
-(a vetoed attempt, then G1's left) and
-`artifacts/exploration/demo_2026-11-11/isaac_standard_run3/demo.mp4` (G1's right).
-Evidence and recordings are kept untracked under `artifacts/`, not in Git.
+## Demonstration video
+
+One continuous Isaac `standard` run on the final code, recorded on 2026-11-19, in
+`artifacts/exploration/final_demo_2026-11-19/isaac_standard/` (its `README.md` describes it):
+
+- `presentation.mp4` (2:59): for the supervisor. Search plays 4x faster and the return
+  2x faster; detection, localization, planning, the drive, parking and the five-second
+  wait play at the recorded speed. Every banner states its speed, and title cards
+  separate the stages.
+- `complete.mp4` (4:50): the whole recording at the recorded speed.
+
+Each frame shows two Isaac Sim cameras over the ward, the RViz window (map, state
+machine, parking donut, selected pose) and the mission time and state. Isaac Sim ran at
+about 0.39x real time, so the five simulated seconds of the wait take about 12 s of the
+recording. In this run G1's heading was not estimated, and the robot parked behind G1
+(see the results above).
+
+```bash
+xdg-open artifacts/exploration/final_demo_2026-11-19/isaac_standard/presentation.mp4
+```
+
+To record another run the same way (Isaac headless, compact RViz, one simulator on the
+host), then build both videos from it:
+
+```bash
+export RIDGEBACK_PERCEPTION_VENV=/path/to/perception_venv DISPLAY=:0
+bash tools/parking_scenarios/record_demo_run.sh isaac standard artifacts/exploration/NEW_DEMO
+python3 tools/parking_scenarios/make_demo_videos.py artifacts/exploration/NEW_DEMO
+```
+
+A stills storyboard of the final-code Gazebo runs, including the attempt the LiDAR
+check cancelled and the `no_feasible` refusal, is in `artifacts/exploration/final_demo_2026-11-19/`
+(`storyboard.mp4`, 10 stills of 4 s each, not real time;
+`tools/parking_scenarios/make_demo_storyboard.py`). Earlier complete videos ran older
+mission code: `artifacts/exploration/p8_2026-11-14/isaac_standard/demo.mp4` and
+`artifacts/exploration/demo_2026-11-11/isaac_standard_run3/demo.mp4`. Evidence and
+recordings are kept untracked under `artifacts/`, not in Git.
 
 ## Known limitations
 
-- **Few final-code runs.** One run per behaviour on the final code; no success rate
-  can be stated, and search time depends on the explorer's frontier order.
+- **Few final-code runs.** Four runs on the final code; no success rate can be stated,
+  and search time depends on the explorer's frontier order.
+- **Parking without G1's heading.** When G1's forearms are not seen reliably, the heading
+  is unknown and poses are ranked by the approach side instead of G1's sides; the
+  recorded Isaac run then parked behind G1, a valid pose but not the side the scene
+  prefers.
 - **Reach violation on earlier code.** A Gazebo `standard` run (`gz_standard_run2`,
   `f6ade2f`) completed with a reach of 0.607 m, outside 0.30-0.60 m: the localization
   and map-pose errors added to a plan of 0.517 m.

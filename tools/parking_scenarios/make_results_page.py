@@ -66,6 +66,8 @@ CODE = {'fe60a88': ('P7 scenarios', 'fe60a88 plus the changes committed as 28769
         '544ead1': ('Hospital ward validation', '544ead1 (the mission code of b519ab0; comments changed)',
                     '2026-11-18-parking-hospital-validation.md'),
         '0890e13': ('Hospital ward validation', '0890e13 (the mission code of b519ab0; documentation changed)',
+                    '2026-11-18-parking-hospital-validation.md'),
+        '2c6c5db': ('Hospital ward validation', '2c6c5db (the mission code of b519ab0; documentation changed)',
                     '2026-11-18-parking-hospital-validation.md')}
 # The 2026-11-17 trial: Gazebo in the hospital ward Isaac uses (parking_demo), same mission
 # code as the post-merge runs. Gazebo kept the warehouse after it until the validation below.
@@ -75,8 +77,8 @@ POST_MERGE = ('64b3176', 'c1435d9', '99387ae', '5b5133c')
 # The hospital-ward validation of 2026-11-17/18, both simulators in the ward: the set every
 # overview number on the page is computed from. Its runs span the localization fixes; the
 # final mission code is b519ab0's (544ead1 and 0890e13 changed comments and documentation).
-FINAL_SET = ('9400c10', 'f568789', 'f6ade2f', 'b519ab0', '544ead1', '0890e13')
-FINAL_CODE = ('b519ab0', '544ead1', '0890e13')
+FINAL_SET = ('9400c10', 'f568789', 'f6ade2f', 'b519ab0', '544ead1', '0890e13', '2c6c5db')
+FINAL_CODE = ('b519ab0', '544ead1', '0890e13', '2c6c5db')
 # Runs that need a cause the log alone does not give, by evidence folder.
 CAUSES = {
     'artifacts/exploration/hospital_2026-11-18/gz_standard':
@@ -92,6 +94,11 @@ CAUSES = {
         'estimate, and the 0.053 m localization error and the robot\'s map-pose error added the rest. G1\'s '
         'heading was estimated 65 deg off from a 0.68 m view (unexplained; not reproduced), so the bin stood '
         'behind G1\'s right shoulder rather than at its front right.',
+    'artifacts/exploration/final_demo_2026-11-19/isaac_standard/run':
+        'The recorded demonstration run (complete.mp4 and presentation.mp4 beside it). G1\'s heading was not '
+        'estimated from this view (no reliable forearm view), so parking poses were ranked by the approach side, '
+        'not by G1\'s sides: the robot parked behind G1, the bin about 0.46 m from G1\'s configured position by '
+        'the mission\'s own map pose. The standard scene expects G1\'s left or right.',
     'artifacts/exploration/hospital_2026-11-18/isaac_standard':
         'The head region measured the south wall behind G1, and the position re-seeded onto the wall was '
         'refused five times until the localization deadline. The surface fallback (b519ab0) keeps the '
@@ -442,7 +449,8 @@ def steps(r):
     vetoes = {n: reason.split(':')[-1].strip() for _, n, reason in r['vetoes']}
     out = []
     for n in range(1, (m.get('attempts') or 0) + 1):
-        side = side_name(sides[n - 1]) if n <= len(sides) else 'next side'
+        side = (side_name(sides[n - 1]) if n <= len(sides) else
+                'side not classified (G1 heading unknown)' if not sides else 'next side')
         if n in vetoes:
             out.append(('fail', '✗', f'Attempt {n}: {side}', 'rejected: ' + VETO_SHORT.get(vetoes[n], vetoes[n])))
         elif m['outcome'] == 'MISSION_COMPLETE':
@@ -710,8 +718,10 @@ DEV_IMAGES = {
 def demonstration_card(r):
     m = r['m']
     cls, _, category = classify(r)
-    if category == 'Complete':
+    if category == 'Complete' and m.get('selected_sides'):
         value = f'Parked at {side_name(m["selected_sides"][-1])}'
+    elif category == 'Complete':
+        value = 'Parked behind G1' if r['cause'] and 'behind G1' in r['cause'] else 'Parked'
     elif category == 'Safe refusal':
         value = 'Refused safely'
     else:
@@ -736,6 +746,8 @@ def demonstration_card(r):
         facts.append(f'{m["final_distance_from_start_m"]:.2f} m from the start')
     if m['simulator'] != 'gz':
         facts.append('no ground truth in Isaac')
+    if r['cause'] and r['m']['commit'] in FINAL_CODE:
+        facts.append(esc(r['cause']))
     sim = 'Gazebo' if m['simulator'] == 'gz' else 'Isaac Sim'
     return (f'<div class="kpi {cls}"><div class="v demo">{esc(value)}</div>'
             f'<div class="l">{sim} · {esc(m["scenario"])}</div>'
@@ -786,9 +798,9 @@ def overview(final, scenario_count):
     demos = [r for r in final if r['m']['commit'] in FINAL_CODE]
     earlier = [r for r in final if r not in demos]
     order = {'standard': 0, 'no_feasible': 1}
-    demos.sort(key=lambda r: (order.get(r['m']['scenario'], 2), r['m']['simulator'] != 'gz'))
+    demos.sort(key=lambda r: (order.get(r['m']['scenario'], 2), r['m']['simulator'] != 'gz', r['start']))
     return (f'<section id="overview"><h2>Final implementation: demonstrated behaviours</h2>'
-            f'<p class="caveat"><b>Demonstrations, not reliability statistics.</b> One run of each behaviour in the '
+            f'<p class="caveat"><b>Demonstrations, not reliability statistics.</b> {len(demos)} runs in the '
             f'hospital ward on the final mission code ({FINAL_CODE[0]}; {", ".join(FINAL_CODE[1:])} changed only '
             f'comments and documentation). Each shows that the behaviour happens, not how often: no success rate is '
             f'computed from these {len(demos)} runs. Gazebo measurements are ground truth used only for evaluation; '
@@ -876,7 +888,7 @@ def kpis(r, key):
                 'expected: a refusal without an attempt' if m['scenario'] == 'no_feasible' else '')
     items = [('Outcome', f'<code>{esc(m["outcome"])}</code>', expected)]
     if m['outcome'] == 'MISSION_COMPLETE':
-        items.append(('Parked', esc(side_name(sides[-1])), ''))
+        items.append(('Parked', esc(side_name(sides[-1])) if sides else 'yes', '' if sides else 'side not classified'))
     else:
         items.append(('Parked', 'no', 'no safe pose' if candidates(r) and not m.get('attempts') else ''))
     items.append(('Parking attempts', str(m.get('attempts') or 0),
@@ -1178,7 +1190,7 @@ RESULTS_CSS = """
          border-radius: 10px; padding: 1rem 1.2rem 1.1rem; }
   .kpi.ok { border-top-color: var(--done); } .kpi.safe { border-top-color: var(--safe-c); }
   .kpi.bad { border-top-color: var(--fail); } .kpi.neutral { border-top-color: var(--now); }
-  .kpis-main.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .kpis-main.three { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .kpi .v.demo { font-size: 1.55rem; }
   details.dev { margin-top: 1.2rem; }
   .devtable td { font-size: .86rem; vertical-align: top; }

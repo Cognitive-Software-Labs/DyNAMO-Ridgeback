@@ -59,3 +59,4 @@ artifacts/exploration/hospital_2026-11-18/isaac_standard
 artifacts/exploration/hospital_2026-11-18/isaac_standard_run2
 artifacts/exploration/hospital_2026-11-18/gz_standard_final
 artifacts/exploration/hospital_2026-11-18/gz_no_feasible_final
+artifacts/exploration/final_demo_2026-11-19/isaac_standard/run

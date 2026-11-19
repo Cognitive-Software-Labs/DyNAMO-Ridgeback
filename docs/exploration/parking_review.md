@@ -65,6 +65,7 @@ estimated):
 |---|---|---|
 | `standard` | Gazebo | `MISSION_COMPLETE` on the final code: G1 0.073-0.084 m and 2-6 deg off; G1's right vetoed by the LiDAR check; parked behind G1's left hip on attempt 2 (reach 0.509 m, basket 0.118 m from G1's lower body), waited, returned |
 | `standard` | Isaac | `MISSION_COMPLETE` on the final code: parked at G1's right on attempt 1, waited, returned |
+| `standard` | Isaac (recorded video) | `MISSION_COMPLETE` on the final code: G1's heading not estimated, so poses were ranked by the approach side; parked behind G1 on attempt 1, waited, returned |
 | `no_feasible` | Gazebo | `MISSION_FAILED` as intended on the final code: G1 0.152 m and 10 deg off, none of 258 poses fit, no attempt, returned (also on the code before the surface fallback: G1 0.125 m off, none of 255) |
 
 An earlier Gazebo `standard` completion in the ward, before the surface fallback,
@@ -80,10 +81,11 @@ right, five-second wait, return): `artifacts/exploration/demo_2026-11-11/isaac_s
 kept outside the repository; `artifacts/exploration/p8_2026-11-14/isaac_standard/demo.mp4`
 records the merged code's Isaac run (a vetoed attempt, then G1's left).
 `tools/parking_scenarios/record_demo_run.sh isaac standard OUT_DIR` records another.
-Both videos ran earlier mission code; no final-code run was recorded as video. A stills
-storyboard of the final-code Gazebo runs (`make_demo_storyboard.py`, in
-`artifacts/exploration/final_demo_2026-11-19/`) shows each stage from those runs'
-captures, 4 s per still, not real time.
+Both videos ran earlier mission code. The final code's video is
+`artifacts/exploration/final_demo_2026-11-19/isaac_standard/` (`presentation.mp4`, 2:59,
+search and return shown faster; `complete.mp4`, 4:50; see the
+[handover](parking_handover.md#demonstration-video)). A stills storyboard of the
+final-code Gazebo runs (`make_demo_storyboard.py`) is beside it, 4 s per still, not real time.
 
 ## Known limitations
 
