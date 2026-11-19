@@ -454,6 +454,7 @@ in the reference that owns the fact or moved to the item that owns the work.
 - [Gazebo parking in the hospital ward](../archive/engineering/2026-11-17-parking-gazebo-hospital-ward.md) — the first Gazebo trial in the ward and its 0.57 m mislocalization in `no_feasible`.
 - [Parking in the hospital ward](../archive/engineering/2026-11-18-parking-hospital-validation.md) — why the head region measured a panel or wall, the height check and surface fallback, the bed strip that wedged the robot, and the ward runs in both simulators.
 - [G1 heading quality gate and step back](../archive/engineering/2026-11-19-parking-g1-reobservation.md) — why close views give no heading, the gate's limits, and three live runs on `a162527` (the step back not yet triggered live; the 2026-11-19 Gazebo plan invalidation)
+- [G1-relative parking order](../archive/engineering/2026-11-19-parking-g1-relative-order.md) — offline replay of the strict order on the ward maps; the batches and budget unexercised there
 - [LiDAR/closed-loop SLAM qualification](../archive/engineering/2026-09-17-isaac-lidar-qualification.md)
 - [paired results and interpretation](../archive/engineering/2026-09-17-isaac-lidar-qualification.md#interpretation)
 - [Isaac port history](../archive/engineering/port-history.md#lidars-detached-from-the-articulation-2026-09-11)
