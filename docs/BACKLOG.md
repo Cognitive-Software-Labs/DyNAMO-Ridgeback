@@ -322,7 +322,9 @@ retry and no return to the start. With G1 at a distant workstation the route
 checks are long (10.5 m); most likely the manager's callbacks back up behind them and an
 odometry message can be handled before the clock catches up. The robot stops
 safely at its observation pose. The 2026-11-05 workstation-scenes record under
-archived evidence holds the run.
+archived evidence holds the run. It recurred in a Gazebo ward run on 2026-11-19
+(`motion_evidence_lost: collecting_stationary_interval`, after two such stamps
+restarted the stationary interval); the G1 re-observation record holds that run.
 
 The same blocking checks made a verified plan's G1 estimate older than its 5 s
 limit before driving on 2026-11-09 (`target_stale`); while the robot stands still
@@ -436,6 +438,7 @@ in the reference that owns the fact or moved to the item that owns the work.
 - [Parking workstation scenes](../archive/engineering/2026-11-05-parking-workstation-scenes.md) — G1 out of the robot's sight at a worktable, the presentation captures and pages, and the planning failure after a delayed odometry stamp.
 - [Gazebo parking in the hospital ward](../archive/engineering/2026-11-17-parking-gazebo-hospital-ward.md) — the first Gazebo trial in the ward and its 0.57 m mislocalization in `no_feasible`.
 - [Parking in the hospital ward](../archive/engineering/2026-11-18-parking-hospital-validation.md) — why the head region measured a panel or wall, the height check and surface fallback, the bed strip that wedged the robot, and the ward runs in both simulators.
+- [G1 heading quality gate and step back](../archive/engineering/2026-11-19-parking-g1-reobservation.md) — why close views give no heading, the gate's limits, and three live runs on `a162527` (the step back not yet triggered live; the 2026-11-19 Gazebo plan invalidation)
 - [LiDAR/closed-loop SLAM qualification](../archive/engineering/2026-09-17-isaac-lidar-qualification.md)
 - [paired results and interpretation](../archive/engineering/2026-09-17-isaac-lidar-qualification.md#interpretation)
 - [Isaac port history](../archive/engineering/port-history.md#lidars-detached-from-the-articulation-2026-09-11)

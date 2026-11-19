@@ -209,7 +209,8 @@ recordings are kept untracked under `artifacts/`, not in Git.
   prefers. That run saw G1 from 0.76-0.86 m, where its lower legs are out of the
   image; since 2026-11-19 such a view triggers one LiDAR-checked step back to about
   1.6 m before planning ([observation return](architecture.md#observation-return)).
-  If the new view still gives no heading, the ranking stays undirected.
+  If the new view still gives no heading, the ranking stays undirected. The step back
+  is covered by automated tests only: no simulator run has triggered it yet.
 - **Reach violation on earlier code.** A Gazebo `standard` run (`gz_standard_run2`,
   `f6ade2f`) completed with a reach of 0.607 m, outside 0.30-0.60 m: the localization
   and map-pose errors added to a plan of 0.517 m.
