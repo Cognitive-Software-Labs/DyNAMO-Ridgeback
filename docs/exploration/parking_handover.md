@@ -206,13 +206,18 @@ recordings are kept untracked under `artifacts/`, not in Git.
 - **Parking without G1's heading.** When G1's forearms are not seen reliably, the heading
   is unknown and poses are ranked by the approach side instead of G1's sides; the
   recorded Isaac run then parked behind G1, a valid pose but not the side the scene
-  prefers.
+  prefers. That run saw G1 from 0.76-0.86 m, where its lower legs are out of the
+  image; since 2026-11-19 such a view triggers one LiDAR-checked step back to about
+  1.6 m before planning ([observation return](architecture.md#observation-return)).
+  If the new view still gives no heading, the ranking stays undirected.
 - **Reach violation on earlier code.** A Gazebo `standard` run (`gz_standard_run2`,
   `f6ade2f`) completed with a reach of 0.607 m, outside 0.30-0.60 m: the localization
   and map-pose errors added to a plan of 0.517 m.
 - **Heading error.** That run estimated G1's heading 65 degrees off from a 0.68 m view.
   It was not reproduced or explained; the final Gazebo runs' headings were within
-  10 degrees, which does not show it cannot recur.
+  10 degrees. Since 2026-11-19 a view that close is refused by the heading quality
+  gate ([G1 heading](architecture.md#g1-heading)), which bounds this case but does not
+  explain the wrong fit.
 - **Viewpoint-dependent localization.** Gazebo's G1 error in the ward was 0.05-0.15 m
   (0.015-0.041 m in the warehouse); the head region can measure what stands behind a
   partly hidden or obliquely seen G1, and the fallback then depends on the legs.

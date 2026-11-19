@@ -27,6 +27,7 @@ from sensor_msgs.msg import Image
 
 from ridgeback_autonomy.mission import target_orientation as to
 from ridgeback_autonomy.mission.mission_manager_node import MissionState
+from ridgeback_autonomy.mission.parking_clearance import ClearanceResult
 from ridgeback_autonomy.mission.target_localization import StabilizedTargetPosition
 from test_mission_manager import (  # noqa: F401 (fixture)
     FakePauseClient, enter_localization, localize, manager_factory, trigger_response,
@@ -483,6 +484,10 @@ def test_g1_localized_from_inside_its_keep_out_steps_back_before_planning(manage
     enter_localization(m2)
     m2._step_back_goal = lambda robot, view, target, rng, max_step_m=1.0: (0.0, 2.0, 0.25)
     m2._camera_view = lambda: (1.27, 2.07, 0.25)
+    # The step's route is free in the map and both LiDARs show nothing on it (checked in
+    # test_g1_reobservation): only the keep-out trigger is under test here.
+    m2._step_back_route_problem = lambda route, target, gap: None
+    m2._lidar_clearance = lambda route_from, g1, gap: ClearanceResult(None)
     from test_mission_manager import detection, measurement
     for offset in range(5):                      # G1 0.2 m ahead of the front: inside the keep-out
         stamp_ns = 4_000_000_000 + offset

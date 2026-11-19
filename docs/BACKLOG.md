@@ -263,14 +263,18 @@ heading 65 degrees off from a view 0.68 m from G1 (14589 points on the forearm
 band, against 41-506 elsewhere), which moved the parked bin behind G1 and the
 reach to 0.607 m, and two reproductions near that pose gave no heading. The
 2026-11-17 and 2026-11-18 hospital records under archived evidence hold the runs.
+Since 2026-11-19 a heading is accepted only from a view that shows G1's lower legs,
+so such a close view now gives no heading, and the mission steps back once to look
+again ([G1 heading](exploration/architecture.md#g1-heading)). Why that fit went 65
+degrees wrong is still unexplained; the gate refuses the view, not the fit.
 
 **Completion criteria.** Measure detection over G1 headings, backgrounds and a
 humanoid distractor in both simulators; qualify the head, torso and height checks
 on Isaac and hardware depth (the real D455 is noisier beyond 4 m, where Gazebo G1s
-were localized from up to 10 m); explain or bound the close-view heading error,
-for example by refusing a forearm fit with implausibly many points, and check the
-parked reach against ground truth over several ward runs; decide whether a static
-view that still fails needs a second viewpoint.
+were localized from up to 10 m); qualify the heading quality gate and the step back on
+Isaac and hardware depth over several ward runs, and check the parked reach against
+ground truth over several ward runs; decide whether a view that still gives no
+heading after the step back needs a second viewpoint at another bearing.
 
 ## More than one G1 in a scene
 

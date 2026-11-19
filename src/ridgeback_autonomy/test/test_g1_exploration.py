@@ -650,7 +650,9 @@ from sensor_msgs.msg import Image
 
 from ridgeback_autonomy.mission import mission_manager_node as manager_module
 from ridgeback_autonomy.mission.parking_planner import preference
-from ridgeback_autonomy.mission.target_orientation import OrientationEstimate
+from ridgeback_autonomy.mission.target_orientation import (
+    HEADING_ESTIMATED, HEADING_INSUFFICIENT_EVIDENCE, HeadingAssessment, OrientationEstimate,
+)
 
 WEST = math.pi
 NOTHING = lambda d, a: np.zeros_like(d, dtype=bool)
@@ -661,10 +663,12 @@ def depth_frame():
 
 
 def seeing(monkeypatch, yaws):
-    """Localization frames whose per-frame estimates are ``yaws`` (None: no heading in it)."""
+    """Localization frames whose per-frame estimates are ``yaws`` (None: no heading in it),
+    each from a view that passes the heading quality gate."""
     estimates = iter(yaws)
-    monkeypatch.setattr(manager_module, 'estimate_target_yaw', lambda points, center: (
-        lambda yaw: None if yaw is None else OrientationEstimate(yaw, 200, 0.95))(next(estimates)))
+    monkeypatch.setattr(manager_module, 'assess_heading', lambda points, center, lowest: (
+        lambda yaw: HeadingAssessment(None, HEADING_INSUFFICIENT_EVIDENCE) if yaw is None
+        else HeadingAssessment(OrientationEstimate(yaw, 200, 0.95), HEADING_ESTIMATED))(next(estimates)))
 
     def prepare(m):
         m._camera_to_map = lambda: (np.eye(3), np.zeros(3))

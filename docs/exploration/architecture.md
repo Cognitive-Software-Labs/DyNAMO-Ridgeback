@@ -191,6 +191,32 @@ positions, the mean error against ground truth was 6.7° (maximum 12.9°), and i
 also held with a table next to or across G1's front. The cue is specific to this
 forearms-forward posture, and it is unqualified on Isaac and on hardware.
 
+The bars are fitted around the middle of G1's legs, so a heading is accepted only
+from a view that shows the lower legs (the quality gate in `target_orientation.py`).
+The camera's lowest image row must reach 0.30 m above the floor at G1's nearest leg
+surface, 0.15 m from its axis. That is computed from the camera pose and
+intrinsics, not a fixed range: for the level camera 1.03 m up with a 32° vertical
+half view, it means about 1.3 m from G1. Depth must also show at least 50 leg
+points, the body axis's minimum, reaching down to 0.35 m.
+Closer than that, the legs leave the image, and a fit can be centred on a sliver of
+the far leg. Every recorded view from 0.6-0.9 m gave either no heading or, once, a
+heading 65° off, which had the most supporting points of any recorded view. The
+number of supporting points is therefore not used as a confidence measure. Every
+recorded view that gave a heading cleared both limits by a wide margin.
+The result carries a status, published in the mission state as `g1_heading_quality`:
+
+| Status | Meaning |
+|---|---|
+| `estimated` | heading accepted |
+| `view_too_close` | geometry: the lower legs are out of the image |
+| `insufficient_lower_body` | the legs are in view but hidden, for example by a bed or panel |
+| `insufficient_heading_evidence` | legs seen, no reliable forearm fit |
+| `inconsistent_observations` | the frames disagree |
+| `view_geometry_unavailable` | no camera pose or intrinsics |
+
+Without a heading, no parking pose is labelled as G1's right or left. A view that
+is too close is observed again from farther away ([observation return](#observation-return)).
+
 The same frames give G1's body axis (`estimate_body_axis`): the middle of the
 legs' extent, plus 0.03 m along the view for the legs' hidden far side. It
 replaces the position estimate when at least 3 frames agree within 0.03 m and it
@@ -367,11 +393,44 @@ but the position check uses its head and torso: G1 was localized from 1.35 m on
 steps straight back, less than 1 m, to put the camera 1.5 m from G1, when that
 footprint is free in the map; Nav2 plans that route. On 2026-11-09 a robot 1.2-1.3 m
 from G1 after a vetoed attempt instead drove toward an observation pose 4.3 m away,
-and the controller stalled 1 m short of it until the 90 s deadline. The same step
-back, up to 1.5 m, runs once before planning when G1 is localized while the robot
-stands inside G1's keep-out plus the planner's clearance: every route from there
-starts in the protected region (`path_g1_keepout`), as on 2026-11-11 when a search
-ended with the camera 0.4 m from G1. Otherwise, and
+and the controller stalled 1 m short of it until the 90 s deadline.
+
+A step back of up to `g1_reobservation_max_step_m` (1.5 m) also runs once per
+mission before planning, in two cases:
+
+- **Inside the keep-out:** G1 is localized while the robot stands inside G1's
+  keep-out plus the planner's clearance. Every route from there starts in the
+  protected region (`path_g1_keepout`), as on 2026-11-11 when a search ended with
+  the camera 0.4 m from G1. The camera is put 1.5 m from G1.
+- **Heading unknown from too close:** G1's heading is unknown from a view whose
+  camera is closer than `g1_reobservation_trigger_range_m` (1.5 m). G1's lower
+  legs were then probably out of the image ([G1 heading](#g1-heading)), which also
+  biases its position toward the far leg. The camera is put
+  `g1_reobservation_camera_range_m` (1.6 m) from G1, and G1 is localized again:
+  position, depth check and heading.
+
+The step lies on G1's line through the robot and faces G1. Before it starts:
+
+- the step's pose and its swept straight route, basket included, must be free in
+  the planning map;
+- the route must never come nearer G1 than the robot already stands;
+- fresh scans and odometry must show nothing in the stopping path or on the route.
+
+Otherwise nothing moves and planning starts from where the robot stands.
+
+While it drives, both LiDARs check it on every scan and on the 5 Hz steady-clock
+tick with the parking legs' check: stopping path with margin, remaining straight
+route, and G1's gap. Nav2's own obstacle handling and the collision monitor stay
+active as for every goal.
+
+The step ends early on a veto, a stale or missing scan, a Nav2 abort, or the
+`g1_reobservation_timeout_s` (60 s) deadline. After Nav2 releases the goal and the
+robot is seen stopped, G1 is localized from wherever the robot stopped. No
+confirmed stop fails the mission. The step is never repeated, and if the new view
+still gives no heading the ranking stays undirected. The outcome, with G1's
+position and heading status before and after, is published as `g1_reobservation`.
+
+Apart from that step back, and
 once if the turn, the step back, its view check or the localization fails, it
 returns to the observation pose: the latest pose from which G1 was
 localized and verified, where the detector has already found it. (The first

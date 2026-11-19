@@ -69,10 +69,11 @@ from ridgeback_autonomy.mission.target_localization import (
     TargetLocalizationAdapter,
 )
 from ridgeback_autonomy.mission.target_orientation import (
-    ABOVE_G1_HEIGHT_M, box_pixels, combined_axis, combined_estimate, combined_head, depth_metres,
-    depth_to_map_points, estimate_body_axis, G1_BODY_RADIUS_M, estimate_target_yaw, head_axis,
-    head_observation, occupied_cells, overhead_obstacle_points, points_above_g1, surface_is_g1,
-    surface_offset_from_head, taller_than_g1, torso_confirmed, torso_points,
+    ABOVE_G1_HEIGHT_M, assess_heading, box_pixels, combined_axis, combined_head, combined_heading,
+    depth_metres, depth_to_map_points, estimate_body_axis, G1_BODY_RADIUS_M, head_axis,
+    head_observation, lowest_visible_height, occupied_cells, overhead_obstacle_points,
+    points_above_g1, surface_is_g1, surface_offset_from_head, taller_than_g1, torso_confirmed,
+    torso_points,
 )
 from ridgeback_autonomy.mission.parking_planner import (
     GridSnapshot,
@@ -101,8 +102,8 @@ from ridgeback_autonomy.mission.parking_clearance import (
     ClearanceLimits, ClearanceResult, clearance_reason, scan_points,
 )
 from ridgeback_autonomy.mission.parking_feasibility import (
-    PlanningSnapshot, candidate_groups, driven_poses, path_rejection, path_length, pose_xyyaw,
-    select_path_candidate,
+    PlanningSnapshot, _start_footprint_known, candidate_groups, driven_poses, path_rejection,
+    path_length, pose_xyyaw, select_path_candidate,
 )
 from ridgeback_autonomy.mission.parking_execution import (
     ExecutionContext, ExecutionLimits, ExecutionState, ParkingExecutor,
@@ -154,6 +155,9 @@ _PARKING_DRIVE_STATES = (
 
 # Drift allowed after Nav2 stops inside the observation goal checker (m, rad).
 _OBSERVATION_STOP_ALLOWANCE = (0.01, 0.02)
+
+# Localization noise allowed on G1's gap when a step back may not bring the robot nearer G1.
+_STEP_BACK_GAP_TOLERANCE_M = 0.02
 
 # Planning failures that more mapping around G1 can resolve.
 _EXPLORABLE_PLANNING_FAILURES = ('no_free_donut_cells', 'no_valid_candidate',
@@ -354,6 +358,15 @@ class MissionManagerNode(Node):
         # localized from 1.35 m (2026-11-09) and not detected at 1.01 m (2026-10-30).
         self.declare_parameter('g1_reacquire_min_range_m', 1.3)
         self.declare_parameter('g1_reacquire_max_range_m', 3.5)
+        # One step back from G1 before planning when its heading is unknown from a view
+        # whose camera is closer than the trigger range: G1's lower legs are then out of the
+        # image (target_orientation's quality gate). The step puts the camera at the target
+        # range, at most max_step from where the robot stands; the timeout bounds the move.
+        self.declare_parameter('g1_reobservation_enabled', True)
+        self.declare_parameter('g1_reobservation_trigger_range_m', 1.5)
+        self.declare_parameter('g1_reobservation_camera_range_m', 1.6)
+        self.declare_parameter('g1_reobservation_max_step_m', 1.5)
+        self.declare_parameter('g1_reobservation_timeout_s', 60.0)
         self.declare_parameter('g1_exploration_protected_margin_m', 0.15)
         # G1's heading from the depth frames of each stationary localization; it only
         # orders parking candidates. Off, or without a reliable heading, ranking is undirected.
@@ -610,6 +623,15 @@ class MissionManagerNode(Node):
         self.g1_reacquire_range_m = (
             float(self.get_parameter('g1_reacquire_min_range_m').value),
             float(self.get_parameter('g1_reacquire_max_range_m').value))
+        self.g1_reobservation_enabled = bool(self.get_parameter('g1_reobservation_enabled').value)
+        for name in ('g1_reobservation_trigger_range_m', 'g1_reobservation_camera_range_m',
+                     'g1_reobservation_max_step_m', 'g1_reobservation_timeout_s'):
+            value = float(self.get_parameter(name).value)
+            if not math.isfinite(value) or value <= 0.0:
+                raise ValueError(f'{name} must be finite and positive')
+            setattr(self, name, value)
+        if self.g1_reobservation_camera_range_m < self.g1_reobservation_trigger_range_m:
+            raise ValueError('g1_reobservation_camera_range_m must not be below the trigger range')
         self.facing_sectors_rad = tuple(math.radians(float(self.get_parameter(name).value)) for name in (
             'parking_side_sector_half_deg', 'parking_rear_sector_half_deg',
             'parking_front_sector_half_deg'))
@@ -636,7 +658,8 @@ class MissionManagerNode(Node):
         self._depth_frames = deque(
             maxlen=int(self.get_parameter('target_orientation_frames').value))
         self._camera_intrinsics = None
-        if bool(self.get_parameter('target_orientation_enabled').value):
+        self.target_orientation_enabled = bool(self.get_parameter('target_orientation_enabled').value)
+        if self.target_orientation_enabled:
             self.create_subscription(Image, str(self.get_parameter('target_depth_topic').value),
                                      self._on_depth, qos_profile_sensor_data)
             self.create_subscription(CameraInfo,
@@ -665,6 +688,14 @@ class MissionManagerNode(Node):
             float(self.get_parameter('first_view_turn_min_deg').value))
         self._confirmed_ray = None
         self._planning_step_back_done = False
+        # The step back before planning: its checked straight route (LiDAR-watched while
+        # set), the G1 gap it must keep, whether it is stopping after ending early, and
+        # what it found (published in the mission state).
+        self._step_back_route = None
+        self._step_back_g1_gap_m = None
+        self._step_back_stopping = False
+        self.g1_reobservation = None
+        self.target_heading_quality = None
         self._g1_exploration_deadline_s = None
         self._g1_explorer_resumed = False
         self._g1_frontiers_exhausted = False
@@ -869,6 +900,13 @@ class MissionManagerNode(Node):
                 return
             if self.state == MissionState.RETURNING_TO_OBSERVATION and self._retry_after_stop:
                 self._poll_retry_stop(now_s)
+                return
+            if self.state == MissionState.RETURNING_TO_OBSERVATION and self._step_back_stopping:
+                self._poll_step_back_stop(now_s)
+                return
+            # The steady-clock tick keeps the step back's LiDAR check running if scans stop.
+            if (self.state == MissionState.RETURNING_TO_OBSERVATION
+                    and self._step_back_route is not None and self._check_step_back_clearance()):
                 return
             if self.state == MissionState.RETURNING_TO_OBSERVATION:
                 if self._nav_deadline_s is not None and now_s >= self._nav_deadline_s:
@@ -1267,6 +1305,9 @@ class MissionManagerNode(Node):
             self.confirmed_detection = None
             self._confirmed_ray = None
             self._planning_step_back_done = False
+            self._step_back_route = self._step_back_g1_gap_m = None
+            self._step_back_stopping = False
+            self.g1_reobservation = self.target_heading_quality = None
             self.target_committed = False
             self.target_position = None
             self.approach_pose = None
@@ -1608,10 +1649,20 @@ class MissionManagerNode(Node):
         return (robot[0], robot[1], yaw), f'turning toward G1 in place ({distance:.2f} m away)'
 
     def _step_back_before_planning(self):
-        """Once per localization cycle: when the robot stands inside G1's keep-out plus the
-        planner's clearance, step straight back and relocalize before planning; every route
-        from there is rejected (path_g1_keepout), as on 2026-11-11 when the search ended
-        with the camera 0.4 m from G1. True when the step back was started."""
+        """Once per localization cycle, step straight back from G1 and relocalize before planning:
+
+        * when the robot stands inside G1's keep-out plus the planner's clearance: every route
+          from there is rejected (path_g1_keepout), as on 2026-11-11 when the search ended with
+          the camera 0.4 m from G1;
+        * when G1's heading is unknown from a view closer than the re-observation trigger
+          range: G1's lower legs were out of the image, as in the final Isaac demonstration
+          of 2026-11-19 (0.86 m), which also biases G1's position toward its far leg.
+
+        One attempt per cycle, whatever its outcome. The robot moves only when the step's pose
+        and its straight route are free in the planning map, never nearer G1 than it stands,
+        and fresh scans and odometry show nothing on that route; both LiDARs then watch the
+        move as they watch the parking legs (_check_step_back_clearance). Anything else plans
+        from where the robot stands, as before. True when the step back was started."""
         if self._planning_step_back_done:
             return False
         robot, view, target = self._current_robot_pose(), self._camera_view(), self.target_position
@@ -1622,20 +1673,146 @@ class MissionManagerNode(Node):
         reference = TargetReference(
             x=target.map_x_m, y=target.map_y_m, frame_id=self.map_frame, stamp_ns=target.last_stamp_ns,
             reference=target.reference, is_foot_midpoint=target.is_foot_midpoint, source=target.source)
-        limit = keepout_radius_m(reference, self.planner_config) + self.planner_config.min_obstacle_clearance_m
-        if gap >= limit:
+        keepout = keepout_radius_m(reference, self.planner_config)
+        camera_range = math.hypot(target.map_x_m - view[0], target.map_y_m - view[1])
+        status = None if self.target_heading_quality is None else self.target_heading_quality.status
+        if gap < keepout + self.planner_config.min_obstacle_clearance_m:
+            trigger, purpose = f'G1 localized {gap:.2f} m from the robot, inside its keep-out', 'plan'
+            camera_goal = self.g1_reacquire_range_m[0] + 0.2
+        elif (self.g1_reobservation_enabled and self.target_orientation_enabled
+              and self.target_heading is None and camera_range < self.g1_reobservation_trigger_range_m):
+            trigger = f'G1 heading unknown ({status}) from {camera_range:.2f} m'
+            purpose, camera_goal = 'observe G1 again', self.g1_reobservation_camera_range_m
+        else:
             return False
-        goal = self._step_back_goal(robot, view, target, self.g1_reacquire_range_m[0] + 0.2,
-                                    max_step_m=1.5)
-        if goal is None:
-            return False          # plan from here; the route checks refuse it if unsafe
         self._planning_step_back_done = True
+        self.g1_reobservation = {
+            'trigger': trigger, 'started': False, 'outcome': None,
+            'camera_range_before_m': round(camera_range, 2), 'heading_status_before': status,
+            'position_before': [round(target.map_x_m, 3), round(target.map_y_m, 3)]}
+        # Never nearer G1 than now (a robot already inside the keep-out may only leave it).
+        route_gap = min(keepout, gap - _STEP_BACK_GAP_TOLERANCE_M)
+        live_gap = min(keepout - self.final_xy_tolerance_m, gap - _STEP_BACK_GAP_TOLERANCE_M)
+        goal = self._step_back_goal(robot, view, target, camera_goal,
+                                    max_step_m=self.g1_reobservation_max_step_m)
+        route = None if goal is None else self._straight_step(robot, goal)
+        if goal is None:
+            problem = (f'no free pose {camera_goal:.1f} m from G1 on its line through the robot '
+                       f'within {self.g1_reobservation_max_step_m:.1f} m')
+        else:
+            problem = self._step_back_route_problem(route, target, route_gap)
+        if problem is None:
+            # Fresh scans and odometry, and nothing on the route now; else no move at all.
+            check = self._lidar_clearance(lambda _robot: route, (target.map_x_m, target.map_y_m), live_gap)
+            reason = check.reason if isinstance(check, ClearanceResult) else check
+            problem = None if reason is None else f'lidar_clearance: {reason}'
+        if problem is not None:
+            self.g1_reobservation['outcome'] = f'not started: {problem}'
+            self.get_logger().warning(f'{trigger}; no step back ({problem}); planning from here')
+            self._publish_state(f'step back not started: {problem}', event='g1_reobservation')
+            return False
+        self.g1_reobservation['started'] = True
+        self._step_back_route, self._step_back_g1_gap_m = route, live_gap
         self._observation_goal, self._observation_fallback = goal, False
         if self._transition(MissionState.RETURNING_TO_OBSERVATION,
-                            f'G1 localized {gap:.2f} m from the robot, inside its keep-out; stepping '
-                            f'{math.hypot(goal[0] - robot[0], goal[1] - robot[1]):.2f} m back to plan'):
+                            f'{trigger}; stepping {math.hypot(goal[0] - robot[0], goal[1] - robot[1]):.2f} m '
+                            f'back to {purpose} (camera {camera_goal:.1f} m from G1)'):
             self._set_goal_tolerance(self.observation_tolerance, self._send_observation_goal)
         return True
+
+    def _straight_step(self, robot, goal):
+        """The straight step from ``robot`` to ``goal`` at half-cell / 0.05 rad steps."""
+        dyaw = normalize_angle(goal[2] - robot[2])
+        n = max(1, math.ceil(math.hypot(goal[0] - robot[0], goal[1] - robot[1]) / 0.025),
+                math.ceil(abs(dyaw) / 0.05))
+        return [(robot[0] + (goal[0] - robot[0]) * k / n, robot[1] + (goal[1] - robot[1]) * k / n,
+                 normalize_angle(robot[2] + dyaw * k / n)) for k in range(n + 1)]
+
+    def _step_back_route_problem(self, route, target, min_g1_gap_m):
+        """Why the swept planning footprint (basket included) of the straight step is not
+        free in the planning map, or comes nearer G1 than ``min_g1_gap_m``; None when clear.
+        Unknown cells reject, except under the footprint the robot stands on."""
+        if self.latest_map is None:
+            return 'map unavailable'
+        try:
+            grid = self._planning_grid(self.latest_map)
+        except ValueError as exc:
+            return f'map invalid: {exc}'
+        grid = _start_footprint_known(grid, route[0], self.planner_config)
+        for pose in route[1:]:
+            polygon = rotated_footprint_vertices(self.planner_config.footprint, *pose)
+            reason = footprint_rejection_reason(polygon, grid, self.planner_config.occupied_threshold)
+            if reason is not None:
+                return f'route_footprint_{reason} at ({pose[0]:.2f}, {pose[1]:.2f})'
+            if points_to_polygon_distance([target.map_x_m], [target.map_y_m], polygon)[0] < min_g1_gap_m:
+                return f'route_g1_keepout at ({pose[0]:.2f}, {pose[1]:.2f})'
+        return None
+
+    def _check_step_back_clearance(self):
+        """The parking legs' LiDAR check on the step back: fresh scans and odometry, the
+        stopping path, the rest of the straight route and G1's gap. On a veto the move is
+        cancelled and ends; True then."""
+        target = self.target_position
+        result = self._lidar_clearance(lambda _robot: self._step_back_route,
+                                       (target.map_x_m, target.map_y_m), self._step_back_g1_gap_m)
+        reason = result
+        if isinstance(result, ClearanceResult):
+            reason = result.reason
+            self._clearance = result
+            leg = self._clearance_legs.setdefault('step_back', {
+                'checks': 0, 'min_nearest_m': None, 'min_g1_gap_m': None})
+            leg['checks'] += 1
+            for key, value in (('min_nearest_m', result.nearest_m), ('min_g1_gap_m', result.g1_gap_m)):
+                if value is not None and (leg[key] is None or value < leg[key]):
+                    leg[key] = round(value, 3)
+        if reason is None:
+            return False
+        self.get_logger().error(f'Step back LiDAR veto: {reason}')
+        self._cancel_navigation_goal()
+        self._finish_step_back(False, f'lidar_clearance: {reason}')
+        return True
+
+    def _finish_step_back(self, ok, detail):
+        """End the step back: reached, localize G1 there; otherwise stop first and localize G1
+        from wherever the robot stopped. It is never restarted in this cycle."""
+        self._step_back_route = None
+        self.get_logger().info(f'LiDAR clearance during the step back: {self._clearance_legs.get("step_back")}')
+        if ok:
+            self.g1_reobservation['outcome'] = 'reached'
+            self.motion.reset()
+            self._motion_deadline_s = self._monotonic() + self.motion_settlement_timeout_s
+            self._observation_check_pending = False
+            self._transition(MissionState.SETTLING_MOTION,
+                             'step back reached; waiting for physical motion settlement')
+            self._restore_shared_tolerance('the step back')
+            return
+        self.g1_reobservation['outcome'] = f'ended early: {detail}'
+        self.get_logger().warning(f'Step back ended early: {detail}; stopping, then localizing G1 '
+                                  'from where the robot stands')
+        self._step_back_stopping = True
+        if self._nav_goal_generation is None:
+            self._settle_before_return()
+
+    def _poll_step_back_stop(self, now_s):
+        """After a step back ended early: once Nav2 released the goal and the robot stopped,
+        localize G1 from there; no confirmed stop fails the mission, as after a parking veto."""
+        if self._nav_goal_generation is not None:
+            return   # the cancelled step has not been released by Nav2 yet
+        if self.motion.ready(self.get_clock().now().nanoseconds, now_s):
+            self._step_back_stopping = False
+            self._nav_deadline_s = None
+            self.motion.reset()
+            self._motion_deadline_s = now_s + self.motion_settlement_timeout_s
+            self._observation_check_pending = False
+            self._transition(MissionState.SETTLING_MOTION,
+                             'stopped after the step back ended early; localizing G1 from here')
+            self._restore_shared_tolerance('the step back')
+        elif self._nav_deadline_s is not None and now_s >= self._nav_deadline_s:
+            self._step_back_stopping = False
+            self._nav_deadline_s = None
+            self.last_issue = MissionIssue(FailureClass.TERMINAL, 'stop_not_confirmed', self.motion.reason)
+            self._transition(MissionState.MISSION_FAILED,
+                             f'no confirmed stop after the step back ended: {self.motion.reason}')
 
     def _step_back_goal(self, robot, view, target, camera_range_m, *, max_step_m=1.0):
         """A pose on the line from G1 through the robot that puts the camera
@@ -1820,6 +1997,11 @@ class MissionManagerNode(Node):
                 'yaw_rad': round(self.target_heading.yaw_rad, 3),
                 'support_points': self.target_heading.support_points,
                 'inlier_fraction': self.target_heading.inlier_fraction},
+            # Why the heading is missing (or 'estimated'); without one, no pose is a G1 side.
+            'g1_heading_quality': None if self.target_heading_quality is None else {
+                'status': self.target_heading_quality.status,
+                'detail': self.target_heading_quality.detail},
+            'g1_reobservation': self.g1_reobservation,
             'parking_mission_navigation': {
                 'enabled': self.parking_navigation_enabled,
                 'failure': self._parking_failure,
@@ -2563,7 +2745,9 @@ class MissionManagerNode(Node):
             # Never return loosely: the view, not just the place, must be restored.
             self._navigation_finished(False, 'observation goal tolerance not applied')
             return
-        self._send_navigation_goal(self._observation_goal, self.parking_navigation_timeout_s)
+        self._send_navigation_goal(self._observation_goal,
+                                   self.g1_reobservation_timeout_s if self._step_back_route is not None
+                                   else self.parking_navigation_timeout_s)
 
     def _restore_shared_tolerance(self, context):
         def done(ok):
@@ -2718,7 +2902,8 @@ class MissionManagerNode(Node):
                             event='navigation_released')
         if self.state == MissionState.RETURNING_TO_START and self._return_after_stop:
             self._settle_before_return()
-        if self.state == MissionState.RETURNING_TO_OBSERVATION and self._retry_after_stop:
+        if self.state == MissionState.RETURNING_TO_OBSERVATION and (
+                self._retry_after_stop or self._step_back_stopping):
             self._settle_before_return()
         elif (self.state == MissionState.RETURNING_TO_OBSERVATION
               and self._observation_after_release):
@@ -2741,6 +2926,9 @@ class MissionManagerNode(Node):
             self.get_logger().info(f'LiDAR clearance in {self.state.name}: '
                                    f'{self._clearance_legs.get(self.state.value)}')
         if self.state == MissionState.RETURNING_TO_OBSERVATION:
+            if self._step_back_route is not None:
+                self._finish_step_back(ok, detail)
+                return
             if self.target_position is None:
                 # The turn before the first localization: localize from wherever it stopped.
                 if not ok:
@@ -2983,6 +3171,9 @@ class MissionManagerNode(Node):
             self._scans[topic] = (msg, self._monotonic())
             if self.state in _PARKING_LEGS:
                 self._check_parking_clearance()
+            elif (self.state == MissionState.RETURNING_TO_OBSERVATION
+                  and self._step_back_route is not None and self._nav_cancel_deadline_s is None):
+                self._check_step_back_clearance()
 
     def _laser_pose(self, frame):
         if frame not in self._laser_in_base:
@@ -3026,6 +3217,16 @@ class MissionManagerNode(Node):
         return True
 
     def _parking_clearance(self):
+        plan, sel = self.parking_plan, self.parking_plan.selected
+        # Without the robot pose driven_poses prepends, so remaining_route locates the
+        # robot on the checked route instead of sweeping back to its start.
+        return self._lidar_clearance(
+            lambda robot: driven_poses(plan.selected_path, sel, robot)[1:],
+            (plan.target.x, plan.target.y), plan.keepout_radius_m - self.final_xy_tolerance_m)
+
+    def _lidar_clearance(self, route_from, g1_xy, g1_min_gap_m):
+        """A ClearanceResult for the next movement on ``route_from(robot)``, or why it cannot be
+        judged: a missing, stale or unplaced scan, no robot pose, or stale odometry."""
         now_ns, now_s = self.get_clock().now().nanoseconds, self._monotonic()
         limit = self.clearance_limits.scan_max_age_s
         xs, ys, age = [], [], 0.0
@@ -3051,15 +3252,10 @@ class MissionManagerNode(Node):
         if odometry is None or now_s - self._execution_odom_received_s > 2.0 * limit:
             return 'odometry_stale'
         t = odometry.twist.twist
-        plan, sel = self.parking_plan, self.parking_plan.selected
-        # Without the robot pose driven_poses prepends, so remaining_route locates the
-        # robot on the checked route instead of sweeping back to its start.
-        route = driven_poses(plan.selected_path, sel, robot)[1:]
         return clearance_reason(
             (np.concatenate(xs), np.concatenate(ys)), self.planner_config.footprint,
-            (t.linear.x, t.linear.y, t.angular.z), age, robot, route,
-            (plan.target.x, plan.target.y), plan.keepout_radius_m - self.final_xy_tolerance_m,
-            self.safety_monitor.limits, self.clearance_limits)
+            (t.linear.x, t.linear.y, t.angular.z), age, robot, route_from(robot),
+            g1_xy, g1_min_gap_m, self.safety_monitor.limits, self.clearance_limits)
 
     def _send_return_goal(self, ok):
         if not ok:
@@ -3114,7 +3310,8 @@ class MissionManagerNode(Node):
         self.get_logger().error(f'Navigation goal ownership unresolved: {detail}')
         self.last_issue = MissionIssue(FailureClass.TERMINAL, 'navigation_cancel_unresolved', detail)
         if self.state in (MissionState.RETURNING_TO_START, MissionState.RETURNING_TO_OBSERVATION):
-            self._retry_after_stop = False
+            self._retry_after_stop = self._step_back_stopping = False
+            self._step_back_route = None
             self._transition(MissionState.MISSION_FAILED, detail)
         else:
             self._publish_state(detail, event='navigation_ownership')
@@ -3470,10 +3667,11 @@ class MissionManagerNode(Node):
                         f'{"in front of" if offset > 0 else "behind"} G1\'s head at {head.range_m:.2f} m: '
                         f'another object in the detection box; position re-seeded on the head '
                         f'({center[0]:.3f}, {center[1]:.3f})')
-        estimates, axes = [], []
-        for points in clouds:
-            estimates.append(estimate_target_yaw(points, center))
-            axes.append(estimate_body_axis(points, center, camera_xy))
+        axes = [estimate_body_axis(points, center, camera_xy) for points in clouds]
+        # The heading only from a view that shows G1's lower legs (quality gate).
+        lowest = (lowest_visible_height(*rotation_translation, self._camera_intrinsics,
+                                        depths[0].shape[0], center) if depths else None)
+        assessments = [assess_heading(points, center, lowest) for points in clouds]
         axis = combined_axis(axes)
         shift = None if axis is None else math.hypot(axis[0] - center[0], axis[1] - center[1])
         if head_not_g1 and self.target_body_check and shift is not None and shift > self.target_axis_max_shift_m:
@@ -3502,13 +3700,24 @@ class MissionManagerNode(Node):
         if clouds:
             # The view also shows what the 2D LiDARs pass under.
             self._overhead_points = overhead_obstacle_points(clouds[-1], position)
-        self.target_heading = combined_estimate(estimates)
+        quality = combined_heading(assessments)
+        self.target_heading_quality = quality
+        self.target_heading = quality.estimate
+        camera_range = math.hypot(position[0] - camera_xy[0], position[1] - camera_xy[1])
+        reobservation = self.g1_reobservation
+        if reobservation is not None and reobservation['started'] and 'heading_status_after' not in reobservation:
+            # The first localization after the step back: what the better view gave.
+            reobservation.update(
+                heading_status_after=quality.status, camera_range_after_m=round(camera_range, 2),
+                position_after=[round(position[0], 3), round(position[1], 3)])
         if head is not None:
             self.get_logger().info(f'G1 verified in depth: head {head.range_m:.2f} m from the camera, '
                                    f'torso points {torso}, points above G1 {above}')
         if self.target_heading is None:
-            self.get_logger().info(f'G1 heading unknown: no reliable forearm view in {len(frames)} '
-                                   'depth frames; parking ranking stays undirected')
+            self.get_logger().info(
+                f'G1 heading unknown: {quality.status} ({quality.detail}) in {len(frames)} depth '
+                f'frames, camera {camera_range:.2f} m from G1; parking ranking stays undirected: '
+                'no pose is labelled as G1\'s right or left')
         else:
             self.get_logger().info(
                 f'G1 heading {math.degrees(self.target_heading.yaw_rad):.1f} deg from depth: '

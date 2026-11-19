@@ -97,7 +97,9 @@ def estimate_target_yaw(points_map, center_xy, floor_z=0.0):
     around = ((np.hypot(dx, dy) <= SEARCH_RADIUS_M)
               & (height >= BODY_HEIGHT_M[0]) & (height <= BODY_HEIGHT_M[1]))
     legs = _leg_points(dx, dy, height)
-    if not legs.any():
+    # The bars are fitted around the middle of the legs: as many leg points as the body
+    # axis needs, or a sliver of one leg (the far one, in a close view) shifts the fit.
+    if np.count_nonzero(legs) < MIN_LEG_POINTS:
         return None
     dx, dy = dx - _middle(dx[legs]), dy - _middle(dy[legs])
     radius = np.hypot(dx, dy)
@@ -333,6 +335,104 @@ def combined_estimate(estimates):
         return None
     return OrientationEstimate(yaw, min(e.support_points for e in seen),
                                min(e.inlier_fraction for e in seen))
+
+
+# Heading quality gate. The forearm fit is trusted only from a view that shows G1's lower
+# legs, since it is centred on them; how many points support a fit says nothing about that
+# (2026-11-18, gz_standard_run2: -155 deg for a G1 facing -90 deg, from 0.68 m, on 14589
+# points and 0.968 inliers). The camera is level at 1.03 m with a 64 deg vertical field of
+# view, so closer than about 1.3 m the floor-level part of the legs leaves the image:
+#   * recorded views that gave a heading (72-view Gazebo sweep 2026-11-01 at 1.6-2.7 m from
+#     every side, ward views 2026-11-17 at 2.1-3.3 m) see down to 0.12 m or lower at G1's
+#     nearest leg, show at least 219 leg points, and their lowest leg points (2nd percentile)
+#     are at most 0.28 m high;
+#   * every recorded view at 0.63-0.70 m (the hospital standard approach, 2026-11-17/18)
+#     sees nothing below 0.72 m there and shows no leg point; Isaac at 0.41-0.86 m
+#     (2026-11-11, 2026-11-19) gave no heading.
+# The limits sit between the two groups. They are geometric, not a fixed range, so a
+# lower or tilted camera is judged by what it can actually see.
+LEG_NEAR_SURFACE_M = 0.15         # G1's axis to its nearest leg surface, from any side
+LOWER_BODY_VISIBLE_HEIGHT_M = 0.30   # the camera must see this low at that surface
+MAX_LOWEST_LEG_HEIGHT_M = 0.35    # and depth must show leg points at least this low
+
+HEADING_ESTIMATED = 'estimated'
+HEADING_VIEW_TOO_CLOSE = 'view_too_close'                    # geometry: lower legs out of view
+HEADING_INSUFFICIENT_LOWER_BODY = 'insufficient_lower_body'  # in view, but not seen (hidden)
+HEADING_INSUFFICIENT_EVIDENCE = 'insufficient_heading_evidence'  # legs seen, forearms not fitted
+HEADING_INCONSISTENT = 'inconsistent_observations'           # frames disagree
+HEADING_UNAVAILABLE = 'view_geometry_unavailable'            # no camera pose or intrinsics
+
+
+@dataclass(frozen=True)
+class HeadingAssessment:
+    estimate: OrientationEstimate | None   # only with status HEADING_ESTIMATED
+    status: str
+    detail: str = ''
+
+
+def lowest_visible_height(rotation, translation, intrinsics, image_height, target_xy, floor_z=0.0):
+    """How high above the floor the lowest image row looks at G1's nearest leg surface.
+
+    ``rotation`` and ``translation`` take the optical frame to the map. The bottom row's ray
+    through the principal column; None for a camera that does not look across the floor."""
+    fx, fy, cx, cy = intrinsics
+    ray = np.asarray(rotation, dtype=float) @ np.array([0.0, (image_height - 1 - cy) / fy, 1.0])
+    horizontal = math.hypot(ray[0], ray[1])
+    if horizontal < 1e-6:
+        return None
+    distance = math.hypot(target_xy[0] - translation[0], target_xy[1] - translation[1])
+    return float(translation[2] - floor_z + ray[2] / horizontal * max(0.0, distance - LEG_NEAR_SURFACE_M))
+
+
+def assess_heading(points_map, center_xy, lowest_visible_m, floor_z=0.0):
+    """One frame's heading with the reason it is missing (see the quality gate above)."""
+    if lowest_visible_m is None:
+        return HeadingAssessment(None, HEADING_UNAVAILABLE)
+    if lowest_visible_m > LOWER_BODY_VISIBLE_HEIGHT_M:
+        return HeadingAssessment(None, HEADING_VIEW_TOO_CLOSE,
+                                 f'lowest visible height at G1 {lowest_visible_m:.2f} m '
+                                 f'(limit {LOWER_BODY_VISIBLE_HEIGHT_M:.2f} m)')
+    points = np.asarray(points_map, dtype=float)
+    if points.size == 0:
+        return HeadingAssessment(None, HEADING_INSUFFICIENT_LOWER_BODY, 'no depth points')
+    height = points[:, 2] - floor_z
+    legs = _leg_points(points[:, 0] - center_xy[0], points[:, 1] - center_xy[1], height)
+    count = int(np.count_nonzero(legs))
+    lowest = float(np.percentile(height[legs], 2)) if count else None
+    if count < MIN_LEG_POINTS or lowest > MAX_LOWEST_LEG_HEIGHT_M:
+        return HeadingAssessment(None, HEADING_INSUFFICIENT_LOWER_BODY,
+                                 f'{count} leg points, lowest {lowest if lowest is None else round(lowest, 2)} m')
+    estimate = estimate_target_yaw(points, center_xy, floor_z)
+    if estimate is None:
+        return HeadingAssessment(None, HEADING_INSUFFICIENT_EVIDENCE,
+                                 f'{count} leg points, no reliable forearm fit')
+    return HeadingAssessment(estimate, HEADING_ESTIMATED)
+
+
+def combined_heading(assessments):
+    """One assessment for a stationary view's frames: a heading only when enough frames agree."""
+    assessments = list(assessments)
+    if not assessments:
+        return HeadingAssessment(None, HEADING_UNAVAILABLE, 'no depth frames')
+    estimates = [a.estimate for a in assessments if a.estimate is not None]
+    if len(estimates) >= MIN_AGREEING_FRAMES:
+        combined = combined_estimate(estimates)
+        if combined is None:
+            yaws = ', '.join(f'{math.degrees(e.yaw_rad):.0f}' for e in estimates)
+            return HeadingAssessment(None, HEADING_INCONSISTENT,
+                                     f'frame headings {yaws} deg spread over '
+                                     f'{math.degrees(MAX_FRAME_SPREAD_RAD):.0f} deg')
+        return HeadingAssessment(combined, HEADING_ESTIMATED,
+                                 f'{len(estimates)}/{len(assessments)} frames agree')
+    failures = [a for a in assessments if a.estimate is None]
+    if not failures:
+        return HeadingAssessment(None, HEADING_INSUFFICIENT_EVIDENCE,
+                                 f'{len(estimates)} frames; {MIN_AGREEING_FRAMES} must agree')
+    # The most frequent reason among the frames without a heading speaks for the view.
+    status = max({a.status for a in failures}, key=lambda s: sum(a.status == s for a in failures))
+    detail = next(a.detail for a in failures if a.status == status)
+    return HeadingAssessment(None, status, f'{len(estimates)}/{len(assessments)} frames with a heading; '
+                                           f'{detail}'.rstrip('; '))
 
 
 # Obstacles the 2D LiDARs pass under (a tabletop): depth points between just above
