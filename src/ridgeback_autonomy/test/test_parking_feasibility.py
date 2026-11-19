@@ -824,3 +824,41 @@ def test_failed_direction_exclusions_still_apply_under_the_strict_order(manager_
     assert not any(label(c) == 'g1_right' for c in valid())
     groups = candidate_groups(plan, approach, m.path_candidates_per_class)
     assert {label(c) for c in groups[0]} == {'g1_left'}
+
+
+def test_a_safe_route_in_hand_is_selected_before_the_batch_deadline_can_discard_it(
+        manager_factory, monkeypatch):
+    m, client, checked, _ = facing_manager(manager_factory, monkeypatch)
+    m._next_path(now_ns=PLAN_NOW_NS)
+    finish(client)                                   # the first right route is safe
+    assert m._path_valid and m._path_queue           # the rest of its batch is still queued
+    # Too little time left for another request to finish: select what is in hand.
+    m._monotonic.value = m._path_batch_deadline - m.parking_path_timeout_s + 0.1
+    m._next_path(now_ns=PLAN_NOW_NS)
+    assert m.state == MissionState.PARKING_PATH_FEASIBLE
+    assert m.parking_plan.paths_checked == 1
+    assert m.parking_plan.selected.preference_label == 'g1_right'
+
+
+def test_without_a_safe_route_the_deadline_guard_starts_the_next_check(manager_factory, monkeypatch):
+    m, client, checked, _ = facing_manager(manager_factory, monkeypatch, ('g1_right',))
+    m._next_path(now_ns=PLAN_NOW_NS)
+    finish(client)
+    m._monotonic.value = m._path_batch_deadline - m.parking_path_timeout_s + 0.1
+    m._next_path(now_ns=PLAN_NOW_NS)
+    assert m.state == MissionState.EVALUATING_PARKING_PATHS and m.parking_plan.paths_checked == 2
+
+
+def test_the_log_names_each_class_and_why_the_search_moved_on(manager_factory, monkeypatch):
+    m, client, checked, published = facing_manager(manager_factory, monkeypatch, ('g1_right',))
+    m.path_check_budget = 100
+    evaluate(m, client)
+    logs = published['logs']
+    right = class_count(m, 'g1_right')
+    assert any(log.startswith('Checking parking path 1 (g1_right)') for log in logs)
+    assert sum(log.startswith('Parking path rejected (g1_right)') for log in logs) == right
+    moved = [log for log in logs if log.startswith('No safe route in g1_right; checking g1_left next')]
+    assert len(moved) == 1 and f'g1_right none_feasible ({right}/{right} checked, 0 feasible)' in moved[0]
+    assert any(log.startswith('Route search by class: g1_right none_feasible') and 'g1_left feasible' in log
+               for log in logs)
+    assert m.parking_plan.selected.preference_label == 'g1_left'

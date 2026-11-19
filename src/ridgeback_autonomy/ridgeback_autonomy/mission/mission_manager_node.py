@@ -741,6 +741,7 @@ class MissionManagerNode(Node):
         self._path_batch_deadline = None
         self._path_groups = []
         self._path_approach = None
+        self._path_class = None          # the class whose routes are being checked
         self._path_valid = []
         self._path_queue = []
         self._paths = {}
@@ -2130,12 +2131,15 @@ class MissionManagerNode(Node):
                 self._fail_planning('parking_tf_unavailable', 'source-time map-to-odom unavailable')
                 return
             self._path_groups = candidate_groups(plan, approach, self.path_candidates_per_class)
+            self._path_class = None
             self._path_queue = []
             self._path_valid = []
             self._paths = {}
             self._path_batch_deadline = now_s + self.parking_path_batch_timeout_s
             self._clear_recoverable_issue()
             self.get_logger().info(f'Geometric parking candidates ready: {counts}')
+            self.get_logger().info('Valid parking poses by class, in checking order: ' + (', '.join(
+                f"{e['class']} {e['valid']}" for e in route_search_summary(plan, approach)) or 'none'))
             self._transition(
                 MissionState.PARKING_CANDIDATES_READY,
                 'geometric candidates generated; path feasibility pending')
@@ -2543,7 +2547,11 @@ class MissionManagerNode(Node):
             self._fail_planning('parking_plan_invalidated', reason)
             return
         budget_spent = self.parking_plan.paths_checked >= self.path_check_budget
-        if not self._path_queue or budget_spent:
+        # A safe route in hand is not risked on the rest of its batch: no new check
+        # starts unless it can finish (one request timeout) before the batch deadline.
+        late = (self._path_valid and self._path_batch_deadline is not None
+                and self._monotonic() + self.parking_path_timeout_s > self._path_batch_deadline)
+        if not self._path_queue or budget_spent or late:
             if self._path_valid:
                 # Every higher class was checked in full; this is the best class with a route.
                 selected = select_path_candidate(self._path_valid, self.parking_plan.resolution_m)
@@ -2588,6 +2596,13 @@ class MissionManagerNode(Node):
                     f'no safe route to any valid pose: {self._route_search_text()}')
                 return
             self._path_queue = list(self._path_groups.pop(0))
+            label = self._path_queue[0].preference_label
+            if label != self._path_class:
+                if self._path_class is not None:
+                    self.get_logger().info(
+                        f'No safe route in {self._path_class}; checking {label} next. '
+                        f'Route search so far: {self._route_search_text()}')
+                self._path_class = label
         if not self.compute_path_client.server_is_ready():
             return
         candidate = self._path_queue.pop(0)
@@ -2604,7 +2619,8 @@ class MissionManagerNode(Node):
         self._path_request_deadline = self._monotonic() + self.parking_path_timeout_s
         generation = self._path_generation
         self.parking_plan.paths_checked += 1
-        self.get_logger().info(f'Checking parking path {self.parking_plan.paths_checked}: '
+        self.get_logger().info(f'Checking parking path {self.parking_plan.paths_checked} '
+                               f'({candidate.preference_label}): '
                                f'x={candidate.base_x:.3f}, y={candidate.base_y:.3f}')
         try:
             future = self.compute_path_client.send_goal_async(request)
@@ -2715,7 +2731,7 @@ class MissionManagerNode(Node):
             candidate.path_status = 'rejected' if reason else 'valid'
             candidate.path_reason = reason
             if reason:
-                self.get_logger().info(f'Parking path rejected: {reason}')
+                self.get_logger().info(f'Parking path rejected ({candidate.preference_label}): {reason}')
             else:
                 candidate.path_length_m = path_length(route)
                 self._path_valid.append(candidate)

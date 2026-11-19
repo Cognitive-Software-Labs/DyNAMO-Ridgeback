@@ -338,6 +338,9 @@ runs. If the budget runs out with no safe route, planning fails
 not selected over a higher one that was never fully checked. The mission state's
 `route_search` gives each class's valid, checked and feasible poses and its outcome
 (`feasible`, `none_feasible`, `incomplete` or `unchecked`), also logged at selection.
+With a safe route found, no check starts that could not finish (`parking_path_timeout_s`)
+before the batch timeout. The log names each check's class, each rejection's reason,
+and every move to the next class.
 With a heading, the clearance score also counts G1's legs,
 0.21 m to each side of its axis (`G1_LEG_LATERAL_M`). This affects quality only:
 the keep-out is a circle while G1 is wider than deep, and its mapped leg cells
