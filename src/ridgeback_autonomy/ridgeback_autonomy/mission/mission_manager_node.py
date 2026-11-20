@@ -720,6 +720,13 @@ class MissionManagerNode(Node):
         self._departure_stopping = False
         self._departure_wait_deadline_s = None
         self.departure = None
+        # After a parking-planning timeout: the one return home it may start, once stopped,
+        # sensors are fresh and Nav2 has planned a route home; and what came of it.
+        self.timeout_recovery = None
+        self._timeout_return_pending = False
+        self._home_route_deadline_s = None
+        self._home_route_token = 0
+        self._parking_failure_code = 'parking_failed'
         self.target_heading_quality = None
         self._g1_exploration_deadline_s = None
         self._g1_explorer_resumed = False
@@ -1348,6 +1355,11 @@ class MissionManagerNode(Node):
             self._departure_stopping = False
             self._departure_wait_deadline_s = None
             self.departure = None
+            self.timeout_recovery = None
+            self._timeout_return_pending = False
+            self._home_route_deadline_s = None
+            self._home_route_token += 1
+            self._parking_failure_code = 'parking_failed'
             self.target_committed = False
             self.target_position = None
             self.approach_pose = None
@@ -2043,6 +2055,7 @@ class MissionManagerNode(Node):
                 'detail': self.target_heading_quality.detail},
             'g1_reobservation': self.g1_reobservation,
             'departure': self.departure,
+            'timeout_recovery': self.timeout_recovery,
             'parking_mission_navigation': {
                 'enabled': self.parking_navigation_enabled,
                 'failure': self._parking_failure,
@@ -2180,6 +2193,8 @@ class MissionManagerNode(Node):
             self._next_path(now_ns=now_ns)
 
     def _fail_planning(self, code: str, reason: str) -> None:
+        if code == 'planner_timeout' and self._recover_from_planning_timeout(reason):
+            return
         if code in _EXPLORABLE_PLANNING_FAILURES and self._maybe_explore_around_g1(
                 f'{code}: {reason}'):
             return
@@ -2219,6 +2234,131 @@ class MissionManagerNode(Node):
         self.get_logger().error(f'No feasible parking pose [{code}]: {reason}; returning to start')
         self._start_return(f'no feasible parking pose: {code}')
         return True
+
+    def _recover_from_planning_timeout(self, reason):
+        """A timed-out route search says nothing about whether a parking pose exists: stop
+        checking, then return home once only if that is shown safe (``_check_timeout_return``),
+        else stay stopped. Either way the mission fails as ``planning_timeout``. False when
+        driving is off: the plain planning failure stands and nothing moves."""
+        if not self.parking_navigation_enabled or self.timeout_recovery is not None:
+            return False
+        self._invalidate_path_requests()
+        self._planning_deadline_s = None
+        if self.parking_plan is not None:
+            plan = self.parking_plan
+            plan.ok, plan.selected, plan.selected_path = False, None, None
+            plan.failure_reason = 'planner_timeout'
+            self._publish_parking_markers()
+        self._parking_failure = f'planning_timeout: {reason}'
+        self._parking_failure_code = 'planning_timeout'
+        self.timeout_recovery = {'outcome': None, 'reason': reason}
+        self.get_logger().error(f'Parking planning timed out: {reason}; returning home only if '
+                                'the robot is stopped, its sensors are fresh and a route home exists')
+        if self.start_pose is None:
+            self._timeout_return_refused('start pose unavailable')
+        elif self._nav_goal_generation is not None:
+            self._timeout_return_refused('a navigation goal may still be executing')
+        else:
+            self._timeout_return_pending = True
+            self._start_return('planning_timeout: confirming the stop and a safe route home',
+                               stop_first=True)
+        return True
+
+    def _timeout_return_refused(self, problem):
+        """No return home after the planning timeout: nothing is commanded, nothing retried."""
+        self._timeout_return_pending = False
+        self._home_route_deadline_s = None
+        self._home_route_token += 1
+        self.timeout_recovery['outcome'] = f'not started: {problem}'
+        self.last_issue = MissionIssue(FailureClass.TERMINAL, 'planning_timeout',
+                                       f'{self.timeout_recovery["reason"]}; return home not '
+                                       f'started: {problem}; remaining stopped')
+        self.get_logger().error(f'Return home after the planning timeout not started: {problem}; '
+                                'the robot stays stopped')
+        self._transition(MissionState.MISSION_FAILED if self.state == MissionState.RETURNING_TO_START
+                         else MissionState.PARKING_PLANNING_FAILED,
+                         f'planning_timeout; return home not safe: {problem}; remaining stopped')
+
+    def _timeout_return_sensors(self):
+        """Why the scans, odometry or robot pose cannot support the return now, or None."""
+        target = self.target_position
+        g1 = (target.map_x_m, target.map_y_m) if target is not None else (1e9, 1e9)
+        check = self._lidar_clearance(lambda _robot: [], g1, 0.0)
+        reason = check.reason if isinstance(check, ClearanceResult) else check
+        return None if reason is None else f'lidar_clearance: {reason}'
+
+    def _check_timeout_return(self):
+        """Stopped after the planning timeout: fresh scans and odometry with nothing in the
+        stopping margin, both Nav2 action servers up, then a route home that Nav2 can plan
+        now. Only then the existing collision-monitored return starts."""
+        problem = self._timeout_return_sensors()
+        if problem is None and not (self.compute_path_client.server_is_ready()
+                                    and self.navigation_client.server_is_ready()):
+            problem = 'nav2_unavailable: planner or navigate_to_pose server not ready'
+        robot = None if problem else self._current_robot_pose()
+        if problem is None and robot is None:
+            problem = 'robot_pose_unavailable'
+        if problem:
+            self._timeout_return_refused(problem)
+            return
+        start = self.start_pose.pose
+        request = ComputePathToPose.Goal()
+        request.goal = self._pose_stamped(start.position.x, start.position.y, _yaw(start.orientation))
+        request.start = self._pose_stamped(*robot)
+        request.use_start = True
+        request.planner_id = self.planner_id
+        self._home_route_token += 1
+        token = self._home_route_token
+        self._home_route_deadline_s = self._monotonic() + self.parking_path_timeout_s
+        try:
+            future = self.compute_path_client.send_goal_async(request)
+        except Exception as exc:
+            self._timeout_return_refused(f'home_route_unavailable: {exc}')
+            return
+        future.add_done_callback(lambda f: self._home_route_accepted(f, token))
+
+    def _home_route_accepted(self, future, token):
+        with self._lock:
+            if (token != self._home_route_token or not self._timeout_return_pending
+                    or self.state != MissionState.RETURNING_TO_START):
+                return   # superseded, cancelled or already decided
+            try:
+                handle = future.result()
+            except Exception as exc:
+                self._timeout_return_refused(f'home_route_unavailable: {exc}')
+                return
+            if not handle.accepted:
+                self._timeout_return_refused('home_route_unavailable: request rejected')
+                return
+            handle.get_result_async().add_done_callback(lambda f: self._home_route_result(f, token))
+
+    def _home_route_result(self, future, token):
+        with self._lock:
+            if (token != self._home_route_token or not self._timeout_return_pending
+                    or self.state != MissionState.RETURNING_TO_START):
+                return   # superseded, cancelled or already decided
+            self._home_route_deadline_s = None
+            try:
+                wrapped = future.result()
+                status, path = wrapped.status, wrapped.result.path
+            except Exception as exc:
+                self._timeout_return_refused(f'home_route_unavailable: {exc}')
+                return
+            if status != GoalStatus.STATUS_SUCCEEDED or not path.poses:
+                self._timeout_return_refused(
+                    f'home_route_unavailable: status={status}, error_code={wrapped.result.error_code}')
+                return
+            problem = self._timeout_return_sensors()   # still fresh now that it will move
+            if problem:
+                self._timeout_return_refused(problem)
+                return
+            self._timeout_return_pending = False
+            self.timeout_recovery['outcome'] = 'returning'
+            self.get_logger().info(f'Route home found ({len(path.poses)} poses); returning to start '
+                                   'after the planning timeout')
+            self._publish_state('planning_timeout: stopped, sensors fresh, route home found; '
+                                'returning to start', event='timeout_recovery')
+            self._send_shared_return()
 
     def _current_robot_pose(self, *, with_stamp: bool = False):
         pose = self._frame_pose(self.base_frame, Time())
@@ -3083,11 +3223,16 @@ class MissionManagerNode(Node):
                 if self._parking_failure is None:
                     self._transition(MissionState.MISSION_COMPLETE, 'returned to start pose')
                     return
-                self.last_issue = MissionIssue(FailureClass.TERMINAL, 'parking_failed',
+                if self.timeout_recovery is not None:
+                    self.timeout_recovery['outcome'] = 'returned home'
+                self.last_issue = MissionIssue(FailureClass.TERMINAL, self._parking_failure_code,
                                                self._parking_failure)
                 self._transition(MissionState.MISSION_FAILED,
                                  f'returned to start after: {self._parking_failure}')
             else:
+                if self.timeout_recovery is not None:
+                    self.timeout_recovery['outcome'] = f'return failed: {detail}'
+                    detail = f'{detail} (after {self._parking_failure})'
                 self.last_issue = MissionIssue(FailureClass.TERMINAL,
                                                'return_navigation_failed', detail)
                 self._transition(MissionState.MISSION_FAILED, f'return to start failed: {detail}')
@@ -3110,15 +3255,24 @@ class MissionManagerNode(Node):
                 if self._depart_after_stop:
                     self._depart_after_stop = False
                     self._start_departure(self._send_shared_return)
+                elif self._timeout_return_pending:
+                    self._check_timeout_return()
                 else:
                     self._send_shared_return()
             elif now_s >= self._nav_deadline_s:
                 self._return_after_stop = False
                 self._nav_deadline_s = None
+                if self._timeout_return_pending:
+                    self._timeout_return_refused(f'stop not confirmed: {self.motion.reason}')
+                    return
                 self.last_issue = MissionIssue(FailureClass.TERMINAL, 'stop_not_confirmed',
                                                self.motion.reason)
                 self._transition(MissionState.MISSION_FAILED,
                                  f'no confirmed stop after the parking veto: {self.motion.reason}')
+            return
+        if self.state == MissionState.RETURNING_TO_START and self._timeout_return_pending:
+            if self._home_route_deadline_s is not None and now_s >= self._home_route_deadline_s:
+                self._timeout_return_refused('home_route_unavailable: ComputePathToPose deadline expired')
             return
         if self.state == MissionState.PARKED and self._parked_settled_ns is not None:
             now_ns = self.get_clock().now().nanoseconds

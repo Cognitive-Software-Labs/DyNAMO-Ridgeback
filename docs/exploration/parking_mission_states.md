@@ -46,6 +46,25 @@ times out after a turn falls back once to the observation pose. A failure while 
 may still own a goal stops the robot in place (`MISSION_FAILED`) instead of starting
 another goal.
 
+### Planning timeout
+
+A route search that outlives the 10 s batch deadline or a 3 s request deadline
+(`planner_timeout`) says nothing about whether a parking pose exists, so it neither
+explores around G1 nor reads as `no_valid_candidate`; a spent route-check budget and a
+search with no safe route stay `bounded_search_exhausted`, and missing post-planning
+motion evidence stays `motion_settlement_timeout`. With driving on, the outstanding
+check is cancelled and the mission enters `RETURNING_TO_START` without a goal. Once the
+stop is confirmed, it starts the shared-checker return to the start only when the scans
+and odometry are fresh with nothing within the 0.05 m stopping margin, both Nav2 action
+servers are ready, and Nav2's planner returns a route home within 3 s; the return is
+then watched by Nav2 and its collision monitor like any other. Otherwise nothing moves:
+the mission ends `MISSION_FAILED` (`planning_timeout`) with the reason, for example
+`stop not confirmed`, `lidar_stale` or `home_route_unavailable`, and is not retried. A
+completed return also ends `MISSION_FAILED` (`planning_timeout`), and a failed one
+`return_navigation_failed` naming the timeout; `timeout_recovery` in the mission state
+records the outcome. With driving off, nothing moves and the failure stays
+`PARKING_PLANNING_FAILED` (`planner_timeout`).
+
 After the wait, the robot leaves G1 before the return: straight out to the plan's
 pre-parking pose, 0.5 m directly away from G1, with the parking legs' 0.08 m / 0.12
 rad goal checker. It starts only on current stop evidence, with the swept planning
