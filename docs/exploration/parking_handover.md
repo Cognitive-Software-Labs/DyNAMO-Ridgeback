@@ -222,6 +222,14 @@ recordings are kept untracked under `artifacts/`, not in Git.
   odometry fluctuations of the stationary robot delay the stop confirmation it needs (by
   6 s of the 10 s allowed in that run); past the allowance the robot stays stopped beside
   G1. Moving obstacles were not tested.
+- **Return after an incomplete route search.** After a planning timeout
+  (`planning_timeout`) or a spent route-check budget (`route_budget_exhausted`), the
+  robot returns to the start only once its stop is confirmed, its sensors are fresh and
+  Nav2 plans a route home; otherwise it stays stopped
+  ([incomplete route search](parking_mission_states.md#incomplete-route-search)). Both
+  recoveries passed automated tests only; neither has been validated in a simulator or
+  on the robot. `bounded_search_exhausted` and `no_valid_candidate` keep their earlier
+  immediate return.
 - **Reach violation on earlier code.** A Gazebo `standard` run (`gz_standard_run2`,
   `f6ade2f`) completed with a reach of 0.607 m, outside 0.30-0.60 m: the localization
   and map-pose errors added to a plan of 0.517 m.

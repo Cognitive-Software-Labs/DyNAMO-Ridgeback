@@ -51,9 +51,11 @@ another goal.
 A route search cut short, by the 10 s batch deadline or a 3 s request deadline
 (`planner_timeout`, reported as `planning_timeout`) or by the 16-check route budget
 with poses still untested (`route_budget_exhausted`), says nothing about whether a
-parking pose exists, so neither reads as `no_valid_candidate`. A search that checked
-every valid pose and found no safe route stays `bounded_search_exhausted`, and missing
-post-planning motion evidence stays `motion_settlement_timeout`. A spent budget may
+parking pose exists, so neither reads as `no_valid_candidate`, and each keeps its own
+code. A search that checked every valid pose and found no safe route stays
+`bounded_search_exhausted` and, like `no_valid_candidate`, keeps its existing handling:
+it may map around G1, then returns to the start at once, without the checks below.
+Missing post-planning motion evidence stays `motion_settlement_timeout`. A spent budget may
 still map around G1 first, as before; a timeout does not. With driving on, the
 outstanding check is cancelled and the mission enters `RETURNING_TO_START` without a
 goal. Once the stop is confirmed, it starts the shared-checker return to the start
