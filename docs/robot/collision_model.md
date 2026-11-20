@@ -15,11 +15,12 @@ An image of one does not establish the others.
 
 ## Configured navigation footprint
 
-Both costmaps and the collision monitor use one outline, the robot body with the
-provisional deck basket's two rear-wall corners (x -0.48 m, y ±0.17 m;
-[geometry](geometry.md#photographed-payload-and-the-provisional-basket)), which reach
+Both costmaps and the collision monitor use one outline, the robot body and the
+provisional deck basket, whose rear-wall corners (x -0.48 m, y ±0.17 m;
+[geometry](geometry.md#photographed-payload-and-the-provisional-basket)) reach
 0.015-0.029 m past the body's angled rear ends; the parking checks use the same
-outline. The body part takes the Clearpath r100 collision meshes (`body-collision.stl` and `top.stl`),
+outline. Its two rear vertices, x -0.4851 m and y ±0.1751 m, enclose those corners
+with the body's 5.1 mm margin. The body part takes the Clearpath r100 collision meshes (`body-collision.stl` and `top.stl`),
 widens them by the 4.408 mm longitudinal and 0.201 mm lateral Isaac origin
 offset, mirrors them front to rear and left to right, and encloses the result
 along 24 support directions with 5.1 mm margin: 95.2 × 80.1 cm, angled ends
@@ -29,12 +30,13 @@ included. The margin is built in, so both costmaps set `footprint_padding` to
 and checks that it encloses both simulator placements of the meshes by at
 least 5 mm.
 
-![Configured 24-point outline over the Gazebo, Isaac and Clearpath-mesh robot bodies, with front-left corner zooms and the direct tape survey dotted.](assets/navigation-footprint.png)
+![Configured 24-point outline over the Gazebo, Isaac and Clearpath-mesh robot bodies and the provisional basket colliders, with rear-left basket-corner zooms and the direct tape survey dotted.](assets/navigation-footprint.png)
 
 The figure plots the identical local/global costmap `footprint` entries from
 [`nav2_params.yaml`](../../src/ridgeback_autonomy/config/nav2_params.yaml)
-against each backend's collision hull. The outline clears the Gazebo hull by at
-least 5.3 mm and the Isaac hull by at least 5.1 mm. In a 1.05 m doorway it
+against each backend's collision hull and the basket's colliders. The outline clears
+the Gazebo hull by at least 5.3 mm, the Isaac hull (the same meshes at the origin
+offset) by at least 5.1 mm and the basket's collider corners by 5.1 mm. In a 1.05 m doorway it
 leaves 12.5 cm per side when aligned, and its widest swept width while turning
 is 105.1 cm. The survey-based outline it replaced, 101.4 × 84.7 cm with
 padding, needed 119.8 cm to turn, and the collision monitor's 1.2 s approach
@@ -42,11 +44,10 @@ check stopped MPPI's sideways and turning commands inside doorways.
 
 The containment policy is: the outline must enclose every raw simulator
 collision projection with at least 5 mm clearance. Inflation remains an
-obstacle-cost policy and does not count toward that margin. The basket's
-colliders do not meet it: their rear-wall corners lie on the outline, without
-margin, because the basket itself is unmeasured. The figure shows the body outline
-before the basket corners were added (2026-11-19); the inscribed (0.400 m) and
-circumscribed (0.525 m) radii are unchanged.
+obstacle-cost policy and does not count toward that margin. The basket's colliders
+meet it, but the basket itself is unmeasured, so its margin is only as good as its
+provisional size. Adding it left the inscribed (0.400 m) and circumscribed
+(0.525 m) radii unchanged.
 
 **Open hardware basis.** The outline treats `r100_0160` as having the Clearpath
 mesh shape, a decision made on 2026-10-30. Two tape surveys of 2026-10-16 bear

@@ -17,8 +17,8 @@ EXPECTED_OUTLINE = [
     [0.475762, 0.073265], [0.409768, 0.319557], [0.393065, 0.348488],
     [0.367198, 0.374355], [0.339166, 0.390539], [0.302752, 0.400297],
     [-0.302752, 0.400297], [-0.339166, 0.390539], [-0.367198, 0.374355],
-    [-0.393065, 0.348488], [-0.409768, 0.319557], [-0.48, 0.17],
-    [-0.48, -0.17], [-0.409768, -0.319557], [-0.393065, -0.348488],
+    [-0.393065, 0.348488], [-0.409768, 0.319557], [-0.4851, 0.1751],
+    [-0.4851, -0.1751], [-0.409768, -0.319557], [-0.393065, -0.348488],
     [-0.367198, -0.374355], [-0.339166, -0.390539], [-0.302752, -0.400297],
     [0.302752, -0.400297], [0.339166, -0.390539], [0.367198, -0.374355],
     [0.393065, -0.348488], [0.409768, -0.319557], [0.475762, -0.073265],
@@ -76,10 +76,7 @@ def test_the_outline_encloses_the_basket_and_equals_the_parking_footprint():
     # The provisional basket's colliders (camera_support.urdf.xacro) reach past the body's
     # angled rear ends; Nav2, the collision monitor and the parking checks use one outline.
     from ridgeback_autonomy.mission.parking_geometry import BASKET_CORNERS_BASE, parking_footprint
-    from ridgeback_autonomy.mission.parking_planner import points_in_polygon, points_to_polygon_distance
     outline = [tuple(p) for p in EXPECTED_OUTLINE]
-    xs, ys = zip(*BASKET_CORNERS_BASE)
-    inside = points_in_polygon(list(xs), list(ys), outline)
-    on_edge = points_to_polygon_distance(list(xs), list(ys), outline) < 1e-9
-    assert all(i or e for i, e in zip(inside, on_edge))
+    # The body's containment margin: at least 5 mm around every basket collider corner.
+    assert min(_inside_margin(outline, x, y) for x, y in BASKET_CORNERS_BASE) >= 0.005
     assert sorted(parking_footprint(outline)) == sorted(outline)

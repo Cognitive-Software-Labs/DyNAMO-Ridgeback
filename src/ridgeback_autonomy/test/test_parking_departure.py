@@ -193,3 +193,92 @@ def test_no_free_departure_route_keeps_the_robot_stopped(manager_factory, monkey
     end_wait(m)
     assert m.state == MissionState.MISSION_FAILED
     assert m.departure['outcome'].startswith('not started: route_footprint_occupied')
+
+
+# The corridor: Nav2's default tree may replan or recover; the departure ends if the robot
+# leaves its checked straight route by more than the goal's own tolerance.
+
+def off_route(m, along, aside_away_from_g1=0.0, turn=0.0):
+    """Move the robot ``along`` its heading and sideways away from G1, turned by ``turn``."""
+    b, t = m.tf_buffer, m.target_position
+    c, s = math.cos(b.yaw), math.sin(b.yaw)
+    gy = -s * (t.map_x_m - b.x) + c * (t.map_y_m - b.y)
+    side = -math.copysign(aside_away_from_g1, gy)
+    b.x, b.y = b.x + c * along - s * side, b.y + s * along + c * side
+    b.yaw += turn
+
+
+@pytest.mark.parametrize('aside,turn,vetoed', [(0.05, 0.0, False), (0.10, 0.0, True), (0.0, 0.15, True)])
+def test_leaving_the_checked_route_ends_the_departure(manager_factory, monkeypatch, aside, turn, vetoed):
+    m, handle, _ = departing(manager_factory, monkeypatch)
+    off_route(m, 0.2, aside, turn)
+    feed(m)
+    assert handle.cancels == int(vetoed)
+    if vetoed:
+        assert m.departure['outcome'].startswith('ended early: route_deviation')
+        assert m._departure_stopping
+
+
+# A failed final leg leaves the robot near G1: the same departure runs once it has stopped.
+
+def final_leg_failed(manager_factory, monkeypatch, attempts):
+    """Vetoed on the final leg 0.1 m short of the parking pose."""
+    from test_parking_mission_navigation import aim_camera
+    m, published = feasible(manager_factory, monkeypatch, attempts=attempts)
+    aim_camera(m)
+    sel, params, nav = m.parking_plan.selected, m._goal_checker_set_client, m.navigation_client
+    answer(params)
+    navigation_result(nav)                                   # pre-parking pose reached
+    assert m.state == MissionState.NAVIGATING_TO_PARKING
+    answer(params)
+    _, accepted, handle = nav.calls[-1]
+    accepted.set_result(handle)
+    pre = preparking_pose(sel.base_x, sel.base_y, sel.yaw, 0.5)
+    m.tf_buffer.x, m.tf_buffer.y = sel.base_x + 0.2 * (pre[0] - sel.base_x), sel.base_y + 0.2 * (pre[1] - sel.base_y)
+    m.tf_buffer.yaw = sel.yaw
+    m._parking_navigation_failed('lidar_clearance: lidar_obstacle_in_stopping_path', stop_first=True)
+    assert handle.cancels == 1 and m._depart_after_stop
+    return m, handle, pre, published
+
+
+def stopped_near_g1(m, handle, points=()):
+    release(handle)
+    hold_still(m)
+    fresh(m, points)
+    m.tick()
+
+
+def depart(m, pre):
+    assert answer(m._goal_checker_set_client) == {'general_goal_checker.xy_goal_tolerance': 0.08,
+                                                  'general_goal_checker.yaw_goal_tolerance': 0.12}
+    feed(m)
+    assert navigation_result(m.navigation_client) == pytest.approx(pre)
+    assert m.departure['outcome'] == 'reached'
+
+
+def test_a_failed_final_leg_departs_before_the_retry(manager_factory, monkeypatch):
+    m, handle, pre, _ = final_leg_failed(manager_factory, monkeypatch, attempts=3)
+    assert m.state == MissionState.RETURNING_TO_OBSERVATION
+    stopped_near_g1(m, handle)
+    assert m._departure_route is not None and m.state == MissionState.RETURNING_TO_OBSERVATION
+    depart(m, pre)
+    answer(m._goal_checker_set_client)                       # the observation tolerance
+    assert navigation_result(m.navigation_client) == pytest.approx(m._observation_goal[:3])
+
+
+def test_a_failed_last_final_leg_departs_before_the_return(manager_factory, monkeypatch):
+    m, handle, pre, _ = final_leg_failed(manager_factory, monkeypatch, attempts=1)
+    assert m.state == MissionState.RETURNING_TO_START
+    stopped_near_g1(m, handle)
+    depart(m, pre)
+    answer(m._goal_checker_set_client)                       # the shared checker
+    assert navigation_result(m.navigation_client) == pytest.approx((1.0, 2.0, 0.25))
+    assert m.state == MissionState.MISSION_FAILED and m.last_issue.code == 'parking_failed'
+
+
+def test_a_failed_final_leg_with_no_safe_departure_stays_stopped(manager_factory, monkeypatch):
+    m, handle, _, _ = final_leg_failed(manager_factory, monkeypatch, attempts=3)
+    calls = len(m.navigation_client.calls)
+    stopped_near_g1(m, handle, [ahead(m)])
+    assert m.state == MissionState.MISSION_FAILED and m.last_issue.code == 'departure_not_safe'
+    assert len(m.navigation_client.calls) == calls           # nothing was driven

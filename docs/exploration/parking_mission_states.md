@@ -35,7 +35,7 @@ mission manager unless noted.
 | `NAVIGATING_TO_PREPARKING` | Drive to the pose 0.5 m before the parking pose, LiDAR checked | arrival, veto or failure | `parking_navigation_timeout_s` 90 s, `parking_progress_timeout_s` 20 s | 14.0 (2.6-18.2), 5 visits | 9.8 (2.2-17.3), 2 visits |
 | `NAVIGATING_TO_PARKING` | The final, tight-tolerance leg, LiDAR checked | arrival, veto or failure | as above | 2.7 (2.4-3.0), 2 visits | 6.2, 1 visit |
 | `PARKED` | Confirm the stop, then wait; then check the departure | the departure starts, or `MISSION_FAILED` (`departure_not_safe`) with the robot stopped | `parking_wait_s` 5 s after the stop is confirmed; fresh stop evidence then, within `motion_settlement_timeout_s` | 8.6, 1 visit | 17.3, 1 visit |
-| `RETURNING_TO_START` | Depart (after parking only), then drive back to the saved start pose | arrival or failure | departure `parking_navigation_timeout_s` 90 s; return `return_navigation_timeout_s` 300 s | 17.8 (3.0-77.3), 6 visits | 51.2, 1 visit |
+| `RETURNING_TO_START` | Depart (after parking or a failed final leg), then drive back to the saved start pose | arrival or failure | departure `parking_navigation_timeout_s` 90 s; return `return_navigation_timeout_s` 300 s | 17.8 (3.0-77.3), 6 visits | 51.2, 1 visit |
 | `MISSION_COMPLETE` | Parked, waited and returned | terminal | - | - | - |
 | `MISSION_FAILED`, `PARKING_PLANNING_FAILED`, `PARKING_EXECUTION_FAILED`, `MOTION_SETTLEMENT_FAILED`, `MISSION_CANCELED` | Terminal failure or cancellation, with a reason | terminal | - | - | - |
 
@@ -52,12 +52,18 @@ rad goal checker. It starts only on current stop evidence, with the swept planni
 footprint (basket included) free in the current map and never nearer G1, and with
 fresh scans and odometry showing nothing in the stopping path or on the route. The
 parking legs' LiDAR check then runs on every scan and tick until the pose is reached
-(`departure` in the clearance legs). If the departure cannot start, the mission ends
-`MISSION_FAILED` (`departure_not_safe`) where the robot parked. A veto, a stale sensor,
-a Nav2 failure or the deadline cancels it; once Nav2 releases the goal and the stop is
-confirmed, the mission ends `MISSION_FAILED` (`departure_failed`) without another goal
-near G1 (`stop_not_confirmed` if no stop is confirmed). Reaching the pose starts the
-unchanged return. The return after a failed parking leg has no departure step.
+(`departure` in the clearance legs). Nav2's default behavior tree replans at 1 Hz and
+may spin or back up, so the robot must also stay within the goal checker's 0.08 m and
+0.12 rad of the checked straight route (`route_deviation`). If the departure cannot
+start, the mission ends `MISSION_FAILED` (`departure_not_safe`) with the robot
+stopped. A veto, leaving the route, a stale sensor, a Nav2 failure or the deadline
+cancels it; once Nav2 releases the goal and the stop is confirmed, the mission ends
+`MISSION_FAILED` (`departure_failed`) without another goal near G1
+(`stop_not_confirmed` if no stop is confirmed). Reaching the pose starts the unchanged
+return. A failed or vetoed final leg leaves the robot near G1, so once the stop is
+confirmed the same departure runs first, in `RETURNING_TO_OBSERVATION` before a retry
+or in `RETURNING_TO_START` before the return; a failure on the pre-parking leg goes
+straight to the retry or return.
 
 ## Whole missions
 

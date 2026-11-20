@@ -80,6 +80,28 @@ def remaining_route(route, robot, limits=ClearanceLimits()):
     return out
 
 
+def route_deviation(route, robot, xy_tolerance_m, yaw_tolerance_rad):
+    """Why ``robot`` has left the corridor around the checked ``route``, or ``None``: more than
+    ``xy_tolerance_m`` from the polyline (before its start or past its end included), or turned
+    more than ``yaw_tolerance_rad`` from the route's heading at the nearest point."""
+    best = None
+    for a, b in zip(route, route[1:]) if len(route) > 1 else [(route[0], route[0])]:
+        dx, dy = b[0] - a[0], b[1] - a[1]
+        length2 = dx * dx + dy * dy
+        t = 0.0 if length2 == 0.0 else max(0.0, min(1.0, (
+            (robot[0] - a[0]) * dx + (robot[1] - a[1]) * dy) / length2))
+        distance = math.hypot(a[0] + t * dx - robot[0], a[1] + t * dy - robot[1])
+        if best is None or distance < best[0]:
+            best = (distance, a[2] + normalize_angle(b[2] - a[2]) * t)
+    distance, yaw = best
+    if distance > xy_tolerance_m:
+        return f'route_deviation: {distance:.3f} m off the checked route'
+    turned = abs(normalize_angle(robot[2] - yaw))
+    if turned > yaw_tolerance_rad:
+        return f'route_deviation: turned {turned:.3f} rad off the checked route'
+    return None
+
+
 def to_base(pose, robot):
     dx, dy = pose[0] - robot[0], pose[1] - robot[1]
     c, s = math.cos(robot[2]), math.sin(robot[2])

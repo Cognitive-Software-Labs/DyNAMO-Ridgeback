@@ -323,3 +323,17 @@ def test_the_prefiltered_check_gives_the_full_check_s_answer():
         assert (got.reason, None if got.vetoed_by is None else got.vetoed_by[:2]) == expected
         outcomes.add(expected[0])
     assert outcomes == {None, 'lidar_obstacle_in_stopping_path', 'lidar_obstacle_on_route'}
+
+
+@pytest.mark.parametrize('robot,problem', [
+    ((0.25, 0.05, 0.0), None), ((0.25, 0.0, 0.10), None), ((0.55, 0.0, 0.0), None),
+    ((0.25, 0.09, 0.0), 'off the checked route'),          # sideways (a replanned curve)
+    ((-0.09, 0.0, 0.0), 'off the checked route'),          # backed up behind the start
+    ((0.59, 0.0, 0.0), 'off the checked route'),           # past the end
+    ((0.25, 0.0, -0.13), 'turned'),                         # a spin
+])
+def test_route_deviation_bounds_the_robot_to_a_corridor_around_the_checked_route(robot, problem):
+    from ridgeback_autonomy.mission.parking_clearance import route_deviation
+    route = [(0.025 * k, 0.0, 0.0) for k in range(21)]
+    reason = route_deviation(route, robot, 0.08, 0.12)
+    assert (reason is None) if problem is None else (problem in reason)

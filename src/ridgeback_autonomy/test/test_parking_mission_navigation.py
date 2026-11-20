@@ -513,7 +513,8 @@ def test_failures_not_specific_to_the_attempt_are_never_retried(manager_factory,
 def test_the_third_failed_attempt_returns_home_and_reports_all_attempts(manager_factory, monkeypatch):
     m, handle, _, _ = vetoed(manager_factory, monkeypatch)
     m._parking_attempts = 3                                    # this was the last allowed attempt
-    m.state = MissionState.NAVIGATING_TO_PARKING
+    # On the pre-parking leg, away from G1 (a failed final leg departs first: test_parking_departure).
+    m.state = MissionState.NAVIGATING_TO_PREPARKING
     m._parking_navigation_failed('lidar_clearance: lidar_obstacle_in_stopping_path', stop_first=True)
     assert m.state == MissionState.RETURNING_TO_START
     stopped(m, handle)
