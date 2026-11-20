@@ -158,6 +158,105 @@ def path_rejection(path, candidate, start, grid, target, config, keepout, *, occ
     return None
 
 
+ROUTE_WINDOW_POSES = 8      # driven poses per window; neighbouring windows share one
+
+
+def route_window(path, candidate, start, grid, config, *, occupied=()):
+    """Inclusive grid bounds ((r0, r1, c0, c1), ...) holding every cell ``path_rejection``
+    can read for this route, or None when they cannot be bounded (no reuse then).
+
+    It reads cells only within one cell of the bounding box of a footprint placed at a
+    swept pose, at ``start`` or at an ``occupied`` pose. Every swept pose interpolates two
+    consecutive ``driven_poses``; each run of ``ROUTE_WINDOW_POSES`` of them, sharing its
+    last pose with the next run, gets one window, so every swept segment lies inside one.
+    Every footprint point lies within the footprint's radius of its pose, whatever its
+    orientation, and two more cells cover rounding.
+    """
+    try:
+        driven = driven_poses(path, candidate, start)
+    except (AttributeError, ValueError, TypeError):
+        return None
+    radius = max((math.hypot(x, y) for x, y in config.footprint), default=float('nan'))
+    step = ROUTE_WINDOW_POSES - 1
+    groups = [driven[i:i + ROUTE_WINDOW_POSES] for i in range(0, max(len(driven) - 1, 1), step)]
+    groups += [[tuple(start[:2])]] + [[tuple(o[:2])] for o in occupied]
+    res = grid.resolution
+    windows = []
+    for group in groups:
+        xs = [p[0] for p in group]
+        ys = [p[1] for p in group]
+        # min() and max() skip a NaN silently, so every value is checked.
+        if not (math.isfinite(radius) and all(math.isfinite(v) for v in xs + ys)):
+            return None
+        x0, x1, y0, y1 = min(xs) - radius, max(xs) + radius, min(ys) - radius, max(ys) + radius
+        lx, ly = grid.map_to_local([x0, x1, x1, x0], [y0, y0, y1, y1])
+        c0 = max(0, math.floor(float(lx.min()) / res) - 2)
+        c1 = min(grid.width - 1, math.ceil(float(lx.max()) / res) + 2)
+        r0 = max(0, math.floor(float(ly.min()) / res) - 2)
+        r1 = min(grid.height - 1, math.ceil(float(ly.max()) / res) + 2)
+        if c0 <= c1 and r0 <= r1:
+            windows.append((r0, r1, c0, c1))
+    return tuple(windows) or None
+
+
+# A stored sweep is reused only while the robot stays this close to the pose it was swept
+# from (never chained from pose to pose): tighter than the 1 mm / 1 mrad rounding used
+# before, without its boundary flips. A footprint corner then moves under 1 mm against
+# 0.05 m cells. SLAM corrections of a standing robot (about 10 mm) sweep again.
+ROUTE_REUSE_POSE_M = 0.0005
+ROUTE_REUSE_YAW_RAD = 0.0005
+
+
+class RouteCheckCache:
+    """The last ``path_rejection`` result, reused only while every input it reads is
+    unchanged: the route's poses and frames, the candidate, target, keep-out, footprint,
+    threshold, occupied poses, the grid's frame, resolution, origin and size, the cells in
+    ``route_window`` and the robot pose (within the tolerance above). Anything else in
+    the map may change: SLAM rewrites the whole map every 0.5 s while the robot stands
+    still, so a whole-map key swept the route on every tick (0.29 s for a 5 m route,
+    which delayed odometry past the stationary window; controlled Gazebo run, 2026-11-20).
+    """
+
+    def __init__(self):
+        self._entry = None
+
+    def clear(self):
+        self._entry = None
+
+    def check(self, path, candidate, start, grid, target, config, keepout, *, occupied=(),
+              sweep=path_rejection):
+        window = route_window(path, candidate, start, grid, config, occupied=occupied)
+        key = cells = None
+        if window is not None:
+            try:
+                route = (path.header.frame_id, tuple(
+                    (p.header.frame_id, p.pose.position.x, p.pose.position.y, p.pose.position.z,
+                     p.pose.orientation.x, p.pose.orientation.y, p.pose.orientation.z,
+                     p.pose.orientation.w) for p in path.poses))
+            except AttributeError:
+                window = None
+        if window is not None:
+            key = (route, candidate.base_x, candidate.base_y, candidate.yaw, target.x, target.y,
+                   keepout, tuple(config.footprint), config.occupied_threshold,
+                   tuple(tuple(o) for o in occupied), grid.frame_id, grid.resolution,
+                   grid.origin_x, grid.origin_y, grid.origin_yaw, grid.width, grid.height, window)
+            cells = [grid.data[r0:r1 + 1, c0:c1 + 1] for r0, r1, c0, c1 in window]
+            entry = self._entry
+            if (entry is not None and entry[0] == key and _near(entry[1], start)
+                    and all(np.array_equal(a, b) for a, b in zip(entry[2], cells))):
+                return entry[3]
+        result = sweep(path, candidate, start, grid, target, config, keepout, occupied=occupied)
+        self._entry = None if key is None else (
+            key, tuple(start[:3]), [c.copy() for c in cells], result)
+        return result
+
+
+def _near(swept, robot):
+    return (abs(robot[0] - swept[0]) <= ROUTE_REUSE_POSE_M
+            and abs(robot[1] - swept[1]) <= ROUTE_REUSE_POSE_M
+            and abs(normalize_angle(robot[2] - swept[2])) <= ROUTE_REUSE_YAW_RAD)
+
+
 def driven_poses(path, candidate, start, poses=None):
     """The (x, y, yaw) sequence the robot drives along ``path`` from ``start`` to the candidate."""
     if poses is None:

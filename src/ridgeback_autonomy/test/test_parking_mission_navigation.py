@@ -316,7 +316,7 @@ def test_path_checks_include_the_saved_mission_start_footprint(manager_factory, 
     seen = []
     monkeypatch.setattr('ridgeback_autonomy.mission.mission_manager_node.path_rejection',
                         lambda *a, **k: seen.append(k) or None)
-    m._route_check_cache = None            # planning already checked this route once
+    m._route_check.clear()                 # planning already checked this route once
     assert m._plan_invalid_reason() is None
     assert seen == [{'occupied': m._start_footprint_poses()}]
 
@@ -638,20 +638,29 @@ def test_an_excluded_provisional_pick_is_not_revived(manager_factory, monkeypatc
     assert all(c.status == 'rejected' for c in plan.candidates if c.preference_label == 'g1_left')
 
 
-def test_an_unchanged_route_check_is_reused_and_a_changed_map_rechecks(manager_factory, monkeypatch):
+def test_an_unchanged_route_check_is_reused_and_only_its_own_cells_recheck(manager_factory, monkeypatch):
     """Gazebo standard after the dev merge (2026-11-14): sweeping a 9 m route every tick
-    delayed odometry past the stationary window and the plan expired."""
+    delayed odometry past the stationary window and the plan expired. SLAM rewrites the
+    map every 0.5 s while the robot stands still (controlled Gazebo run, 2026-11-20), so
+    only the cells the route's sweep reads may sweep it again."""
     import ridgeback_autonomy.mission.mission_manager_node as node
+    from ridgeback_autonomy.mission.parking_planner import GridSnapshot
     m, _ = feasible(manager_factory, monkeypatch, enabled=False)
     calls = []
-    real = node.path_rejection
+    from ridgeback_autonomy.mission.parking_feasibility import path_rejection as real   # running() stubs it
     monkeypatch.setattr(node, 'path_rejection', lambda *a, **k: calls.append(1) or real(*a, **k))
-    m._route_check_cache = None
+    m._route_check.clear()
     assert m._plan_invalid_reason() is None and m._plan_invalid_reason() is None
     assert len(calls) == 1
-    blocked = m.latest_map
-    data = list(blocked.data)
-    data[0] = 100 if data[0] != 100 else 0           # same stamp, different contents
-    blocked.data = data
-    m._plan_invalid_reason()
-    assert len(calls) == 2
+    msg = m.latest_map
+    grid = GridSnapshot.from_msg(msg)
+    assert not any(r0 == 0 and c0 == 0 for r0, _, c0, _ in m._route_check._entry[0][-1])
+    data = list(msg.data)
+    data[0] = 100 if data[0] != 100 else 0           # same stamp, a far cell changed
+    msg.data = data
+    assert m._plan_invalid_reason() is None and len(calls) == 1
+    on_route = m.parking_plan.selected_path.poses[len(m.parking_plan.selected_path.poses) // 2].pose.position
+    lx, ly = grid.map_to_local(on_route.x, on_route.y)
+    data[int(ly // grid.resolution) * grid.width + int(lx // grid.resolution)] = 100
+    msg.data = data
+    assert m._plan_invalid_reason() == 'path_footprint_occupied' and len(calls) == 2
