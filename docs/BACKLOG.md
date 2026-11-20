@@ -123,6 +123,81 @@ qualified. Each needs a new scope decision; reopen it before the named use.
 it as an active item with its own criteria, or when its gate is qualified and
 the result is recorded in its reference.
 
+## Frame-to-estimate latency
+
+**Gap.** How late target estimates arrive is only partly measured. On Thor,
+only box-mask conditions with a person target have numbers: box + stereo has a
+per-frame measurement from camera stamp to measurement receipt (frame-timing
+record under [Archived evidence](#archived-evidence)), and box + monocular has
+the delays in the
+[deployment qualification](target_localization/distributed_deployment.md#qualification-and-paired-rollback).
+Silhouette conditions and the G1 target are unmeasured there. Simulator timing
+diagnostics start at detector arrival and report independent stage percentiles
+([timing interpretation](target_localization/detection.md#timing-interpretation)),
+so they are not comparable with the hardware figures.
+
+**Remaining work.** Replay the
+[recorded hardware bags](target_distance_benchmarking/hardware_bag_validation.md)
+in real time through the live pipeline. A tracked probe records each
+`TargetMeasurements` receipt time minus its header stamp (the camera frame
+stamp), plus the `TargetDetections` receipt time for the detector share.
+
+- Play the bags on Intel with `ros2 bag play --clock` at a high rate such as
+  1000 Hz, and run localization on Thor with `use_sim_time:=true`. Sim time
+  stands still between `/clock` messages, so the rate bounds the resolution.
+  Wall time cannot work: the recorded stamps are days old, and acquisition-age
+  checks and result consumers compare stamps with `now`. The bag clock follows
+  the original Intel receive time, so the recorded driver delay stays in the
+  result.
+- Use a separate ROS domain so live sensors and TF do not collide with the
+  replay, and stop Thor's `dynamo-localization.service` so only one
+  localization instance uses the GPU. Confirm that the localization launch
+  starts against replayed inputs; any new readiness condition uses
+  `launch_wait` gates.
+- Measure box/silhouette × stereo/monocular as separate runs from a warm
+  pipeline; polar estimates arrive in the same message. Run the same probe in
+  Gazebo and Isaac.
+- The Intel copies of the bags were removed after offload. Copy the needed bags
+  back (about 50 GB for all of them) before the robot slot.
+- The same harness is the measurement method for
+  [Intel and Thor workload allocation](#intel-and-thor-workload-allocation),
+  so latency can be measured in the same robot slot as that comparison. No
+  other heavy work runs on Intel or Thor during it.
+
+**Completion criteria.** For each of the four conditions, on Thor with the G1
+target and in Gazebo and Isaac, record median, p95 and maximum
+camera-stamp-to-estimate latency and the achieved estimate rate. The Thor box +
+stereo result agrees with the earlier measurement or the difference is
+explained. Results go into the
+[pipeline reference](target_localization/target_localization_pipeline.md) with
+a dated archive record, and this item is removed.
+
+## Intel and Thor workload allocation
+
+**Gap.** Localization compute runs on Thor, while sensors, TF and result
+consumers run on Intel, as the
+[deployment contract](target_localization/distributed_deployment.md) describes.
+No other split of processes and sensors between the two hosts has been
+compared, so the current split is not known to be the right one. Candidate
+splits are still under discussion. Further optimization or parallel estimator
+execution is a discussion item, not committed work.
+
+**Remaining work.** List the candidate splits here once chosen. Compare them
+with the [frame-to-estimate latency](#frame-to-estimate-latency) bag-replay
+harness: run the current split first as the baseline, then each candidate in
+the same robot slot with the same bags and all four mask × depth conditions.
+Record per-host CPU, GPU, memory and temperature, and link usage, alongside
+latency. Covering all four conditions keeps the comparison valid while
+estimator parameters change; rerun only if the configuration adds
+timing-relevant work such as a new model. Bag replay is stationary, so a split
+that moves SLAM or Nav2 also needs the full driving workflow.
+
+**Completion criteria.** A split is selected from measured latency, achieved
+estimate rate and host load for every candidate. The choice and its measured
+basis are recorded in the deployment contract with a dated archive record. A
+selected split that moves SLAM or Nav2 has also passed the full workflow on the
+robot.
+
 ## Missing physical operator procedures
 
 **Gap.** The runbooks found three operator steps with no maintained procedure:
@@ -291,3 +366,4 @@ in the reference that owns the fact or moved to the item that owns the work.
 - [r100_0160 D455 calibration vs the nominal model](../archive/engineering/2026-10-13-r100-0160-d455-calibration-vs-nominal.md)
 - [urg_node reconnect leak and recovery](../archive/engineering/2026-10-13-urg-node-reconnect-leak.md)
 - [r100_0160 rear LiDAR side-target recheck](../archive/engineering/2026-09-24-r100-0160-rear-lidar-recheck.md)
+- [Intel–Thor perception frame timing](../archive/engineering/2026-10-22-perception-frame-timing.md)
