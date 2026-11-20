@@ -223,6 +223,13 @@ recordings are kept untracked under `artifacts/`, not in Git.
   unknown: the mission reads raw `platform/odom` in Isaac, but only the filtered odometry
   was recorded. Past the allowance the robot stays stopped beside G1. Moving obstacles
   were not tested.
+- **Waiting to drive in Gazebo.** Re-sweeping a verified route against SLAM's
+  constantly rewritten map once delayed odometry until the plan was discarded
+  (`motion_evidence_lost`). The route check is now reused while the map cells along the
+  route and the robot pose stay unchanged. One controlled Gazebo run confirmed it, with
+  routes of at most 2.78 m (record under archived evidence below); the original 5 m case
+  was checked only by replaying recorded maps. Reuse within 0.5 mm and 0.5 mrad of the
+  checked pose is a bounded approximation, and no moving obstacle was tested.
 - **Return after an incomplete route search.** After a planning timeout
   (`planning_timeout`) or a spent route-check budget (`route_budget_exhausted`), the
   robot returns to the start only once its stop is confirmed, its sensors are fresh and
@@ -259,3 +266,4 @@ and its neighbouring parking items.
 
 - [Parking in the hospital ward](../../archive/engineering/2026-11-18-parking-hospital-validation.md) — every ward validation run, the localization and scenario problems they exposed, and the final-code runs.
 - [Departure from G1, first Isaac run](../../archive/engineering/2026-11-20-parking-departure-isaac.md) — the checked departure live, its LiDAR checks and route deviation, and the delayed stop confirmation.
+- [Route revalidation cache, controlled Gazebo runs](../../archive/engineering/2026-11-20-parking-route-cache-gazebo.md) — the cache misses that starved odometry while a verified plan waited, and one controlled run of the route-local cache.

@@ -348,6 +348,12 @@ That run's log cannot tell a motion fault from an expired restart allowance; sin
 2026-11-20 the failure names which, and the mission state records each restart's cause
 with the odometry stamp and the manager's clock
 ([stop evidence](exploration/parking_mission_states.md#stop-evidence)).
+A controlled Gazebo run on 2026-11-20 found the cause: the route revalidation
+re-swept the route on almost every tick, because its cache keyed the whole map, which
+SLAM rewrites every 0.5 s. That starved odometry (`odometry_stale`), while the
+manager's stamp skew stayed under 0.1 s. Since `9f7120e` only the map cells along the
+route sweep it again. One controlled run with routes of at most 2.78 m confirmed it.
+One restart per attempt remains, during the route search itself.
 
 The same blocking checks made a verified plan's G1 estimate older than its 5 s
 limit before driving on 2026-11-09 (`target_stale`); while the robot stands still
@@ -355,10 +361,8 @@ for planning, new views of G1 where the localization measured it now keep the
 estimate's stamp fresh (compared with that view's surface estimate, which the head
 check may have moved off a table edge).
 
-**Completion criteria.** Decide whether a timestamp fault seen right after
-blocking path checks should restart the stationary interval, as a restarted
-interval already does, and whether a planning failure after a feasible plan
-should return to the start; then rerun a long-route scene.
+**Completion criteria.** Rerun a long-route scene (about 5 m or more) live; decide
+whether a planning failure after a feasible plan should return to the start.
 
 ## Orientation-aware navigation through narrow passages
 
