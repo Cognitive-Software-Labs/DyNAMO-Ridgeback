@@ -216,6 +216,12 @@ recordings are kept untracked under `artifacts/`, not in Git.
   1.6 m before planning ([observation return](architecture.md#observation-return)).
   If the new view still gives no heading, the ranking stays undirected. The step back
   is covered by automated tests only: no simulator run has triggered it yet.
+- **Departure from G1.** One Isaac hospital run demonstrated the checked departure, with
+  the LiDAR check active throughout (record under archived evidence below);
+  the departure after a failed final approach is covered by automated tests only. Small
+  odometry fluctuations of the stationary robot delay the stop confirmation it needs (by
+  6 s of the 10 s allowed in that run); past the allowance the robot stays stopped beside
+  G1. Moving obstacles were not tested.
 - **Reach violation on earlier code.** A Gazebo `standard` run (`gz_standard_run2`,
   `f6ade2f`) completed with a reach of 0.607 m, outside 0.30-0.60 m: the localization
   and map-pose errors added to a plan of 0.517 m.
@@ -243,3 +249,4 @@ and its neighbouring parking items.
 ## Archived evidence
 
 - [Parking in the hospital ward](../../archive/engineering/2026-11-18-parking-hospital-validation.md) — every ward validation run, the localization and scenario problems they exposed, and the final-code runs.
+- [Departure from G1, first Isaac run](../../archive/engineering/2026-11-20-parking-departure-isaac.md) — the checked departure live, its LiDAR checks and route deviation, and the delayed stop confirmation.
