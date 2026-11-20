@@ -25,7 +25,8 @@ from the robot's own localization, and the scene had no moving obstacle.
   evidence for the departure came 6 s after the wait, inside its 10 s allowance: the
   filtered odometry of the stationary robot reported 0.005-0.009 rad/s, just above the
   0.005 rad/s settlement limit, and each such sample restarted the 2 s interval. No
-  velocity command was sent meanwhile.
+  velocity command was sent meanwhile. (Explanation withdrawn on 2026-11-20; see the
+  correction below. The measurements stand.)
 - The departure drove 0.50 m straight to the pre-parking pose in 4.8 s (up to 0.30 m/s
   forward, at most 0.018 m/s sideways, never reversing) and ended 0.078 m short, within
   the 0.08 m goal tolerance.
@@ -43,4 +44,27 @@ from the robot's own localization, and the scene had no moving obstacle.
 One run. It did not exercise the departure after a failed final approach or a corridor
 cancellation; automated tests alone cover them. The odometry fluctuations above can use
 up the 10 s allowance, which ends the mission `departure_not_safe` with the robot
-stopped beside G1. Moving obstacles and the real robot were not tested.
+stopped beside G1 (corrected below: the restarts' cause is unknown, but restarts
+that recur can still use up the allowance). Moving obstacles and the real robot were
+not tested.
+
+## Correction
+
+Correction dated 2026-11-20, from the launch configuration and an offline replay of this
+run's recordings. In Isaac the mission's stop check reads raw `platform/odom`: the
+`odometry_topic` default of `ridgeback_mission.launch.py` for the Isaac backend since
+`2e48b81`. The passive recorder captured only `platform/odom/filtered`, the EKF output,
+which fuses the simulated IMU gyro (noise 0.005 rad/s at the default odometry noise).
+The 0.005-0.009 rad/s readings above are measurements of that filtered topic, not of
+what the mission checked. Replayed through the stop check, the filtered odometry
+never stayed still for 2 s during the whole parked period. The mission nevertheless
+confirmed the stop twice, so it did not see those readings.
+
+What the recordings do show: the simulator ran at 0.454 times real time without
+stalling (largest gap between filtered odometry messages 0.14 s). The 2 s interval is
+counted in simulated time, about 4.4 s of wall time here, so the 6 s delay fits one
+restart about 1.6 s after the wait ended. **The cause of that restart, and so of the
+six-second delay, remains unknown**: raw `platform/odom` was not recorded, and the
+mission did not report why its interval restarted. Later scenario runs record raw and
+filtered odometry, and in Isaac `/clock`. The mission state now records each restart's
+cause with the odometry stamp and the mission's clock.

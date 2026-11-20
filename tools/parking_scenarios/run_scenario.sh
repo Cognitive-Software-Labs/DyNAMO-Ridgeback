@@ -1,7 +1,8 @@
 #!/bin/bash
 # One parking scenario run: run_scenario.sh gz|isaac SCENARIO OUT_DIR.
 # Waits for a free workstation, starts start_parking_demo.sh in its own session, records a small
-# bag (with both 2D scans, for parking-clearance review), samples Gazebo ground truth, takes RViz screenshots at mission stages and
+# bag (with both 2D scans, for parking-clearance review; raw and filtered odometry, and in Isaac
+# /clock, because the mission's stop check reads raw platform/odom there), samples Gazebo ground truth, takes RViz screenshots at mission stages and
 # server-rendered top-down views of the scene (capture_scene_views.py) when parked and at the
 # end, and stops only that session with SIGTERM. LIMIT (s) bounds the run; DEMO_ARGS adds launch arguments (e.g. rviz_layout:=compact);
 # END_VIEWS names the scene views taken at the end (default overview,workstation), PARKED_VIEWS those
@@ -26,7 +27,8 @@ setsid bash start_parking_demo.sh $B demo_scenario:=$SC ${DEMO_ARGS:-} > "$D/con
 LPID=$!
 ( until [ -s "$D/console.log" ]; do timeout 1 tail -n0 -f /dev/null; done; source install/setup.bash
   export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp ROS_DOMAIN_ID=83 ROS_LOCALHOST_ONLY=1 CYCLONEDDS_URI="file://$PWD/install/ridgeback_autonomy/share/ridgeback_autonomy/config/parking_demo_cyclonedds.xml"
-  exec ros2 bag record -s mcap -o "$D/bag" /r100_0001/parking_mission/state /r100_0001/parking/visualization /r100_0001/plan /r100_0001/map /r100_0001/detections/target/raw /r100_0001/measurements/target/mask /r100_0001/sensors/lidar2d_0/scan /r100_0001/sensors/lidar2d_1/scan > "$D/bag_record.log" 2>&1 ) & RPID=$!
+  exec ros2 bag record -s mcap -o "$D/bag" /r100_0001/parking_mission/state /r100_0001/parking/visualization /r100_0001/plan /r100_0001/map /r100_0001/detections/target/raw /r100_0001/measurements/target/mask /r100_0001/sensors/lidar2d_0/scan /r100_0001/sensors/lidar2d_1/scan \
+    /r100_0001/platform/odom /r100_0001/platform/odom/filtered $([ "$B" = isaac ] && echo /clock) > "$D/bag_record.log" 2>&1 ) & RPID=$!
 [ "$B" = gz ] && { python3 "$P/truth_track.py" "$D" & TPID=$!; }
 # FRAMES=1 also keeps camera frames (FRAMES_PERIOD s apart, FRAMES_EXT jpg about 50 KB or lossless png) for detector review.
 # The saver records its own PID (frame_saver.pid) so the stop below reaches exactly it.

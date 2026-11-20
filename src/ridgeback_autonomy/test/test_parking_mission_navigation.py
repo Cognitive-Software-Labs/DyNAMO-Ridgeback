@@ -283,7 +283,7 @@ def test_motion_after_planning_still_invalidates_the_plan(manager_factory, monke
     _delayed_sample(m, velocity=0.05, wall_gap=0.1)
     m.tick()
     assert m.state == MissionState.PARKING_PLANNING_FAILED
-    assert m.last_issue.reason == 'motion_evidence_lost: robot_moving'
+    assert m.last_issue.reason.startswith('motion_evidence_lost: motion fault robot_moving')
 
 
 def test_restarted_evidence_must_complete_within_the_settlement_timeout(manager_factory, monkeypatch):

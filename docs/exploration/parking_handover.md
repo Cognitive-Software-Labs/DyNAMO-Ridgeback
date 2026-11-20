@@ -218,10 +218,11 @@ recordings are kept untracked under `artifacts/`, not in Git.
   is covered by automated tests only: no simulator run has triggered it yet.
 - **Departure from G1.** One Isaac hospital run demonstrated the checked departure, with
   the LiDAR check active throughout (record under archived evidence below);
-  the departure after a failed final approach is covered by automated tests only. Small
-  odometry fluctuations of the stationary robot delay the stop confirmation it needs (by
-  6 s of the 10 s allowed in that run); past the allowance the robot stays stopped beside
-  G1. Moving obstacles were not tested.
+  the departure after a failed final approach is covered by automated tests only. The
+  stop confirmation it needs took 6 s of the 10 s allowed in that run, and the cause is
+  unknown: the mission reads raw `platform/odom` in Isaac, but only the filtered odometry
+  was recorded. Past the allowance the robot stays stopped beside G1. Moving obstacles
+  were not tested.
 - **Return after an incomplete route search.** After a planning timeout
   (`planning_timeout`) or a spent route-check budget (`route_budget_exhausted`), the
   robot returns to the start only once its stop is confirmed, its sensors are fresh and

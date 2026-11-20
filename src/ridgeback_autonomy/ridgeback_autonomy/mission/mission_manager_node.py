@@ -146,6 +146,11 @@ class MissionState(Enum):
 _PARKING_LEGS = (MissionState.NAVIGATING_TO_PREPARKING, MissionState.NAVIGATING_TO_PARKING)
 
 # States in which the manager owns a NavigateToPose goal or a parked stop.
+# States that wait for stop evidence; their restarts are logged (rate-limited).
+_STOP_EVIDENCE_STATES = frozenset({
+    MissionState.SETTLING_MOTION, MissionState.PARKING_CANDIDATES_READY,
+    MissionState.EVALUATING_PARKING_PATHS, MissionState.PARKING_PATH_FEASIBLE,
+    MissionState.PARKED})
 _PARKING_DRIVE_STATES = (
     MissionState.NAVIGATING_TO_PREPARKING,
     MissionState.NAVIGATING_TO_PARKING,
@@ -876,6 +881,7 @@ class MissionManagerNode(Node):
                                      qos_profile_sensor_data)
         self._motion_fault_mark = 0
         self._motion_restart_s = None
+        self._motion_log_total, self._motion_log_s = 0, float('-inf')
 
         # Safety deadlines must still be polled if /clock pauses or stops.
         self.control_timer = self.create_timer(
@@ -912,6 +918,7 @@ class MissionManagerNode(Node):
             if self._plan_rays_grid is not None:
                 self._draw_plan_rays()
             self._poll_safety_evidence(now_s)
+            self._log_motion_restarts(now_s)
             self._publish_keepout_mask()
             stage_was_busy = self.stage_paths.busy
             if stage_was_busy:
@@ -977,8 +984,8 @@ class MissionManagerNode(Node):
                     self._start_localization('fresh odometry confirms physical motion settled')
                 elif now_s >= self._motion_deadline_s:
                     self.last_issue = MissionIssue(FailureClass.TERMINAL,
-                        'motion_settlement_timeout', self.motion.reason)
-                    self._transition(MissionState.MOTION_SETTLEMENT_FAILED, self.motion.reason)
+                        'motion_settlement_timeout', self.motion.explain())
+                    self._transition(MissionState.MOTION_SETTLEMENT_FAILED, self.motion.explain())
                 return
             if self.state == MissionState.PARKING_CANDIDATES_READY:
                 if self.motion.ready(self.get_clock().now().nanoseconds, now_s):
@@ -990,7 +997,7 @@ class MissionManagerNode(Node):
                     self._next_path()
                 elif now_s >= self._motion_deadline_s:
                     self._fail_planning('motion_settlement_timeout',
-                        f'post-planning motion evidence unavailable: {self.motion.reason}')
+                        f'post-planning motion evidence unavailable: {self.motion.explain()}')
                 return
             if self.state in (MissionState.EVALUATING_PARKING_PATHS, MissionState.PARKING_PATH_FEASIBLE):
                 reason = self._plan_invalid_reason()
@@ -1868,9 +1875,9 @@ class MissionManagerNode(Node):
         elif self._nav_deadline_s is not None and now_s >= self._nav_deadline_s:
             self._step_back_stopping = False
             self._nav_deadline_s = None
-            self.last_issue = MissionIssue(FailureClass.TERMINAL, 'stop_not_confirmed', self.motion.reason)
+            self.last_issue = MissionIssue(FailureClass.TERMINAL, 'stop_not_confirmed', self.motion.explain())
             self._transition(MissionState.MISSION_FAILED,
-                             f'no confirmed stop after the step back ended: {self.motion.reason}')
+                             f'no confirmed stop after the step back ended: {self.motion.explain()}')
 
     def _step_back_goal(self, robot, view, target, camera_range_m, *, max_step_m=1.0):
         """A pose on the line from G1 through the robot that puts the camera
@@ -2070,6 +2077,7 @@ class MissionManagerNode(Node):
                 'cancel_pending': self._nav_canceling,
             },
             'motion_status': self.motion.reason,
+            'motion_evidence': self.motion.diagnostics(),
             'parking_clearance': None if self._clearance is None else {
                 'reason': self._clearance.reason, 'points': self._clearance.points,
                 'nearest_m': None if self._clearance.nearest_m is None
@@ -2633,6 +2641,20 @@ class MissionManagerNode(Node):
             self.execution.collision_state(msg.action_type,
                 self.get_clock().now().nanoseconds, self._monotonic())
 
+    def _log_motion_restarts(self, wall_s):
+        """While the mission waits for stop evidence, say why it restarted: at most one
+        line per 2 s, and only when it restarted since the last line. Diagnostics only."""
+        total = self.motion.restart_total
+        if total == self._motion_log_total or wall_s - self._motion_log_s < 2.0:
+            return
+        waiting = (self.state in _STOP_EVIDENCE_STATES or self._return_after_stop
+                   or self._departure_stopping or self._retry_after_stop or self._step_back_stopping)
+        summary = self.motion.summary()
+        if not waiting or not summary:
+            return
+        self._motion_log_total, self._motion_log_s = total, wall_s
+        self.get_logger().info(f'Stationary evidence restarted ({self.state.name}): {summary}')
+
     def _mark_motion_evidence(self):
         """A plan stays valid only while no motion fault follows this point."""
         self._motion_fault_mark = self.motion.faults
@@ -2650,7 +2672,8 @@ class MissionManagerNode(Node):
         if self.motion.ready(now_ns, wall_s):
             self._motion_restart_s = None
         elif self.motion.faults != self._motion_fault_mark:
-            return f'motion_evidence_lost: {self.motion.reason}'
+            # Name the fault itself: by now later samples may read as collecting again.
+            return f'motion_evidence_lost: motion fault {self.motion.describe(self.motion.last_fault)}'
         else:
             # Synchronous path checks can delay odometry callbacks past the
             # evidence window; the interval then restarts without any motion.
@@ -2658,7 +2681,9 @@ class MissionManagerNode(Node):
             if self._motion_restart_s is None:
                 self._motion_restart_s = wall_s
             elif wall_s - self._motion_restart_s > self.motion_settlement_timeout_s:
-                return f'motion_evidence_lost: {self.motion.reason}'
+                return (f'motion_evidence_lost: restart allowance of '
+                        f'{self.motion_settlement_timeout_s:.1f} s expired without motion; '
+                        f'now {self.motion.explain()}')
         plan = self.parking_plan
         if plan is None:
             return 'plan_unavailable'
@@ -3274,12 +3299,12 @@ class MissionManagerNode(Node):
                 self._return_after_stop = False
                 self._nav_deadline_s = None
                 if self._timeout_return_pending:
-                    self._timeout_return_refused(f'stop not confirmed: {self.motion.reason}')
+                    self._timeout_return_refused(f'stop not confirmed: {self.motion.explain()}')
                     return
                 self.last_issue = MissionIssue(FailureClass.TERMINAL, 'stop_not_confirmed',
-                                               self.motion.reason)
+                                               self.motion.explain())
                 self._transition(MissionState.MISSION_FAILED,
-                                 f'no confirmed stop after the parking veto: {self.motion.reason}')
+                                 f'no confirmed stop after the parking veto: {self.motion.explain()}')
             return
         if self.state == MissionState.RETURNING_TO_START and self._timeout_return_pending:
             if self._home_route_deadline_s is not None and now_s >= self._home_route_deadline_s:
@@ -3385,9 +3410,9 @@ class MissionManagerNode(Node):
         elif self._nav_deadline_s is not None and now_s >= self._nav_deadline_s:
             self._retry_after_stop = False
             self._nav_deadline_s = None
-            self.last_issue = MissionIssue(FailureClass.TERMINAL, 'stop_not_confirmed', self.motion.reason)
+            self.last_issue = MissionIssue(FailureClass.TERMINAL, 'stop_not_confirmed', self.motion.explain())
             self._transition(MissionState.MISSION_FAILED,
-                             f'no confirmed stop after the failed parking attempt: {self.motion.reason}')
+                             f'no confirmed stop after the failed parking attempt: {self.motion.explain()}')
 
     def _send_retry_observation(self):
         goal, how = self._reacquisition_goal()
@@ -3462,7 +3487,7 @@ class MissionManagerNode(Node):
         robot = self._current_robot_pose()
         problem, route = None, None
         if not self.motion.ready(self.get_clock().now().nanoseconds, self._monotonic()):
-            problem = f'stop not confirmed: {self.motion.reason}'
+            problem = f'stop not confirmed: {self.motion.explain()}'
         elif robot is None or sel is None or target is None:
             problem = 'robot pose, parking plan or G1 position unavailable'
         else:
@@ -3574,9 +3599,9 @@ class MissionManagerNode(Node):
         elif self._nav_deadline_s is not None and now_s >= self._nav_deadline_s:
             self._departure_stopping = False
             self._nav_deadline_s = None
-            self.last_issue = MissionIssue(FailureClass.TERMINAL, 'stop_not_confirmed', self.motion.reason)
+            self.last_issue = MissionIssue(FailureClass.TERMINAL, 'stop_not_confirmed', self.motion.explain())
             self._transition(MissionState.MISSION_FAILED,
-                             f'no confirmed stop after the departure ended early: {self.motion.reason}')
+                             f'no confirmed stop after the departure ended early: {self.motion.explain()}')
 
     def _settle_before_return(self):
         self.motion.reset()

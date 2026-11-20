@@ -46,6 +46,23 @@ times out after a turn falls back once to the observation pose. A failure while 
 may still own a goal stops the robot in place (`MISSION_FAILED`) instead of starting
 another goal.
 
+### Stop evidence
+
+Every wait for a stop needs 2 s of continuous odometry below 0.005 m/s and 0.005 rad/s,
+counted in both the odometry stamps (simulated time in a simulator) and wall time. One
+sample over a limit, an odometry stamp more than 0.1 s ahead of the manager's clock, a
+stale sample, or a gap of more than 0.5 s restarts the interval. Motion, an invalid
+frame or value, or a stamp that does not advance also counts as a motion fault. After
+planning, a fault discards the plan; other restarts may recur only until
+`motion_settlement_timeout_s` (10 s) has passed without a completed interval. Such a
+lost plan says which: `motion_evidence_lost: motion fault ...` or `motion_evidence_lost:
+restart allowance of 10.0 s expired without motion; ...`. Diagnostics do not affect
+these decisions. `motion_evidence` in the mission state counts this wait's restarts by
+cause (`callback_gap` and `odometry_gap` included), and gives the latest restart and
+fault with the odometry stamp, the manager's clock and their difference, and the range
+of that difference. While the mission waits for a stop, the log names the latest
+restart at most once every 2 s.
+
 ### Incomplete route search
 
 A route search cut short, by the 10 s batch deadline or a 3 s request deadline

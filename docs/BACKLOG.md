@@ -344,6 +344,10 @@ safely at its observation pose. The 2026-11-05 workstation-scenes record under
 archived evidence holds the run. It recurred in a Gazebo ward run on 2026-11-19
 (`motion_evidence_lost: collecting_stationary_interval`, after two such stamps
 restarted the stationary interval); the G1 re-observation record holds that run.
+That run's log cannot tell a motion fault from an expired restart allowance; since
+2026-11-20 the failure names which, and the mission state records each restart's cause
+with the odometry stamp and the manager's clock
+([stop evidence](exploration/parking_mission_states.md#stop-evidence)).
 
 The same blocking checks made a verified plan's G1 estimate older than its 5 s
 limit before driving on 2026-11-09 (`target_stale`); while the robot stands still
