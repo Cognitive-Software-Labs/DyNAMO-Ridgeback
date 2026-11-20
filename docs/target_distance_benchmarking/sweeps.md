@@ -142,6 +142,9 @@ fixed 16-run Gazebo/Isaac campaign and can supervise it as a local user service,
 with capture-readiness checks, strict result checks, deadlines and automatic
 reports. Preparation does not launch a simulation; recorder integration and its
 short readiness checks must pass before full qualification runs begin.
+Its [Isaac-only preparation](unattended_qualification.md#isaac-only-repeatability)
+selects two fresh Isaac sessions with the deterministic rendering policy and
+requires a registered receiving-agent failure heartbeat before launch.
 
 ## Archived evidence
 

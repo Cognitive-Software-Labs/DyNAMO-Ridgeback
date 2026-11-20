@@ -31,6 +31,17 @@ TOTAL_SEC = 12 * 3600 - TIMING_SPENT_SEC
 LIVE_SEC = 9 * 3600
 CLEANUP_SEC = 180
 ADMISSION_SEC = 35 * 60
+CONFIG_TIMEOUT_SEC = 40 * 60
+# Deterministic PathTracing costs up to 23.4 s per trial, about 2600 s for one
+# 109-trial condition, where the realtime campaign needed 1450 s.
+ISAAC_ADMISSION_SEC = 45 * 60
+ISAAC_CONFIG_TIMEOUT_SEC = 55 * 60
+# Three readiness conditions took about 190 s warm; a cold simulator start may
+# add the 300-second scene-control wait before the first condition is admitted.
+CHECK_STAGE_SEC = 15 * 60
+CHECK_ADMISSION_SEC = 120
+# Cleanup reserve between the configuration stop time and the stage deadline.
+STAGE_RESERVE_SEC = 90
 STOP_REQUESTED = False
 LIVE_COMPLETE = 'live-complete-offline-pending'
 PROBE_COMPLETE = 'probe-complete-not-a-campaign'
@@ -114,7 +125,34 @@ def check_installed():
             raise RuntimeError(f'Installed asset/config differs from source: {package}/{relative}')
 
 
-def prepare(bundle):
+def campaign_order(state):
+    order = tuple(state.get('order', ORDER))
+    if state.get('purpose') == 'isaac-repeatability' and order != ('isaac_r1', 'isaac_r2'):
+        raise ValueError('Isaac repeatability must contain exactly its two fresh sessions')
+    return order
+
+
+def campaign_backends(state):
+    return tuple(dict.fromkeys(stage.split("_r")[0] for stage in campaign_order(state)))
+
+
+def campaign_checks(state):
+    return tuple("check_" + backend for backend in campaign_backends(state))
+
+
+def require_monitoring(bundle, state):
+    if state.get('purpose') != 'isaac-repeatability':
+        return
+    path = Path(bundle) / 'monitor_registration.json'
+    registration = read_json(path) if path.exists() else {}
+    if (registration.get('enabled') is not True
+            or registration.get('delivery_verified') is not True
+            or not registration.get('automation_id') or not registration.get('target_chat_id')):
+        raise RuntimeError('Receiving agent must arm and verify its failure heartbeat before launch; '
+                           'record it in monitor_registration.json')
+
+
+def prepare(bundle, *, isaac_only=False):
     bundle = Path(bundle).resolve()
     bundle.mkdir(parents=True, exist_ok=False)
     (bundle / 'inputs').mkdir()
@@ -122,9 +160,13 @@ def prepare(bundle):
     if not isinstance(overrides, dict):
         raise ValueError('capture_arguments.yaml must contain a launch-argument mapping')
     scenario = ROOT / 'src/ridgeback_autonomy/config/benchmark_scenarios_full.yaml'
-    for name in ORDER:
+    order = ("isaac_r1", "isaac_r2") if isaac_only else ORDER
+    for name in order:
         document = yaml.safe_load((HERE / 'sweeps' / f'{name}.yaml').read_text())
         document['defaults'].update(scenario=str(scenario), output_dir=str(bundle / name))
+        if isaac_only:
+            document['defaults'].update(sim_mode='deterministic', renderer='PathTracing',
+                                        anti_aliasing=0)
         # Both repetitions use the same recording workload; only r1 is replayed.
         for config in document['configs']:
             config.update(overrides)
@@ -133,7 +175,7 @@ def prepare(bundle):
     # Short capture checks precede all full runs, both monocular mask paths
     # included. Their unequal durations check that the live window follows
     # time while the stored sample stays at the batch bound.
-    for backend in ('gz', 'isaac'):
+    for backend in (('isaac',) if isaac_only else ('gz', 'isaac')):
         document = yaml.safe_load((bundle / 'inputs' / f'{backend}_r1.yaml').read_text())
         document['sweep']['name'] = f'capture_check_{backend}'
         document['defaults'].update(scene_ids='multi_04', output_dir=str(bundle / f'check_{backend}'))
@@ -144,13 +186,20 @@ def prepare(bundle):
         (bundle / 'inputs' / f'check_{backend}.yaml').write_text(yaml.safe_dump(document, sort_keys=False))
     atomic_json(bundle / 'campaign.json', {
         'schema': 'ridgeback-qualification-campaign/1', 'status': 'prepared-not-launched',
-        'order': list(ORDER), 'operations': [], 'validated': {}, 'errors': [], 'phases': {},
+        'order': list(order), 'purpose': 'isaac-repeatability' if isaac_only else 'qualification',
+        'operations': [], 'validated': {}, 'errors': [], 'phases': {},
         'budget_sec': TOTAL_SEC, 'live_budget_sec': LIVE_SEC, 'timing_already_spent_sec': TIMING_SPENT_SEC,
         'qualification_verdict': 'pending; capture checks, scene audit and acceptance margins are unresolved',
     })
     atomic_json(bundle/'plan_inputs.json', {str(path): sha(path) for path in (
         scenario, ROOT/'src/ridgeback_autonomy/config/benchmark_background_lab.yaml',
         ROOT/'src/ridgeback_autonomy/config/benchmark_backgrounds/lab.yaml')})
+    if isaac_only:
+        atomic_json(bundle/'monitor_registration.json', {
+            'enabled': False, 'delivery_verified': False,
+            'automation_id': None, 'target_chat_id': None,
+            'instruction': 'Receiving agent arms and verifies the prepared heartbeat before launch.'})
+        atomic_json(bundle/'prepared_files.json', {'files': frozen_files(bundle)})
     report(bundle)
     return bundle
 
@@ -166,9 +215,18 @@ def validate_matrix(bundle):
         if sha(path) != checksum:
             raise ValueError('Scenario/background changed since preparation: '+path)
     for path in sorted((Path(bundle) / 'inputs').glob('*.yaml')):
+        if path.stem not in (*campaign_checks(state), *campaign_order(state)):
+            raise ValueError('Unexpected stage outside campaign scope: '+path.stem)
         spec = load_sweep(str(path))
         resolve_benchmark_environment(spec.backend, 'target_distance_calibration', spec.backend_settings,
             package_share=lambda package: str(ROOT / 'install' / package / 'share' / package))
+        if spec.backend != path.stem.removeprefix('check_').split('_r')[0]:
+            raise ValueError('Backend differs from stage scope')
+        if state.get('purpose') == 'isaac-repeatability':
+            if spec.backend != 'isaac' or any(str(spec.defaults.get(k)) != v for k, v in
+                    {'sim_mode': 'deterministic', 'renderer': 'PathTracing',
+                     'anti_aliasing': '0'}.items()):
+                raise ValueError('Isaac repeatability rendering policy changed')
         trials = []
         for config in spec.configs:
             args = config.arguments
@@ -201,11 +259,18 @@ def validate_matrix(bundle):
         if not check and any(c.arguments['capture_sec'] != '10.0' for c in spec.configs):
             raise ValueError('Full runs must keep the 10-second live window')
         counts[path.stem] = trials
-    for stage in (*CHECK_STAGES, *ORDER):
+    for stage in (*campaign_checks(state), *campaign_order(state)):
         if stage_conditions(state, stage) and stage not in counts:
             raise ValueError(f'{stage} has conditions to run but no sweep input')
     for key in state.get('imported', {}):
         counts[key] = [109]
+    if state.get('purpose') == 'isaac-repeatability':
+        if state.get('imported'):
+            raise ValueError('Isaac repeatability requires fresh runs, not imported results')
+        documents = [yaml.safe_load((Path(bundle)/'inputs'/f'{s}.yaml').read_text())
+                     for s in campaign_order(state)]
+        if any(_settings(documents[0], c) != _settings(documents[1], c) for c in CONDITIONS):
+            raise ValueError('Isaac repetition configurations differ')
     return counts
 
 
@@ -219,7 +284,7 @@ def stage_conditions(state, stage):
 def check_needed(state, stage):
     """A simulator's readiness check guards its own full runs; none left, nothing to guard."""
     backend = stage.removeprefix('check_') + '_'
-    return any(stage_conditions(state, s) for s in ORDER if s.startswith(backend))
+    return any(stage_conditions(state, s) for s in campaign_order(state) if s.startswith(backend))
 
 
 def condition_paths(bundle, state, stage, condition):
@@ -258,7 +323,9 @@ def import_conditions(bundle, source, stage, conditions):
     state = read_json(bundle/'campaign.json')
     if state['status'] != 'prepared-not-launched':
         raise RuntimeError('Conditions can only be imported before launch')
-    if stage not in ORDER:
+    if state.get('purpose') == 'isaac-repeatability':
+        raise ValueError('Isaac repeatability requires two fresh sessions; imports are disabled')
+    if stage not in campaign_order(state):
         raise ValueError(f'Only full-run stages can import conditions, not {stage}')
     imports = state.setdefault('imported', {})
     if any(c not in CONDITIONS or f'{stage}/{c}' in imports for c in conditions):
@@ -515,7 +582,7 @@ def install_stop_handlers():
 
 
 def run(bundle):
-    """The live phase only: checks and the four blocks, never offline processing."""
+    """The live phase only: selected checks and fresh sessions, never offline processing."""
     bundle = Path(bundle).resolve()
     state = read_json(bundle / 'campaign.json')
     if state['status'] != 'prepared-not-launched':
@@ -534,7 +601,7 @@ def run(bundle):
         try:
             idle_fd = acquire_idle_inhibitor()
             preflight(bundle, state)
-            run_stages(bundle, state, (*CHECK_STAGES, *ORDER), end)
+            run_stages(bundle, state, (*campaign_checks(state), *campaign_order(state)), end)
             state['offline_inputs'] = inventory(bundle, state)
             check_frozen(bundle)
             state['status'] = LIVE_COMPLETE
@@ -553,6 +620,13 @@ def run(bundle):
 
 def preflight(bundle, state):
     """Host, installation and matrix checks, then freeze implementation and inputs."""
+    require_monitoring(bundle, state)
+    if state.get('purpose') == 'isaac-repeatability':
+        before = read_json(Path(bundle)/'prepared_files.json')['files']
+        after = frozen_files(bundle)
+        if before != after:
+            raise RuntimeError('Implementation/model references changed since preparation; '
+                               'review and prepare a new bundle before launch')
     state.setdefault('host_checks', {})['preflight'] = host_available(
         state.get('external_gpu_policy', 'stop'))
     check_installed()
@@ -562,6 +636,20 @@ def preflight(bundle, state):
         'revision': subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip(),
         'dirty_patch': subprocess.check_output(['git', 'diff', '--binary', '--', 'src', 'tools/benchmark/qualification'], cwd=ROOT, text=True),
     })
+
+
+def stage_limits(state, stage):
+    """(stage cap, admission allowance, configuration timeout) in seconds.
+
+    Full blocks divide the live budget equally, so a campaign with fewer blocks
+    gives each more time without extending the nine hours they share.
+    """
+    if stage.startswith('check_'):
+        return CHECK_STAGE_SEC, CHECK_ADMISSION_SEC, CONFIG_TIMEOUT_SEC
+    block = LIVE_SEC // len(campaign_order(state))
+    if state.get('purpose') == 'isaac-repeatability':
+        return block, ISAAC_ADMISSION_SEC, ISAAC_CONFIG_TIMEOUT_SEC
+    return block, ADMISSION_SEC, CONFIG_TIMEOUT_SEC
 
 
 def run_stages(bundle, state, stages, end):
@@ -578,13 +666,15 @@ def run_stages(bundle, state, stages, end):
         proof = stage.startswith('check_')
         if not proof and live_end is None:
             live_end = min(time.monotonic()+LIVE_SEC, end-CLEANUP_SEC)
-        stage_end = min(time.monotonic()+(240 if proof else 8100),
-                        end-CLEANUP_SEC, end if proof else live_end)
+        stage_cap, admission, config_timeout = stage_limits(state, stage)
+        stage_end = min(time.monotonic()+stage_cap, end-CLEANUP_SEC, end if proof else live_end)
         env = environment(bundle, 'isaac' if 'isaac' in stage else 'gz')
         env.update(QUALIFICATION_BUNDLE=str(bundle), QUALIFICATION_STAGE=stage,
-                   QUALIFICATION_STOP_AT=str(stage_end-90),
-                   QUALIFICATION_ADMISSION_SEC=str(30 if proof else ADMISSION_SEC))
-        state.update(status='checking-capture' if proof else 'running-live', current_stage=stage)
+                   QUALIFICATION_STOP_AT=str(stage_end-STAGE_RESERVE_SEC),
+                   QUALIFICATION_ADMISSION_SEC=str(admission),
+                   QUALIFICATION_CONFIG_TIMEOUT_SEC=str(config_timeout))
+        state.update(status='checking-capture' if proof else 'running-live', current_stage=stage,
+                     stage_started_utc=datetime.now(timezone.utc).isoformat())
         atomic_json(bundle / 'campaign.json', state)
         started_epoch = time.time()
         operation = owned_command([sys.executable, str(HERE/'sweep_entry.py'), str(bundle/'inputs'/f'{stage}.yaml'),
@@ -625,7 +715,7 @@ def probe(bundle):
         try:
             idle_fd = acquire_idle_inhibitor()
             preflight(bundle, state)
-            for stage in CHECK_STAGES:
+            for stage in campaign_checks(state):
                 stage_started = time.monotonic()
                 run_stages(bundle, state, (stage,), deadline)
                 sweep_dir = find_sweep(bundle, stage).parent
@@ -653,7 +743,7 @@ def inventory(bundle, state):
     """The immutable live outputs a later offline phase may consume, by hash."""
     from ridgeback_autonomy.benchmarking.replay_artifacts import load_artifact
     datasets = {}
-    for stage in ORDER:
+    for stage in campaign_order(state):
         for condition in CONDITIONS:
             key = f'{stage}/{condition}'
             run_dir, sensor = condition_paths(bundle, state, stage, condition)
@@ -728,7 +818,7 @@ def run_offline(bundle):
 
 def offline(bundle, state, deadline):
     inputs = read_json(bundle/'offline_inputs.json')
-    for stage in ('gz_r1', 'isaac_r1'):
+    for stage in (s for s in campaign_order(state) if s.endswith('_r1')):
         for condition in CONDITIONS:
             dataset = inputs[f'{stage}/{condition}']
             process_dataset(bundle, state, stage, condition, Path(dataset['sensor_capture']),
@@ -832,7 +922,7 @@ def report(bundle):
         state['errors'].append('User service: '+service_result)
         atomic_json(bundle/'campaign.json', state)
     comparisons = {}
-    for backend in ('gz', 'isaac'):
+    for backend in campaign_backends(state):
         for condition in CONDITIONS:
             try:
                 first, _sensor = condition_paths(bundle, state, backend+'_r1', condition)
@@ -847,7 +937,8 @@ def report(bundle):
                     comparisons[f'{backend}/{condition}/{estimator}'] = {'error': str(error)}
     atomic_json(bundle/'comparisons.json', comparisons)
     lines = ['# Overnight benchmark campaign', '', f"Execution status: **{state['status']}**", '',
-             '16 full condition runs: Gazebo/Isaac × four conditions × two independent sessions.', '',
+             f'{len(campaign_order(state))*len(CONDITIONS)} full condition runs: '
+             f'{"/".join(campaign_backends(state))} × four conditions × two independent sessions.', '',
              '| Stage | Exit | Wall seconds | Owned leftovers |', '| --- | ---: | ---: | --- |']
     for operation in state['operations']:
         lines.append(f"| {operation['stage']} | {operation['returncode']} | {operation['wall_sec']:.1f} | {operation['leftover_pids']} |")
@@ -878,7 +969,7 @@ def report(bundle):
     lines += ['', '## Full live configurations', '',
               '| Session / condition | Checked | Live window events | Stored sample batches |',
               '| --- | --- | ---: | ---: |']
-    for stage in ORDER:
+    for stage in campaign_order(state):
         path = bundle/f'{stage}_guard.json'
         checked = read_json(path).get('checked', {}) if path.exists() else {}
         for condition in CONDITIONS:
@@ -889,10 +980,12 @@ def report(bundle):
                          f"{result['window_events'] if result else '—'} | "
                          f"{result.get('sampled_batches', '—') if result else '—'} |")
     lines += ['', '## Repeatability', '',
-              '| Backend / condition / estimator | Changed outcome/reason rows | Median paired estimate delta (m) |',
-              '| --- | ---: | ---: |']
+              '| Backend / condition / estimator | Changed outcome/reason rows | Median delta (m) | Max delta (m) |',
+              '| --- | ---: | ---: | ---: |']
     for key, result in comparisons.items():
-        lines.append(f"| {key} | {result.get('outcome_or_reason_changes', 'unavailable')} | {result.get('median_abs_estimate_delta_m', 'unavailable')} |")
+        lines.append(f"| {key} | {result.get('outcome_or_reason_changes', 'unavailable')} | "
+                     f"{result.get('median_abs_estimate_delta_m', 'unavailable')} | "
+                     f"{result.get('max_abs_estimate_delta_m', 'unavailable')} |")
     lines += ['', '## Frozen-input replay against the sampled live reference', '',
               '| Dataset | Event identity | Per-event parity (events) | Unmeasured live batches | '
               'Trial/instance parity (trials) | Repeated numeric evaluation |',
@@ -929,6 +1022,7 @@ def start(bundle, action='run'):
     if action == 'run':
         if state['status'] != 'prepared-not-launched':
             raise RuntimeError('Bundle has already been launched')
+        require_monitoring(bundle, state)
         validate_matrix(bundle)
         suffix, runtime = '', remaining_budget(state)
     else:
@@ -963,15 +1057,15 @@ def start(bundle, action='run'):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('action', choices=(
-        'prepare', 'import', 'allow-external-gpu', 'check', 'probe', 'start', 'run', 'start-offline',
+        'prepare', 'prepare-isaac', 'import', 'allow-external-gpu', 'check', 'probe', 'start', 'run', 'start-offline',
         'offline', 'report'))
     parser.add_argument('bundle', type=Path)
     parser.add_argument('--from', dest='source', type=Path, help='import: earlier campaign bundle')
     parser.add_argument('--stage', help='import: full-run stage, e.g. gz_r1')
     parser.add_argument('--conditions', help='import: comma-separated completed conditions')
     args = parser.parse_args()
-    if args.action == 'prepare':
-        print(prepare(args.bundle))
+    if args.action in ('prepare', 'prepare-isaac'):
+        print(prepare(args.bundle, isaac_only=args.action == 'prepare-isaac'))
     elif args.action == 'import':
         if not (args.source and args.stage and args.conditions):
             parser.error('import needs --from, --stage and --conditions')

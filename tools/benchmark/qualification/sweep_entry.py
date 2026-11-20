@@ -5,7 +5,8 @@ import sys
 import time
 
 from campaign import atomic_json, check_frozen, read_json
-from evidence import processing_diagnostics, validate_run
+from evidence import (processing_diagnostics, sampled_reference, validate_depth_readiness,
+                      validate_run)
 
 
 def main():
@@ -14,6 +15,7 @@ def main():
     stage = os.environ['QUALIFICATION_STAGE']
     end = float(os.environ['QUALIFICATION_STOP_AT'])
     admission = float(os.environ['QUALIFICATION_ADMISSION_SEC'])
+    config_timeout = float(os.environ['QUALIFICATION_CONFIG_TIMEOUT_SEC'])
     expected_trials = 1 if stage.startswith('check_') else 109
     checked = set()
     guard = {'stage': stage, 'checked': {}, 'error': None}
@@ -38,6 +40,13 @@ def main():
                 result = validate_run(Path(sweep_dir)/name, entry, expected_trials,
                                       bundle/'capture_windows.jsonl',
                                       beyond_sample=stage.startswith('check_'))
+                if read_json(bundle/'campaign.json').get('purpose') == 'isaac-repeatability':
+                    reference = sampled_reference(Path(sweep_dir)/name, {
+                        r['trial_id'] for r in read_json(Path(sweep_dir)/name/
+                            'sampled_reference/sampled_windows.json')['windows']})
+                    args = read_json(Path(sweep_dir)/name/'run.json')['parameters']
+                    result['depth_readiness'] = validate_depth_readiness(
+                        args['sensor_capture_dir'], reference['windows'], result['capture'])
                 result['processing_stages'] = processing_diagnostics(bundle/f'{stage}.log', name)
                 required = []
                 if 'silhouette' in name:
@@ -60,7 +69,8 @@ def main():
         return command_original(arguments)
 
     def wait(process, environment, timeout_sec):
-        return wait_original(process, environment, min(timeout_sec, 2400, max(0, end-time.monotonic())))
+        return wait_original(process, environment, min(timeout_sec, config_timeout,
+                                                      max(0, end-time.monotonic())))
 
     sweep._write_manifest = write
     sweep._config_command = command

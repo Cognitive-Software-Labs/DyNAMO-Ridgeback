@@ -7,6 +7,10 @@ A handoff is a dated record: the governing plan under `docs/plans/` stays the
 source of truth for what the work is, and resolved findings move to their
 technical reference.
 
+- [BENCHMARKING — Isaac-only repeatability](BENCHMARKING_isaac_repeatability_codex.md)
+  — live collection completed; the handoff links the repeatability report and
+  retains the original repair and recovery instructions. Offline replay is separate.
+
 Filenames follow the plan convention, `<SCOPE>_<topic>_<author>.md`.
 
 When the receiving owner has absorbed a handoff (its open steps are scheduled

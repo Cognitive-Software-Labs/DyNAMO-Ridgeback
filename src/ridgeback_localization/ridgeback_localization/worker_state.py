@@ -15,11 +15,12 @@ WORKER_STOP_BUDGET_SEC = 5.0
 
 
 class WorkerState:
-    def __init__(self, node, component):
+    def __init__(self, node, component, *, readiness=None):
         self.component = component
         self.epoch = uuid.uuid4().hex
         self.previous = None
         self.closed = False
+        self.readiness = readiness
         qos = QoSProfile(depth=1, durability=DurabilityPolicy.TRANSIENT_LOCAL)
         self.pub = node.create_publisher(String, WORKER_STATE_TOPIC + '/' + component, qos)
         self.set('startup')
@@ -27,10 +28,12 @@ class WorkerState:
     def set(self, state, detail=''):
         if self.closed:
             return
-        value = (state, detail)
+        readiness = self.readiness() if self.readiness is not None else None
+        value = (state, detail, readiness)
         if value != self.previous:
             self.pub.publish(String(data=json.dumps(dict(component=self.component,
-                epoch=self.epoch, state=state, detail=detail))))
+                epoch=self.epoch, state=state, detail=detail,
+                **({'readiness': readiness} if readiness is not None else {})))))
             self.previous = value
 
     def close(self):

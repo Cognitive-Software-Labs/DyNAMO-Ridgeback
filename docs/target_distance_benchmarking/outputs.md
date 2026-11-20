@@ -39,6 +39,12 @@ The run also names its simulator:
 - `summary.md` names the backend, the world (with its native name when it
   differs), the catalog and the background.
 
+For gated monocular depth runs, typed capture manifests retain
+`metadata.depth_warmup`: the mask producer-state snapshot that opened the
+readiness gate, including its epoch and successful warmup input stamp. It is
+startup evidence, not a scored sample or a claim that the requested timed-window
+sample quota was reached.
+
 `run.background` is null for the bare room with the robot at the origin. With
 a background it records:
 - the name, whether props were spawned (`props_spawned`; false is the control

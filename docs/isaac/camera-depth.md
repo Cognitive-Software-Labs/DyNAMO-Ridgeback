@@ -269,6 +269,28 @@ The D455 Replicator writer is retained by a depth handle for the lifetime of
 the runner. Shutdown detaches it before rclpy teardown. This ordering prevents
 a late render callback from publishing through a destroyed ROS node.
 
+## Renderer repeatability
+
+`sim_mode:=deterministic` fixes simulation stepping; it does not guarantee
+bit-identical camera images across independent sessions. Renderer history,
+effective anti-aliasing, scene placement timing, and completed image delivery
+must be checked separately. Requested launch settings alone do not establish
+the effective renderer configuration after stage initialization.
+
+PathTracing's result cache (`/rtx/pathtracing/cached/enabled`) and many-light
+sampling cache (`/rtx/pathtracing/lightcache/cached/enabled`) are separate
+controls. The runner disables the result cache at startup when both
+`sim_mode:=deterministic` and `renderer:=PathTracing` are selected. It leaves
+many-light sampling unchanged. For that combination, requesting AA other than
+DLSS also clears `limitedOps`, preventing Isaac from restoring DLSS over the
+requested mode. Other renderer/simulation combinations retain their existing
+settings. This reduces renderer history dependence; it does not guarantee
+bit-identical live images.
+
+Changing these controls changes the benchmark inputs and requires
+fresh Isaac captures. Keep renderer repeatability, capture coverage, monocular
+inference repeatability, and deliberately noisy LiDAR comparisons separate.
+
 ## Choosing a mode
 
 | Need | Recommended setting | Reason |
@@ -498,3 +520,5 @@ When modifying the camera:
 ## Archived evidence
 
 - [Isaac Sim 6.1 migration](../../archive/engineering/2026-09-13-isaac-6.1-migration.md)
+- [Renderer cache and frame-freshness investigation](../../archive/engineering/2026-11-05-isaac-render-cache-diagnosis.md)
+- [Cache policy verification and residual probes](../../archive/engineering/2026-11-05-isaac-cache-policy-and-residual-probes.md)

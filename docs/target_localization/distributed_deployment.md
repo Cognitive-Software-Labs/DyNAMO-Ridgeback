@@ -152,6 +152,13 @@ shared types live in `ridgeback_interfaces`. See the
 | `mission/status` | `std_msgs/msg/String` JSON | Frontier owner; required, paused, healthy, reason, cancellation, goal_pending |
 | `mission/resume` | `std_srvs/srv/Trigger` | Explicit resume on the frontier owner; unavailable when frontier is not launched |
 
+Worker-state JSON carries `component`, `epoch`, `state`, and `detail`. The mask
+worker also includes `readiness` with `depth_source`, `ready`, and `stamp_ns`
+(the warmup input stamp when applicable). Readiness changes republish the
+latched state even if `state` is still `processing`; other workers can omit
+this optional object. The [aligned-depth lifecycle](aligned_depth.md#3-source-2-rgb-frame--aligned-depth-depth-anything)
+owns the readiness condition.
+
 Sensor subscriptions generally use ROS sensor-data QoS; the detector's RGB
 subscription uses best-effort keep-last depth 1, as described in
 [detection scheduling](detection.md#frame-and-scheduling-behavior).

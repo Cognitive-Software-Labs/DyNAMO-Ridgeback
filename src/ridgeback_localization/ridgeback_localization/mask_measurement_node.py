@@ -184,7 +184,10 @@ class TargetMaskMeasurementNode(Node):
         # ``parameter_overrides`` to stand the node up on a chosen
         # configuration without a launch file or CLI arguments.
         super().__init__('target_mask_measurement_node', **node_kwargs)
-        self.worker_state = WorkerState(self, 'mask')
+        self.depth_source_name = None
+        self.depth_warmup_ready = False
+        self.depth_warmup_stamp_ns = None
+        self.worker_state = WorkerState(self, 'mask', readiness=self.depth_readiness)
 
         self.declare_parameter('detections_topic', RAW_DETECTIONS_TOPIC)
         self.declare_parameter('measurement_topic', MASK_MEASUREMENTS_TOPIC)
@@ -376,6 +379,9 @@ class TargetMaskMeasurementNode(Node):
                 # Node clock so the monocular cooldown respects use_sim_time.
                 now_fn=lambda: self.get_clock().now().nanoseconds / 1e9,
             )
+        self.depth_source_name = str(self.get_parameter('depth_source').value)
+        self.depth_warmup_ready = (
+            self.depth_source is None or self.depth_source.input_kind != 'color')
         self.depth_max_gate_m = resolve_depth_gate(
             self.get_parameter('depth_max_meters').value)
 
@@ -731,6 +737,7 @@ class TargetMaskMeasurementNode(Node):
                 stamp_sec, stamp_nanosec = stamp_key(detections_msg.header.stamp)
                 target_stamp_ns = stamp_sec * 1_000_000_000 + stamp_nanosec
                 try:
+                    self.warm_depth_source(detections_msg, depth_input_msg)
                     self.process_measurements(
                         detections_msg, depth_input_msg, scan_msg,
                         self.latest_camera_info)
@@ -786,7 +793,6 @@ class TargetMaskMeasurementNode(Node):
         """
 
         batch = batch_from_detections_message(detections_msg)
-
         if batch.detected and camera_info is not None:
             intrinsics = intrinsics_from_camera_info(camera_info)
             warning = grid_mismatch_warning(intrinsics, batch)
@@ -1088,6 +1094,30 @@ class TargetMaskMeasurementNode(Node):
             f'{int(MAX_BOX_FRAME_FRACTION * 100)}% of the frame (likely a '
             'detector failure); their path estimates stay unset.')
 
+    def warm_depth_source(self, detections_msg, depth_input_msg) -> None:
+        """Warm once from a real frame, including empty/background batches.
+
+        This runs before measurement processing so readiness does not depend
+        on target detection, masks, or TF. The benchmark waits outside its
+        timed window; normal per-batch inference remains unchanged.
+        """
+
+        if (self.depth_source is not None
+                and self.depth_source.input_kind == 'color'
+                and not self.depth_warmup_ready
+                and depth_input_msg is not None):
+            self.depth_for_batch(
+                depth_input_msg, batch_from_detections_message(detections_msg))
+
+    def depth_readiness(self) -> dict:
+        """Producer readiness, independent of whether a target was detected."""
+
+        return {
+            'depth_source': self.depth_source_name,
+            'ready': self.depth_warmup_ready,
+            'stamp_ns': self.depth_warmup_stamp_ns,
+        }
+
     def depth_for_batch(
         self,
         depth_input_msg: Image | None,
@@ -1138,6 +1168,8 @@ class TargetMaskMeasurementNode(Node):
                 self.synchronize_cuda_for_timing()
             self.record_stage_timing(stage_name, started_ns)
         if frame is None:
+            if is_monocular:
+                self.depth_warmup_ready = False
             return None
         depth_m, _ = frame
         if depth_m.shape != (batch.image_height, batch.image_width):
@@ -1147,6 +1179,12 @@ class TargetMaskMeasurementNode(Node):
                 'masks cannot index it. Check the depth_topic parameter.'
             )
             return None
+        if is_monocular and not self.depth_warmup_ready:
+            header = (prepared_color.message.header if prepared_color is not None
+                      else depth_input_msg.header)
+            sec, nanosec = stamp_key(header.stamp)
+            self.depth_warmup_stamp_ns = sec * 1_000_000_000 + nanosec
+            self.depth_warmup_ready = True
         return depth_m
 
     def publish_mask_debug(

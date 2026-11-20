@@ -256,7 +256,8 @@ def test_sweep_adapter_rejects_failed_condition_and_budget_exhaustion(tmp_path, 
     monkeypatch.setattr(sweep_entry, 'check_frozen', lambda _: None)
     for key, value in {'QUALIFICATION_BUNDLE': str(tmp_path), 'QUALIFICATION_STAGE':'gz_r1',
                        'QUALIFICATION_STOP_AT': str(time.monotonic()+2),
-                       'QUALIFICATION_ADMISSION_SEC':'2100'}.items():
+                       'QUALIFICATION_ADMISSION_SEC':'2100',
+                       'QUALIFICATION_CONFIG_TIMEOUT_SEC':'2400'}.items():
         monkeypatch.setenv(key, value)
     assert sweep_entry.main() == 0
     with pytest.raises(RuntimeError, match='Insufficient'):

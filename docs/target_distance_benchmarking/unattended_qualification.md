@@ -1,4 +1,4 @@
-# Unattended Gazebo and Isaac qualification campaign
+# Unattended qualification and Isaac repeatability
 
 The workstation-specific helper in
 [`tools/benchmark/qualification/campaign.py`](../../tools/benchmark/qualification/campaign.py)
@@ -7,6 +7,72 @@ sweep owner rather than launching individual measurement nodes itself.
 
 It is an execution and evidence-collection helper. A completed job does not
 automatically close the [qualification backlog](BACKLOG.md).
+
+## Isaac-only repeatability
+
+`prepare-isaac BUNDLE` prepares two fresh Isaac sessions and only the Isaac
+readiness check. No Gazebo check, run or imported result is included. Each
+session runs all four mask/depth conditions and the full 109-trial scenario
+expansion. It uses deterministic PathTracing, AA 0, ideal depth and the same
+fixed 10-second windows, five-batch samples, model defaults and recording
+workload in both repetitions. The existing deterministic render policy and
+[monocular startup gate](../target_localization/aligned_depth.md) apply.
+
+```bash
+python3 tools/benchmark/qualification/campaign.py prepare-isaac BUNDLE
+python3 tools/benchmark/qualification/campaign.py check BUNDLE
+```
+
+These commands prepare and validate inputs without launching anything. The
+matrix check rejects different settings between repetitions and imports are
+disabled. Preparation records source, installed-entrypoint, input and model-ref
+hashes in `prepared_files.json`; launch preflight rejects drift instead of
+silently updating the tested implementation. Prepare a fresh reviewed bundle
+after an intentional change. Both condition guards require sampled live records;
+monocular captures additionally require successful producer readiness on a
+camera frame preceding every sampled capture timestamp. This checks startup
+independently of whether a target was detected.
+
+`comparisons.json` preserves each matched trial/instance pair, both outcomes and
+miss reasons, both estimates and absolute/relative deltas. `REPORT.md` gives
+median and maximum deltas. Matching misses have no invented numerical delta.
+Compare scene and target identities within each mask/depth/estimator condition;
+do not pair neighbouring rows or different targets. The optional offline phase
+replays the four first-session condition samples and starts no simulator; it is
+separate from the live repeatability check.
+
+### Receiving-agent heartbeat
+
+The execution helper does not itself wake a chat. Before launching an Isaac-only
+bundle, the receiving agent must register a periodic heartbeat in its own chat,
+verify delivery and record `enabled: true`, `delivery_verified: true`, the real
+`automation_id` and `target_chat_id` in `monitor_registration.json`. Preparation
+leaves these fields disabled and empty. Both `start` and live preflight reject
+an unregistered heartbeat. A file containing an ID is a registration receipt,
+not proof of delivery; the agent must perform that check through its automation
+provider. If the provider is unavailable, keep the job prepared.
+
+The heartbeat runs the read-only health check every two minutes:
+
+```bash
+python3 tools/benchmark/qualification/repeatability_watch.py BUNDLE
+```
+
+It returns JSON and exits nonzero for campaign/guard failures, an inactive owned
+unit, a stale host sampler, unreadable comparisons, or more than five minutes
+without a completed capture window. Diagnostic log chatter does not reset that
+progress clock. Each stage gets a fresh startup allowance. Outcome/miss-reason
+changes and distance deltas above 20 mm or 1% request agent review. Those are
+operational alert triggers, not agreed scientific equivalence margins; all
+deltas remain in the report.
+
+The agent stays quiet while healthy state is unchanged, wakes on a new failure,
+stall or review condition, and reports completion once. On a problem it preserves
+the bundle and inspects the guard, stage log, service result and host samples;
+it stops only the recorded owned unit when necessary. No automatic restart,
+replacement run, estimator change or cross-user process cleanup is permitted.
+Deactivate the heartbeat after handling the terminal result. The receiving
+agent's handoff supplies the exact bundle and heartbeat prompt.
 
 ## Fixed campaign
 
@@ -43,11 +109,11 @@ full-window CSVs and the depth-source record that freezes monocular depth with
 the usable ceiling the live node declared.
 
 A batch the live mask node never measured has no live record and keeps its
-depth explicitly absent. The node keeps only its newest pending batch, so this
-happens while Depth Anything loads on a configuration's first non-empty batch,
-which can overlap the start of the first trial's window. Such a trial is
-reported as inconclusive for replay parity; it is not a capture failure and is
-never counted as a pass.
+depth explicitly absent. The node keeps only its newest pending batch. The
+monocular readiness gate moves cold initialization before capture; it cannot
+recover any later replaced work. Legacy qualification evidence retains those
+gaps as inconclusive replay trials. The Isaac-only repeatability guards reject
+unmeasured sampled batches rather than accepting that legacy population.
 
 ## Readiness checks
 
@@ -156,11 +222,18 @@ it does not stop the campaign under memory pressure.
 ## Deadlines, ownership and failure behavior
 
 The job budget is 12 hours minus the timing study's rounded 428 seconds. The full
-live blocks share a maximum of nine hours, with a 2 h 15 min cap per block. A
-configuration is admitted only with a 35-minute remaining allowance; its runtime
-timeout is at most 40 minutes and cannot extend the block deadline. Three minutes
-are reserved for final cleanup. These are execution limits, not scientific margins
-or a guarantee that all work will finish.
+live blocks share a maximum of nine hours, divided equally: 2 h 15 min per block
+for the four-block campaign and 4 h 30 min for the two-block Isaac repeatability
+campaign. In the four-block campaign a configuration is admitted only with a
+35-minute remaining allowance and its runtime timeout is at most 40 minutes. Isaac
+repeatability uses 45 and 55 minutes. Deterministic PathTracing trials settle at
+about 14.3 seconds, near the 13.4 of realtime mode, so those two limits are
+headroom rather than a measured requirement. Neither timeout can extend the block
+deadline. A readiness stage has a 15-minute cap and admits a
+configuration with a 2-minute allowance, leaving room for a cold simulator start
+before the first condition. Every stage stops admitting 90 seconds before its
+deadline, and three minutes are reserved for final cleanup. These are execution
+limits, not scientific margins or a guarantee that all work will finish.
 
 The component timing projection did not establish sustained full-window raw
 recording costs. Recording all 16 runs adds work; the nine-hour allocation is a
@@ -278,5 +351,6 @@ receive another allocation on launch.
 
 ## Archived evidence
 
+- [Full-matrix Isaac repeatability pair, 2026-11-06](../../archive/engineering/2026-11-06-isaac-full-repeatability.md)
 - [Sampled capture and live-scan parity, 2026-11-03](../../archive/engineering/sampled_capture_live_scan_parity_20261103.md)
 - [Qualification campaign stopped by systemd-oomd, 2026-11-03](../../archive/engineering/2026-11-03-qualification-oom.md)

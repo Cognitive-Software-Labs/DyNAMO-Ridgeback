@@ -161,6 +161,20 @@ source is `depth_sources.MonocularDepthSource` (selected by the mask node's
 per detection batch, not once per camera frame). It is the only consumer of the
 network now; the legacy camera node that also ran it has been deleted.
 
+Before normal measurement processing, the mask worker warms a selected
+monocular depth source with a buffered real camera frame. An empty detection
+batch can supply that frame; readiness does not require a target, valid TF,
+or a successful distance estimate. The source becomes ready only after an
+inference returns the expected image grid. Failed inference and missing input
+leave it unready. Stereo and polar-only configurations do not load a monocular
+model for this warmup.
+
+The worker publishes this readiness with its producer state, independently of
+target detection and liveness; the [worker-state contract](distributed_deployment.md#topics-types-and-acquisition-semantics)
+describes the fields. The benchmark waits for readiness outside its timed
+measurement window. Normal per-batch depth prediction and estimator gates
+remain unchanged.
+
 When the silhouette gate and monocular source are both selected, SlimSAM and
 Depth-Anything share one batch-local, contiguous RGB preparation. The mask
 node first reuses the source's early exact-stamp color lookup when it exists;
@@ -281,6 +295,7 @@ qualification remains a separate optional gate linked from that plan.
 
 ## Archived evidence
 
+- [monocular readiness and Isaac repeatability](../../archive/engineering/2026-11-05-monocular-readiness-and-isaac-repeatability.md)
 - [aligned depth coverage](../../archive/engineering/aligned_depth_coverage.md)
 - [exact-stamp availability evidence](../../archive/engineering/exact_stamp_depth_availability.md)
 - [pointcloud provenance evaluation](../../archive/engineering/pointcloud_provenance_evaluation.md)

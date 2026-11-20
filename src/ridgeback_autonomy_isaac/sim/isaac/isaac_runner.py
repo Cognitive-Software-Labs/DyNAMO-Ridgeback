@@ -77,8 +77,8 @@ def parse_args():
                          "timing, realistic noise — deployment fidelity + "
                          "real-time-deadline testing. deterministic: fixed "
                          "sim-dt per frame (omni.kit.loop manual mode), "
-                         "contention-immune byte-identical sensor data — "
-                         "reproducible A/B benchmarks (rtf:=0 to run flat out, "
+                         "for repeatable stepping; image bit identity is "
+                         "not guaranteed (rtf:=0 to run flat out, "
                          "rtf:=1 headless:=false to watch).")
     ap.add_argument("--renderer", default="RealTimePathTracing",
                     choices=["RealTimePathTracing", "RaytracedLighting",
@@ -154,15 +154,25 @@ def main():
         # Fixed samples per frame, no AI denoiser: converged rather than
         # reconstructed pixels.
         app_cfg["denoiser"] = False
+    if args.sim_mode == "deterministic" and args.renderer == "PathTracing":
+        # The lighting-result cache evolves even with a frozen scene. Avoid
+        # that history dependence in repeatability runs; keep many-light
+        # sampling enabled. This alone does not guarantee image bit identity.
+        app_cfg["extra_args"] = ["--/rtx/pathtracing/cached/enabled=false"]
+        if args.anti_aliasing != 3:
+            # Otherwise Isaac can restore DLSS after stage initialization,
+            # overriding the requested AA mode.
+            app_cfg["extra_args"].append(
+                "--/rtx-transient/post/aa/limitedOps=false")
     if not headless:
         # Windowed on a software-X display (e.g. VNC): a vsync-locked
         # present loop can stall this manually-driven update loop (the
         # full isaacsim app runs Kit's own main loop and is immune).
         # Decouple presentation from our stepping.
-        app_cfg["extra_args"] = [
+        app_cfg.setdefault("extra_args", []).extend([
             "--/app/vsync=false",
             "--/app/runLoops/present/rateLimitEnabled=false",
-        ]
+        ])
     app = SimulationApp(app_cfg)
 
     exit_code = 1

@@ -375,20 +375,48 @@ def compare_rows(live, replay, tolerance=PARITY_ATOL_M):
 
 
 def repeatability(first, second):
-    changes, differences = 0, []
+    changes, differences, pairs = 0, [], []
     if set(first) != set(second):
         raise ValueError('Repetition trial/instance keys differ')
-    for key, a in first.items():
+    for key, a in sorted(first.items()):
         b = second[key]
-        changes += (a['outcome'], a['miss_reason']) != (b['outcome'], b['miss_reason'])
-        try:
-            x, y = float(a['trial_estimate_m']), float(b['trial_estimate_m'])
-            if math.isfinite(x) and math.isfinite(y):
-                differences.append(abs(x-y))
-        except ValueError:
-            pass
+        changed = (a['outcome'], a['miss_reason']) != (b['outcome'], b['miss_reason'])
+        changes += changed
+        x, y = _finite(a['trial_estimate_m'] or None), _finite(b['trial_estimate_m'] or None)
+        delta = abs(x-y) if x is not None and y is not None else None
+        relative = (delta / max(abs(x), abs(y), 1e-12) if delta is not None else None)
+        if delta is not None:
+            differences.append(delta)
+        pairs.append({'trial_id': key[0], 'instance_index': key[1],
+                      'first_outcome': a['outcome'], 'second_outcome': b['outcome'],
+                      'first_reason': a['miss_reason'], 'second_reason': b['miss_reason'],
+                      'first_estimate_m': x, 'second_estimate_m': y,
+                      'abs_delta_m': delta, 'relative_delta': relative})
     return {'rows': len(first), 'outcome_or_reason_changes': changes,
-            'paired_numeric_rows': len(differences),
+            'paired_numeric_rows': len(differences), 'pairs': pairs,
             'median_abs_estimate_delta_m': statistics.median(differences) if differences else None,
             'max_abs_estimate_delta_m': max(differences) if differences else None,
             'verdict': 'descriptive; scientific acceptance margins are not yet frozen'}
+
+
+def validate_depth_readiness(sensor_dir, sampled_windows, capture):
+    """Extra startup/context proof for the new Isaac repeatability population."""
+    manifest = read_json(Path(sensor_dir) / 'manifest.json')
+    parameters = manifest['producer']['parameters']
+    if parameters['depth_source'] == 'monocular':
+        gate = manifest.get('metadata', {}).get('depth_warmup') or {}
+        ready = gate.get('readiness') or {}
+        stamp = ready.get('stamp_ns')
+        if (gate.get('component') != 'mask' or gate.get('state') != 'processing'
+                or ready.get('depth_source') != 'monocular' or ready.get('ready') is not True
+                or not isinstance(stamp, int) or isinstance(stamp, bool)):
+            raise ValueError('Missing successful monocular depth readiness gate')
+        if any(not w.get('sampled_stamps_ns') or stamp >= min(w['sampled_stamps_ns'])
+               for w in sampled_windows.values()):
+            raise ValueError('Monocular warmup did not precede every capture')
+    if capture['events_without_live_record']:
+        raise ValueError('Sampled capture still has unmeasured batches after the readiness gate')
+    # Empty detections can legitimately skip depth/TF-dependent estimator work.
+    # Existing sensor_completeness validates required context for detected batches.
+    return {'gate': manifest.get('metadata', {}).get('depth_warmup'),
+            'sampled_events_without_live_record': 0}

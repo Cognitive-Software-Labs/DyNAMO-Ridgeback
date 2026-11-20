@@ -24,7 +24,7 @@ from ridgeback_common.detector_config import (
     DETECTOR_ENVIRONMENT_KEYS, require_matching_detector_settings,
     resolve_detector_settings,
 )
-from rclpy.qos import qos_profile_sensor_data
+from rclpy.qos import DurabilityPolicy, QoSProfile, qos_profile_sensor_data
 from sensor_msgs.msg import Image
 from sensor_msgs.msg import CameraInfo
 from sensor_msgs.msg import LaserScan
@@ -42,6 +42,7 @@ from ridgeback_autonomy.benchmarking.alignment import (
 from ridgeback_common.camera_profiles import DEFAULT_CAMERA_PROFILE
 from ridgeback_common.ros_signals import init_owned, shielded, spin_step
 from ridgeback_localization.estimator_registry import (
+    DEPTH_PATH_ESTIMATORS,
     MASK_GATE_DEFAULT,
     parse_estimators,
     parse_mask_gate,
@@ -54,6 +55,7 @@ from ridgeback_localization.contracts import (
     GROUND_TRUTH_TOPIC,
     MASK_MEASUREMENTS_TOPIC,
     POINTCLOUD_MEASUREMENTS_TOPIC,
+    WORKER_STATE_TOPIC,
 )
 from ridgeback_autonomy.benchmarking.naming import (
     benchmark_display_name,
@@ -574,6 +576,12 @@ class TargetDistanceBenchmarkRunner(Node):
         self.pointcloud_measurement_seen = False
         self.mask_measurement_seen = False
         self.color_stream_seen = False
+        self.needs_depth_warmup = (
+            self.depth_source == 'monocular'
+            and bool(self.selected_mask_estimators & DEPTH_PATH_ESTIMATORS))
+        self.depth_pipeline_ready = False
+        self.depth_pipeline_state = None
+        self.depth_warmup_gate = None
 
         self.capture_active = False
         self.capture_events = {}
@@ -630,6 +638,10 @@ class TargetDistanceBenchmarkRunner(Node):
             self.on_color_image,
             qos_profile_sensor_data,
         )
+        if self.needs_depth_warmup:
+            self.create_subscription(
+                String, WORKER_STATE_TOPIC + '/mask', self.on_depth_worker_state,
+                QoSProfile(depth=1, durability=DurabilityPolicy.TRANSIENT_LOCAL))
         if self.capture_artifact_enabled():
             self.replay_tf_buffer = Buffer(node=self)
             self.replay_tf_listener = TransformListener(
@@ -690,6 +702,21 @@ class TargetDistanceBenchmarkRunner(Node):
         self.active_truth: dict[str, float] | None = None
         self.active_trial_id = ''
         self.last_truth_publish_monotonic = 0.0
+
+    def on_depth_worker_state(self, msg: String) -> None:
+        try:
+            state = json.loads(msg.data)
+        except (ValueError, TypeError):
+            return
+        if not isinstance(state, dict) or state.get('component') != 'mask':
+            return
+        readiness = state.get('readiness')
+        if (not isinstance(readiness, dict)
+                or readiness.get('depth_source') != self.depth_source):
+            return
+        self.depth_pipeline_state = state
+        self.depth_pipeline_ready = (
+            state.get('state') == 'processing' and readiness.get('ready') is True)
 
     def on_pointcloud_measurement(self, msg: TargetMeasurements) -> None:
         self.pointcloud_measurement_seen = True
@@ -1557,6 +1584,8 @@ class TargetDistanceBenchmarkRunner(Node):
                 'live_run_dir': self.run_output_dir,
                 'trials_included': included_trials,
                 'trials_skipped': skipped_trials,
+                **({'depth_warmup': self.depth_warmup_gate}
+                   if getattr(self, 'depth_warmup_gate', None) else {}),
                 'capture_wall_time_sec': time.monotonic() - self.run_started_monotonic,
             }
             if self.sampled_capture_summary is not None:
@@ -2234,6 +2263,13 @@ class TargetDistanceBenchmarkRunner(Node):
             lambda: self.color_stream_seen,
             f'color stream on "{self.resolved_topic(self.color_topic)}"',
         )
+        if self.needs_depth_warmup:
+            self.wait_for_flag(
+                lambda: self.depth_pipeline_ready,
+                'monocular depth warmup on a real camera frame',
+            )
+            self.depth_warmup_gate = self.depth_pipeline_state
+            self.get_logger().info('Monocular depth readiness gate opened.')
 
     def wait_for_flag(self, condition, description: str) -> None:
         self.get_logger().info(f'Waiting for {description}.')

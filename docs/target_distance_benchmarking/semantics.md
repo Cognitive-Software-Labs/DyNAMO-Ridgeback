@@ -34,6 +34,14 @@ occlusion, clutter, image-edge, trap, and probe scenes; the
 - Never run `cleanup.sh` between persistent sweep configurations. A sweep owns
   one simulator/RViz/detector environment and restarts the per-config layer.
 
+When a monocular depth estimator is selected, the runner also waits for the
+mask worker's successful real-frame inference readiness before scene setup
+and timed measurement. Empty measurement messages alone do not open this
+gate. This warms the model without requiring a target detection or extending
+the capture window; stereo and polar-only runs do not need the gate. The
+[aligned-depth lifecycle](../target_localization/aligned_depth.md#3-source-2-rgb-frame--aligned-depth-depth-anything)
+owns how the producer becomes ready.
+
 ### Simulator assets and cross-simulator comparison
 
 The scenario names a world, the target and each object model only logically.
@@ -60,9 +68,17 @@ What a Gazebo-to-Isaac comparison may claim:
   estimators on the instances both simulators scored, because each simulator's
   own scored set differs, and a lower error on fewer instances is not an
   improvement.
-- **Isaac A/Bs need repeats for every estimator.** Isaac is not reproducible
-  run to run on any estimator path: same-code runs differ in detector outcomes
-  and camera-path estimates.
+- **Isaac A/Bs need repeats for every estimator.** Judge repeatability by
+  trial-level distance estimates, outcomes, and capture coverage across fresh
+  runs with the same configuration. Pixel equality is a diagnostic; RGB
+  differences matter when they materially change those benchmark outputs.
+  Repeats must span fresh sessions: repeats inside one session can see
+  byte-identical RGB and show no spread on a scene that differs between
+  sessions. The full-matrix pair under Archived evidence measured monocular
+  differences up to 1.376 m, against at most 4.3 mm for stereo mask estimators.
+  A later investigation attributes the mask-estimator differences in that
+  pair to stale scene geometry. Those are contaminated-run observations, not
+  measurements of intrinsic renderer or monocular-model variation.
 
 ### Background props
 
@@ -292,6 +308,8 @@ Historical scenario/status transitions are retained in the Archived evidence sec
 
 ## Archived evidence
 
+- [full-matrix Isaac repeatability pair](../../archive/engineering/2026-11-06-isaac-full-repeatability.md)
+- [monocular readiness and two-scene Isaac repeatability](../../archive/engineering/2026-11-05-monocular-readiness-and-isaac-repeatability.md)
 - [benchmark history](../../archive/engineering/benchmark_evolution.md)
 - [Gazebo and Isaac backend qualification](../../archive/engineering/2026-10-26-benchmark-gazebo-isaac-qualification.md)
 - [scene recertification for the current camera](../../archive/engineering/2026-10-29-scene-recertification.md)
