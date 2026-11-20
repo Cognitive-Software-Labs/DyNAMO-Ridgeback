@@ -311,7 +311,7 @@ def test_bounded_search_exhaustion_is_not_claimed_as_fully_blocked(manager_facto
     while m.state == MissionState.EVALUATING_PARKING_PATHS:
         finish(c, error=208, status=GoalStatus.STATUS_ABORTED)
         m._next_path(now_ns=PLAN_NOW_NS)
-    assert m.last_issue.code == 'bounded_search_exhausted'
+    assert m.last_issue.code == 'route_budget_exhausted'      # untested poses remain
     assert len(c.calls) <= 18
     assert m.parking_plan.selected is None
 
@@ -757,7 +757,7 @@ def test_a_spent_budget_never_claims_an_unchecked_class_blocked(manager_factory,
     m.path_check_budget = right - 1               # the budget runs out inside the right class
     evaluate(m, client)
     assert m.state == MissionState.PARKING_PLANNING_FAILED
-    assert m.last_issue.code == 'bounded_search_exhausted'
+    assert m.last_issue.code == 'route_budget_exhausted'      # not 'no safe route'
     assert 'budget' in m.last_issue.reason and 'untested poses remain' in m.last_issue.reason
     assert 'g1_right incomplete' in m.last_issue.reason
     assert set(checked) == {'g1_right'} and len(checked) == right - 1

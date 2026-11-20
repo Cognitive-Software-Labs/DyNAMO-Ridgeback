@@ -288,7 +288,7 @@ sides or used the batches or budget, and a right class larger than the route-che
 budget fails planning rather than falling to the left. In Gazebo, at 0.8-1.2 s a
 check, the 10 s batch timeout ends a search after about 12 checks with
 `planner_timeout`; the mission then neither explores nor parks, and returns to the start
-only when that is shown safe ([planning timeout](exploration/parking_mission_states.md#planning-timeout)).
+only when that is shown safe ([planning timeout](exploration/parking_mission_states.md#incomplete-route-search)).
 
 **Completion criteria.** Run the order live in both simulators; decide whether the
 estimator should report an uncertainty (for example from the spread of the frames'

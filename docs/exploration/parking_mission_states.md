@@ -46,43 +46,27 @@ times out after a turn falls back once to the observation pose. A failure while 
 may still own a goal stops the robot in place (`MISSION_FAILED`) instead of starting
 another goal.
 
-### Planning timeout
+### Incomplete route search
 
-A route search that outlives the 10 s batch deadline or a 3 s request deadline
-(`planner_timeout`) says nothing about whether a parking pose exists, so it neither
-explores around G1 nor reads as `no_valid_candidate`; a spent route-check budget and a
-search with no safe route stay `bounded_search_exhausted`, and missing post-planning
-motion evidence stays `motion_settlement_timeout`. With driving on, the outstanding
-check is cancelled and the mission enters `RETURNING_TO_START` without a goal. Once the
-stop is confirmed, it starts the shared-checker return to the start only when the scans
-and odometry are fresh with nothing within the 0.05 m stopping margin, both Nav2 action
-servers are ready, and Nav2's planner returns a route home within 3 s; the return is
-then watched by Nav2 and its collision monitor like any other. Otherwise nothing moves:
-the mission ends `MISSION_FAILED` (`planning_timeout`) with the reason, for example
+A route search cut short, by the 10 s batch deadline or a 3 s request deadline
+(`planner_timeout`, reported as `planning_timeout`) or by the 16-check route budget
+with poses still untested (`route_budget_exhausted`), says nothing about whether a
+parking pose exists, so neither reads as `no_valid_candidate`. A search that checked
+every valid pose and found no safe route stays `bounded_search_exhausted`, and missing
+post-planning motion evidence stays `motion_settlement_timeout`. A spent budget may
+still map around G1 first, as before; a timeout does not. With driving on, the
+outstanding check is cancelled and the mission enters `RETURNING_TO_START` without a
+goal. Once the stop is confirmed, it starts the shared-checker return to the start
+only when the scans and odometry are fresh with nothing within the 0.05 m stopping
+margin, both Nav2 action servers are ready, and Nav2's planner returns a route home
+within 3 s. That route only gates the start: Nav2 replans the return on its live
+costmaps and every command passes its collision monitor. Otherwise nothing moves: the
+mission ends `MISSION_FAILED` under the search's code with the reason, for example
 `stop not confirmed`, `lidar_stale` or `home_route_unavailable`, and is not retried. A
-completed return also ends `MISSION_FAILED` (`planning_timeout`), and a failed one
-`return_navigation_failed` naming the timeout; `timeout_recovery` in the mission state
-records the outcome. With driving off, nothing moves and the failure stays
-`PARKING_PLANNING_FAILED` (`planner_timeout`).
-
-After the wait, the robot leaves G1 before the return: straight out to the plan's
-pre-parking pose, 0.5 m directly away from G1, with the parking legs' 0.08 m / 0.12
-rad goal checker. It starts only on current stop evidence, with the swept planning
-footprint (basket included) free in the current map and never nearer G1, and with
-fresh scans and odometry showing nothing in the stopping path or on the route. The
-parking legs' LiDAR check then runs on every scan and tick until the pose is reached
-(`departure` in the clearance legs). Nav2's default behavior tree replans at 1 Hz and
-may spin or back up, so the robot must also stay within the goal checker's 0.08 m and
-0.12 rad of the checked straight route (`route_deviation`). If the departure cannot
-start, the mission ends `MISSION_FAILED` (`departure_not_safe`) with the robot
-stopped. A veto, leaving the route, a stale sensor, a Nav2 failure or the deadline
-cancels it; once Nav2 releases the goal and the stop is confirmed, the mission ends
-`MISSION_FAILED` (`departure_failed`) without another goal near G1
-(`stop_not_confirmed` if no stop is confirmed). Reaching the pose starts the unchanged
-return. A failed or vetoed final leg leaves the robot near G1, so once the stop is
-confirmed the same departure runs first, in `RETURNING_TO_OBSERVATION` before a retry
-or in `RETURNING_TO_START` before the return; a failure on the pre-parking leg goes
-straight to the retry or return.
+completed return also ends `MISSION_FAILED` under that code, and a failed one
+`return_navigation_failed` naming it; `search_recovery` in the mission state records
+the code and outcome. With driving off, nothing moves and the failure stays
+`PARKING_PLANNING_FAILED`.
 
 ## Whole missions
 

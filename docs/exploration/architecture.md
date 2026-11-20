@@ -334,7 +334,7 @@ one, and an unsafe preferred pose always loses to a safe alternative. At most
 `parking_path_check_budget` (16) routes are checked per planning, within
 `parking_path_batch_timeout_s` (10 s); a path check took 0.2-0.8 s in the recorded
 runs. If the budget runs out with no safe route, planning fails
-(`bounded_search_exhausted`) and names the class left incomplete: a lower class is
+(`route_budget_exhausted`) and names the class left incomplete: a lower class is
 not selected over a higher one that was never fully checked. The mission state's
 `route_search` gives each class's valid, checked and feasible poses and its outcome
 (`feasible`, `none_feasible`, `incomplete` or `unchecked`), also logged at selection.

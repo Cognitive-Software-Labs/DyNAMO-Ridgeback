@@ -161,7 +161,12 @@ _STEP_BACK_GAP_TOLERANCE_M = 0.02
 
 # Planning failures that more mapping around G1 can resolve.
 _EXPLORABLE_PLANNING_FAILURES = ('no_free_donut_cells', 'no_valid_candidate',
-                                 'bounded_search_exhausted')
+                                 'bounded_search_exhausted', 'route_budget_exhausted')
+
+# Route searches that ended before every ranked pose was checked (deadline or route-check
+# budget): no evidence that no pose exists. The mission code each is reported under.
+_INCOMPLETE_SEARCH_FAILURES = {'planner_timeout': 'planning_timeout',
+                               'route_budget_exhausted': 'route_budget_exhausted'}
 
 # Planning failures that leave the rejected plan on screen.
 _DRAWN_PLANNING_FAILURES = _EXPLORABLE_PLANNING_FAILURES
@@ -720,9 +725,10 @@ class MissionManagerNode(Node):
         self._departure_stopping = False
         self._departure_wait_deadline_s = None
         self.departure = None
-        # After a parking-planning timeout: the one return home it may start, once stopped,
-        # sensors are fresh and Nav2 has planned a route home; and what came of it.
-        self.timeout_recovery = None
+        # After a route search cut short (deadline or budget): the one return home it may
+        # start, once stopped, sensors are fresh and Nav2 has planned a route home; its code
+        # and what came of it.
+        self.search_recovery = None
         self._timeout_return_pending = False
         self._home_route_deadline_s = None
         self._home_route_token = 0
@@ -1355,7 +1361,7 @@ class MissionManagerNode(Node):
             self._departure_stopping = False
             self._departure_wait_deadline_s = None
             self.departure = None
-            self.timeout_recovery = None
+            self.search_recovery = None
             self._timeout_return_pending = False
             self._home_route_deadline_s = None
             self._home_route_token += 1
@@ -2055,7 +2061,7 @@ class MissionManagerNode(Node):
                 'detail': self.target_heading_quality.detail},
             'g1_reobservation': self.g1_reobservation,
             'departure': self.departure,
-            'timeout_recovery': self.timeout_recovery,
+            'search_recovery': self.search_recovery,
             'parking_mission_navigation': {
                 'enabled': self.parking_navigation_enabled,
                 'failure': self._parking_failure,
@@ -2193,10 +2199,10 @@ class MissionManagerNode(Node):
             self._next_path(now_ns=now_ns)
 
     def _fail_planning(self, code: str, reason: str) -> None:
-        if code == 'planner_timeout' and self._recover_from_planning_timeout(reason):
-            return
         if code in _EXPLORABLE_PLANNING_FAILURES and self._maybe_explore_around_g1(
                 f'{code}: {reason}'):
+            return
+        if code in _INCOMPLETE_SEARCH_FAILURES and self._recover_from_incomplete_search(code, reason):
             return
         if code in _EXPLORABLE_PLANNING_FAILURES and self._return_without_parking(code, reason):
             return
@@ -2235,49 +2241,53 @@ class MissionManagerNode(Node):
         self._start_return(f'no feasible parking pose: {code}')
         return True
 
-    def _recover_from_planning_timeout(self, reason):
-        """A timed-out route search says nothing about whether a parking pose exists: stop
-        checking, then return home once only if that is shown safe (``_check_timeout_return``),
-        else stay stopped. Either way the mission fails as ``planning_timeout``. False when
-        driving is off: the plain planning failure stands and nothing moves."""
-        if not self.parking_navigation_enabled or self.timeout_recovery is not None:
+    def _recover_from_incomplete_search(self, code, reason):
+        """A route search cut short by its deadline or its route-check budget says nothing about
+        whether a parking pose exists: stop checking, then return home once only if that is
+        shown safe (``_check_timeout_return``), else stay stopped. Either way the mission fails
+        under the search's own code (``_INCOMPLETE_SEARCH_FAILURES``). False when driving is
+        off: the plain planning failure stands and nothing moves."""
+        if not self.parking_navigation_enabled or self.search_recovery is not None:
             return False
+        issue = _INCOMPLETE_SEARCH_FAILURES[code]
         self._invalidate_path_requests()
         self._planning_deadline_s = None
         if self.parking_plan is not None:
             plan = self.parking_plan
             plan.ok, plan.selected, plan.selected_path = False, None, None
-            plan.failure_reason = 'planner_timeout'
+            plan.failure_reason = code
             self._publish_parking_markers()
-        self._parking_failure = f'planning_timeout: {reason}'
-        self._parking_failure_code = 'planning_timeout'
-        self.timeout_recovery = {'outcome': None, 'reason': reason}
-        self.get_logger().error(f'Parking planning timed out: {reason}; returning home only if '
-                                'the robot is stopped, its sensors are fresh and a route home exists')
+        self._parking_failure = f'{issue}: {reason}'
+        self._parking_failure_code = issue
+        self.search_recovery = {'code': issue, 'outcome': None, 'reason': reason}
+        self.get_logger().error(f'Parking route search incomplete [{issue}]: {reason}; returning '
+                                'home only if the robot is stopped, its sensors are fresh and a '
+                                'route home exists')
         if self.start_pose is None:
             self._timeout_return_refused('start pose unavailable')
         elif self._nav_goal_generation is not None:
             self._timeout_return_refused('a navigation goal may still be executing')
         else:
             self._timeout_return_pending = True
-            self._start_return('planning_timeout: confirming the stop and a safe route home',
+            self._start_return(f'{issue}: confirming the stop and a safe route home',
                                stop_first=True)
         return True
 
     def _timeout_return_refused(self, problem):
-        """No return home after the planning timeout: nothing is commanded, nothing retried."""
+        """No return home after the incomplete search: nothing is commanded, nothing retried."""
         self._timeout_return_pending = False
         self._home_route_deadline_s = None
         self._home_route_token += 1
-        self.timeout_recovery['outcome'] = f'not started: {problem}'
-        self.last_issue = MissionIssue(FailureClass.TERMINAL, 'planning_timeout',
-                                       f'{self.timeout_recovery["reason"]}; return home not '
+        recovery = self.search_recovery
+        recovery['outcome'] = f'not started: {problem}'
+        self.last_issue = MissionIssue(FailureClass.TERMINAL, recovery['code'],
+                                       f'{recovery["reason"]}; return home not '
                                        f'started: {problem}; remaining stopped')
-        self.get_logger().error(f'Return home after the planning timeout not started: {problem}; '
+        self.get_logger().error(f'Return home after {recovery["code"]} not started: {problem}; '
                                 'the robot stays stopped')
         self._transition(MissionState.MISSION_FAILED if self.state == MissionState.RETURNING_TO_START
                          else MissionState.PARKING_PLANNING_FAILED,
-                         f'planning_timeout; return home not safe: {problem}; remaining stopped')
+                         f'{recovery["code"]}; return home not safe: {problem}; remaining stopped')
 
     def _timeout_return_sensors(self):
         """Why the scans, odometry or robot pose cannot support the return now, or None."""
@@ -2288,7 +2298,7 @@ class MissionManagerNode(Node):
         return None if reason is None else f'lidar_clearance: {reason}'
 
     def _check_timeout_return(self):
-        """Stopped after the planning timeout: fresh scans and odometry with nothing in the
+        """Stopped after the incomplete route search: fresh scans and odometry with nothing in the
         stopping margin, both Nav2 action servers up, then a route home that Nav2 can plan
         now. Only then the existing collision-monitored return starts."""
         problem = self._timeout_return_sensors()
@@ -2353,11 +2363,12 @@ class MissionManagerNode(Node):
                 self._timeout_return_refused(problem)
                 return
             self._timeout_return_pending = False
-            self.timeout_recovery['outcome'] = 'returning'
+            self.search_recovery['outcome'] = 'returning'
+            code = self.search_recovery['code']
             self.get_logger().info(f'Route home found ({len(path.poses)} poses); returning to start '
-                                   'after the planning timeout')
-            self._publish_state('planning_timeout: stopped, sensors fresh, route home found; '
-                                'returning to start', event='timeout_recovery')
+                                   f'after {code}')
+            self._publish_state(f'{code}: stopped, sensors fresh, route home found; '
+                                'returning to start', event='search_recovery')
             self._send_shared_return()
 
     def _current_robot_pose(self, *, with_stamp: bool = False):
@@ -2751,7 +2762,7 @@ class MissionManagerNode(Node):
             if budget_spent:
                 # A class with goals left unchecked is not shown blocked, and lower
                 # classes were never compared with it: no pose is selected.
-                self._fail_planning('bounded_search_exhausted',
+                self._fail_planning('route_budget_exhausted',
                     f'route check budget of {self.path_check_budget} spent before any safe '
                     f'route; untested poses remain: {self._route_search_text()}')
                 return
@@ -3223,15 +3234,15 @@ class MissionManagerNode(Node):
                 if self._parking_failure is None:
                     self._transition(MissionState.MISSION_COMPLETE, 'returned to start pose')
                     return
-                if self.timeout_recovery is not None:
-                    self.timeout_recovery['outcome'] = 'returned home'
+                if self.search_recovery is not None:
+                    self.search_recovery['outcome'] = 'returned home'
                 self.last_issue = MissionIssue(FailureClass.TERMINAL, self._parking_failure_code,
                                                self._parking_failure)
                 self._transition(MissionState.MISSION_FAILED,
                                  f'returned to start after: {self._parking_failure}')
             else:
-                if self.timeout_recovery is not None:
-                    self.timeout_recovery['outcome'] = f'return failed: {detail}'
+                if self.search_recovery is not None:
+                    self.search_recovery['outcome'] = f'return failed: {detail}'
                     detail = f'{detail} (after {self._parking_failure})'
                 self.last_issue = MissionIssue(FailureClass.TERMINAL,
                                                'return_navigation_failed', detail)
