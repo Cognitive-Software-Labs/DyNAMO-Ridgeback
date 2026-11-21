@@ -59,7 +59,7 @@ def _parking_rviz(context):
             g1 = parking_scenarios.world_layout(
                 data, LaunchConfiguration('demo_scenario').perform(context),
                 LaunchConfiguration('backend').perform(context),
-                LaunchConfiguration('world').perform(context))['g1']
+                LaunchConfiguration('parking_world').perform(context))['g1']
             view = (task_view((0.0, 0.0), (g1['x'], g1['y']), COMPACT_VIEW_AREA_PX) if compact
                     else task_view((0.0, 0.0), (g1['x'], g1['y'])))
         except ValueError:
@@ -97,7 +97,11 @@ def _configure_simulation(context):
                 or value('parking_navigation_enabled') != 'false'):
             raise ValueError('demo_plan_only requires exploration_enabled:=false, '
                              'stationary_mock_handoff_enabled:=true, parking_navigation_enabled:=false')
+    # The backend include may rename `world` for its own simulator (Gazebo's depot is the
+    # Clearpath `warehouse`) in this shared launch context; the parking scene keeps the
+    # world the caller requested.
     actions = [SetLaunchConfiguration('setup_path', selected),
+               SetLaunchConfiguration('parking_world', value('world')),
                LogInfo(msg=f'Simulation robot declaration: {selected}robot.yaml; '
                        f'mission odometry: {value("odometry_topic")}')]
     if demo:
@@ -140,7 +144,7 @@ def _startup_nodes(context):
         return Node(package='ridgeback_autonomy', executable='parking_simulation_startup',
             name='parking_startup_' + phase, namespace=value('namespace'),
             arguments=['--phase', phase, *common,
-                       *(['--demo', '--scenario', value('demo_scenario'), '--world', value('world')]
+                       *(['--demo', '--scenario', value('demo_scenario'), '--world', value('parking_world')]
                          if demo else [])],
             parameters=[{'use_sim_time': True}],
             remappings=[('/tf', 'tf'), ('/tf_static', 'tf_static')], output='screen')

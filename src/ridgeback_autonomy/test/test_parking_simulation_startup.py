@@ -382,3 +382,57 @@ def test_the_ward_no_feasible_bed_leaves_a_passage_at_any_heading():
     assert abs(math.cos(bed.yaw)) == pytest.approx(1.0, abs=1e-6)   # long side along the wall
     strip = (wall_y - depth / 2) - (bed.y + 0.45)
     assert strip >= 1.35, strip
+
+
+def startup_world(monkeypatch, backend, world, backend_name):
+    """The --world the parking startup gate receives after the backend include renamed
+    ``world`` in the shared launch context (Gazebo's depot is Clearpath's warehouse)."""
+    from types import SimpleNamespace
+    module = launch_module()
+    context = defaults(backend=backend, demo_scene_enabled='true', mission_management_enabled='true',
+                       exploration_enabled='true', world=world)
+    for action in module._configure_simulation(context):
+        if type(action).__name__ == 'SetLaunchConfiguration':
+            action.execute(context)
+    context.launch_configurations['world'] = backend_name          # as the backend include does
+    nodes = []
+    monkeypatch.setattr(module, 'Node', lambda **kw: nodes.append(kw) or SimpleNamespace(**kw))
+    monkeypatch.setattr(module, 'OnProcessExit', lambda **kw: kw)
+    monkeypatch.setattr(module, 'RegisterEventHandler', lambda handler: handler)
+    module._startup_nodes(context)
+    gates = [n['arguments'] for n in nodes if n.get('executable') == 'parking_simulation_startup']
+    assert len(gates) == 2                                          # prepare and release
+    return {args[args.index('--world') + 1] for args in gates}
+
+
+@pytest.mark.parametrize('backend,world,backend_name', [
+    ('gz', 'depot', 'warehouse'),                                  # 2026-11-21: refused as warehouse
+    ('gz', 'parking_demo', 'parking_demo'),
+    ('isaac', 'parking_demo', 'parking_demo'),
+])
+def test_the_parking_startup_keeps_the_requested_world(monkeypatch, backend, world, backend_name):
+    assert startup_world(monkeypatch, backend, world, backend_name) == {world}
+
+
+@pytest.mark.parametrize('backend,world', [('gz', 'warehouse'), ('gz', 'robocup_hcc_arena_x'),
+                                           ('isaac', 'depot')])
+def test_unsupported_parking_worlds_are_still_refused(backend, world):
+    with pytest.raises(ValueError, match='other worlds may already contain'):
+        launch_module()._configure_simulation(defaults(
+            backend=backend, demo_scene_enabled='true', mission_management_enabled='true', world=world))
+
+
+def test_rviz_frames_the_requested_world_workstation(monkeypatch):
+    module = launch_module()
+    context = defaults(backend='gz', demo_scene_enabled='true', mission_management_enabled='true',
+                       world='depot', exploration_rviz='true')
+    for action in module._configure_simulation(context):
+        if type(action).__name__ == 'SetLaunchConfiguration':
+            action.execute(context)
+    seen = []
+    from ridgeback_autonomy.mission import parking_scenarios
+    real = parking_scenarios.world_layout
+    monkeypatch.setattr(parking_scenarios, 'world_layout',
+                        lambda data, scenario, backend, world: seen.append(world) or real(data, scenario, backend, world))
+    module._parking_rviz(context)
+    assert seen == ['depot']
