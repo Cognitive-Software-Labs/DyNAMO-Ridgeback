@@ -38,8 +38,30 @@ def aim_camera(m, offset=0.0):
     m._camera_view = view
 
 
+def stop_before_the_view(m):
+    """After the explorer's handoff the view is chosen only from a confirmed stop: 2 s of
+    stationary odometry ending now (the test clocks are left where they are)."""
+    if not m._retry_after_stop:
+        return
+    sent = len(m.navigation_client.calls)
+    m.tick()
+    assert len(m.navigation_client.calls) == sent        # nothing before the stop is shown
+    ns, wall = m.test_ros_ns, m._monotonic.value
+    for i in range(21):
+        back = 20 - i
+        m.motion.observe((0.,) * 6, ns - back * 100_000_000, ns - back * 100_000_000, wall - back * 0.1)
+    m.tick()
+
+
+def view_choice(m):
+    """How the relocalization view was chosen, once the stop is confirmed."""
+    stop_before_the_view(m)
+    return m._view_choice
+
+
 def back_at_observation(m, status=GoalStatus.STATUS_SUCCEEDED):
-    """Apply the observation goal checker, then finish the one observation goal."""
+    """Confirm the stop, apply the observation goal checker, then finish the one goal."""
+    stop_before_the_view(m)
     assert answer(m._goal_checker_set_client) == {
         'general_goal_checker.xy_goal_tolerance': 0.03,
         'general_goal_checker.yaw_goal_tolerance': 0.10}
@@ -296,7 +318,8 @@ def test_finishing_cancels_through_missionguard_before_any_navigation(manager_fa
     m.process_guard_status(guard_status(handoff_safe=True, goal_active=False, cancellation='none'))
     m.pause_client.calls[-1][1].set_result(trigger_response(True, 'safe'))   # fresh verification
     assert m.state == MissionState.RETURNING_TO_OBSERVATION
-    assert m.navigation_client.calls == []             # the goal waits for its goal checker
+    assert m.navigation_client.calls == []             # the goal waits for the stop and its checker
+    stop_before_the_view(m)
     answer(m._goal_checker_set_client)
     assert len(m.navigation_client.calls) == 1
 
@@ -339,6 +362,7 @@ def returning(manager_factory):
     m._on_map(occupancy_map())
     m.tick()
     assert m.state == MissionState.RETURNING_TO_OBSERVATION
+    stop_before_the_view(m)
     return m
 
 
@@ -437,6 +461,7 @@ def test_observation_goal_is_never_sent_with_the_loose_checker(manager_factory):
     m._goal_checker_set_client.ready = False
     m._on_map(occupancy_map())
     m.tick()
+    stop_before_the_view(m)
     assert m.state == MissionState.MISSION_FAILED
     assert 'observation goal tolerance not applied' in m.last_issue.reason
     assert m.navigation_client.calls == []
@@ -504,13 +529,14 @@ def finish_round_away_from_the_observation_pose(manager_factory):
     m._on_map(occupancy_map())                                  # every pose decided
     m.tick()
     assert m.state == MissionState.RETURNING_TO_OBSERVATION
+    stop_before_the_view(m)
     return m
 
 
 def test_after_exploring_g1_is_relocalized_by_turning_toward_it_in_place(manager_factory):
     m = finish_round_away_from_the_observation_pose(manager_factory)
     t = m.target_position
-    assert 'turning toward G1 in place' in m.transition_history[-1].reason
+    assert 'turning toward G1 in place' in view_choice(m)
     goal = back_at_observation(m)
     assert goal[:2] == pytest.approx((t.map_x_m - 1.9, t.map_y_m - 0.6))
     assert goal[2] == pytest.approx(math.atan2(0.6, 1.9))
@@ -578,7 +604,7 @@ def test_g1_at_1_6_m_is_reacquired_in_place(manager_factory):
     stand(m, t.map_x_m - 1.5, t.map_y_m - 0.5, -1.0)           # 1.58 m: feet out of view
     m._on_map(occupancy_map())
     m.tick()
-    assert 'turning toward G1 in place' in m.transition_history[-1].reason
+    assert 'turning toward G1 in place' in view_choice(m)
 
 
 def test_g1_too_close_steps_back_to_view_it(manager_factory):
@@ -589,7 +615,7 @@ def test_g1_too_close_steps_back_to_view_it(manager_factory):
     stand(m, t.map_x_m - 0.9, t.map_y_m, 0.0)                  # 0.9 m from G1, facing it
     m._on_map(occupancy_map())
     m.tick()
-    assert 'back to view G1' in m.transition_history[-1].reason
+    assert 'back to view G1' in view_choice(m)
     assert m._observation_fallback                             # the observation pose stays the fallback
     x, y, yaw = m._observation_goal
     assert math.hypot(x - t.map_x_m, y - t.map_y_m) == pytest.approx(1.5)
@@ -604,7 +630,7 @@ def test_g1_too_close_with_no_free_step_back_returns_to_the_observation_pose(man
     m._on_map(blocked)
     m._step_back_goal = lambda *a: None                        # e.g. occupied behind the robot
     m.tick()
-    assert 'outside 1.3-3.5 m' in m.transition_history[-1].reason
+    assert 'outside 1.3-3.5 m' in view_choice(m)
     assert back_at_observation(m) == pytest.approx((1.0, 2.0, 0.25))
 
 

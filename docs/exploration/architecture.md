@@ -462,11 +462,11 @@ confirmed stop fails the mission. The step is never repeated, and if the new vie
 still gives no heading the ranking stays undirected. The outcome, with G1's
 position and heading status before and after, is published as `g1_reobservation`.
 
-Apart from that step back, and
-once if the turn, the step back, its view check or the localization fails, it
-returns to the observation pose: the latest pose from which G1 was
-localized and verified, where the detector has already found it. (The first
-localization can be 10 m away; returning there ran past its deadline.) The detector's score near
+Apart from that step back, and once if the turn, the step back, its view check or
+the localization fails, it returns to the observation pose: the latest pose from
+which G1 was reliably localized (head verified, camera 1.3-3.5 m away). A view whose
+head region showed the background, or from farther, is never driven back to: the
+mission fails stopped as `g1_relocalization_failed` (2026-11-21: a 4.3 m view). The detector's score near
 its threshold depends on the exact view: a lateral shift of 0.1 m or an 18°
 turn can put the same, fully visible G1 just below it, and a static simulated
 view scores the same on every frame. Relocalizing a G1 that already has a
@@ -490,17 +490,17 @@ return fails rather than return loosely. A turn cancelled at its deadline is
 released by Nav2 before the observation goal is sent. When Nav2 releases a goal, by
 success, failure or deadline, the shared checker is restored.
 
-Nav2 success alone does not start the localization. After fresh odometry
-confirms the stop, the manager reads the robot pose from TF. It accepts the
-pose only within the checker plus a 0.01 m / 0.02 rad stop allowance, and only
-if the camera's optical axis
-(`observation_camera_frame`, from TF, so the mount is included) points within
-`observation_camera_half_view_rad` (0.60 rad, inside the 0.70 rad half field of
-view of both simulators' colour camera) of the latest G1 estimate. Otherwise
-the observation return fails with `observation_pose_not_reached`,
-`g1_outside_camera_view` or `observation_view_unverified`. There is one
-observation-pose goal and no retry. A G1 that still is not detected there ends
-at the existing localization timeout.
+Nav2 success alone does not start the localization. After the explorer's handoff the turn is
+chosen only from a confirmed stop (the cancelled goal may still be moving). After the goal,
+once fresh odometry confirms the stop, the manager reads the robot pose from TF. A return to
+the observation pose must stop within the checker plus a 0.01 m / 0.02 rad allowance; a turn
+or step chosen where the robot stood must leave the camera 1.3-3.5 m from G1
+(`g1_outside_camera_range`). Either way the camera's optical axis (`observation_camera_frame`,
+from TF, so the mount is included) must point within `observation_camera_half_view_rad` (0.60
+rad, inside the 0.70 rad half field of view of both simulators' colour camera) of the latest
+G1 estimate. Otherwise the observation return fails with `observation_pose_not_reached`,
+`g1_outside_camera_view` or `observation_view_unverified`. There is one observation-pose goal
+and no retry. A G1 that still is not detected there ends at the existing localization timeout.
 
 ### Mission navigation goal ownership
 

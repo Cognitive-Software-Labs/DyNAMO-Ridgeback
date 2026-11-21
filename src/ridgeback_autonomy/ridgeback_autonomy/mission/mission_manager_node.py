@@ -708,6 +708,13 @@ class MissionManagerNode(Node):
         self._g1_preview_new = 0
         self._g1_planned_cells = set()
         self._observation_pose = None
+        # Whether the observation pose's view was reliable: G1 1.3-3.5 m from the camera and
+        # its head, not what stands behind it, in the head region (_observe_target_body).
+        self._observation_reliable = False
+        self._observation_view = (False, None)
+        self._last_view = None            # (reliable, camera range m) of the latest verification
+        self._view_choice = None          # how the latest relocalization view was chosen
+        self._after_stop = None           # what a confirmed stop in RETURNING_TO_OBSERVATION starts
         self._observation_goal = None
         self._observation_fallback = False
         self._observation_check_pending = False
@@ -1272,7 +1279,7 @@ class MissionManagerNode(Node):
                 # A later relocalization falls back to the latest pose G1 was localized and
                 # verified from: the first one can be 10 m away (2026-11-09), and the return
                 # to it then ran past its deadline.
-                self._observation_pose = self._current_robot_pose() or self._observation_pose
+                self._remember_observation_pose()
                 # Plan from the map at hand first; a planning failure that more mapping
                 # could resolve resumes the explorer instead (_fail_planning).
                 if self.parking_planning_enabled or not self._maybe_explore_around_g1():
@@ -1351,6 +1358,8 @@ class MissionManagerNode(Node):
             self._plan_rays_grid = None
             self._depth_frames.clear()
             self._observation_pose = self._observation_goal = None
+            self._observation_reliable, self._last_view, self._after_stop = False, None, None
+            self._observation_view = (False, None)
             self._observation_fallback = False
             self._observation_check_pending = False
             self._g1_exploration_deadline_s = None
@@ -1630,13 +1639,15 @@ class MissionManagerNode(Node):
             self._end_search_without_g1()
             return
         if self._g1_explored and self._observation_pose is not None:
-            # G1 must be in view again for the fresh localization: turn toward it where
-            # the robot stands, falling back once to the pose it was first localized from.
-            goal, how = self._reacquisition_goal()
-            self._observation_goal = goal
-            self._observation_fallback = goal is not self._observation_pose
-            if self._transition(MissionState.RETURNING_TO_OBSERVATION, f'{reason}; {how}'):
-                self._set_goal_tolerance(self.observation_tolerance, self._send_observation_goal)
+            # G1 must be in view again for the fresh localization: turn toward it where the
+            # robot stands, falling back once to the pose it was last reliably localized from.
+            # The explorer's cancelled goal may still be decelerating (0.5 m/s on 2026-11-21):
+            # the view is chosen only once the stop is confirmed.
+            if self._transition(MissionState.RETURNING_TO_OBSERVATION,
+                                f'{reason}; stopping before choosing the view of G1'):
+                self._retry_after_stop = True
+                self._after_stop = self._send_relocalization_view
+                self._settle_before_return()
             return
         turn = self._first_view_turn() if self.target_position is None else None
         if turn is not None:
@@ -1927,7 +1938,21 @@ class MissionManagerNode(Node):
         return x, y, yaw
 
     def _fall_back_to_observation_pose(self, reason):
-        """After a failed in-place relocalization: the single return to the observation pose."""
+        """After a failed in-place relocalization: the single return to the observation pose,
+        only when that pose gave a reliable view; driving back to a distant view whose head
+        region showed the background cannot give one (2026-11-21). Otherwise the mission
+        fails here, stopped, as ``g1_relocalization_failed``. Before the first localization
+        (the turn toward a confirmed detection) the pose is the pre-turn view the detector
+        found G1 from, and the single turn back to it is kept."""
+        if self.target_position is not None and not self._observation_reliable:
+            detail = (f'G1 not relocalized in place ({reason}), and the observation pose gave no '
+                      f'reliable view of G1 ({self._observation_view_text()}): not returning there')
+            self.get_logger().error(detail)
+            if self._nav_goal_generation is None and self._give_up_parking(
+                    'g1_relocalization_failed', detail):
+                return
+            self._fail_terminal('g1_relocalization_failed', detail)
+            return
         self._observation_goal, self._observation_fallback = self._observation_pose, False
         self.get_logger().warning(f'G1 not reacquired in place ({reason}); '
                                   'returning to the observation pose')
@@ -1940,12 +1965,41 @@ class MissionManagerNode(Node):
                 return
             self._set_goal_tolerance(self.observation_tolerance, self._send_observation_goal)
 
+    def _remember_observation_pose(self):
+        """G1 was just localized and verified from here: the fallback view for later
+        relocalizations, unless a reliable view is already kept and this one is not."""
+        if self._last_view is None:
+            # No depth verification ran (target_body_check off): only the range can be judged.
+            view, target = self._camera_view(), self.target_position
+            camera_range = (None if view is None or target is None else
+                            math.hypot(target.map_x_m - view[0], target.map_y_m - view[1]))
+            low, high = self.g1_reacquire_range_m
+            self._last_view = (not self.target_body_check and (
+                camera_range is None or low <= camera_range <= high), camera_range)
+        reliable, camera_range = self._last_view
+        if self._observation_pose is not None and self._observation_reliable and not reliable:
+            self.get_logger().info(
+                f'Keeping the reliable G1 observation pose; this view ({self._view_text(reliable, camera_range)}) '
+                'is not one')
+            return
+        self._observation_pose = self._current_robot_pose() or self._observation_pose
+        self._observation_reliable = reliable
+        self._observation_view = (reliable, camera_range)
+
+    def _view_text(self, reliable, camera_range):
+        where = 'range unknown' if camera_range is None else f'G1 {camera_range:.2f} m from the camera'
+        return f'{where}, {"head verified" if reliable else "head not verified or out of range"}'
+
+    def _observation_view_text(self):
+        return self._view_text(*self._observation_view)
+
     def _start_localization(self, reason: str) -> None:
         if self.state != MissionState.SETTLING_MOTION:
             return
         self._motion_deadline_s = None
         self._depth_frames.clear()
         self._localization_box = None
+        self._last_view = None
         self.localization_adapter.reset()
         self._clear_recoverable_issue()
         self._localization_deadline_s = self._monotonic() + self.localization_timeout_s
@@ -3071,15 +3125,19 @@ class MissionManagerNode(Node):
         return float(t.x), float(t.y), math.atan2(forward_y, forward_x)
 
     def _observation_view_failure(self):
-        """(code, reason) unless the stopped robot is back at the observation view of G1."""
+        """(code, reason) unless the stopped robot views G1 as intended. A return to the
+        observation pose must reproduce that pose (its view was verified before). A turn or
+        step chosen from where the robot stood has no such reference: its stopped camera
+        must see G1 within the relocalization range instead, wherever Nav2 left it."""
         robot, goal = self._current_robot_pose(), self._observation_goal
         if robot is None:
             return 'observation_pose_unverified', 'robot pose unavailable after the observation return'
         xy = math.hypot(robot[0] - goal[0], robot[1] - goal[1])
         yaw = abs(normalize_angle(robot[2] - goal[2]))
+        in_place = goal is not self._observation_pose
         xy_limit, yaw_limit = (limit + allowance for limit, allowance in
                                zip(self.observation_tolerance, _OBSERVATION_STOP_ALLOWANCE))
-        if xy > xy_limit or yaw > yaw_limit:
+        if not in_place and (xy > xy_limit or yaw > yaw_limit):
             return ('observation_pose_not_reached',
                     f'stopped {xy:.3f} m / {yaw:.3f} rad from the observation pose '
                     f'(limits {xy_limit:.3f} m / {yaw_limit:.3f} rad)')
@@ -3087,6 +3145,13 @@ class MissionManagerNode(Node):
         if view is None:
             return 'observation_view_unverified', f'{self.observation_camera_frame} transform unavailable'
         target = self.target_position
+        if in_place:
+            distance = math.hypot(target.map_x_m - view[0], target.map_y_m - view[1])
+            low, high = self.g1_reacquire_range_m
+            if not low <= distance <= high:
+                return ('g1_outside_camera_range',
+                        f'stopped {xy:.3f} m from the chosen view, G1 {distance:.2f} m from the '
+                        f'camera (usable {low:.1f}-{high:.1f} m)')
         bearing = normalize_angle(math.atan2(target.map_y_m - view[1], target.map_x_m - view[0])
                                   - view[2])
         if abs(bearing) > self.observation_camera_half_view_rad:
@@ -3439,24 +3504,42 @@ class MissionManagerNode(Node):
         if self.motion.ready(self.get_clock().now().nanoseconds, now_s):
             self._retry_after_stop = False
             self._nav_deadline_s = None
+            then, self._after_stop = self._after_stop or self._send_retry_observation, None
             if self._depart_after_stop:
                 self._depart_after_stop = False
-                self._start_departure(self._send_retry_observation)
+                self._start_departure(then)
             else:
-                self._send_retry_observation()
+                then()
         elif self._nav_deadline_s is not None and now_s >= self._nav_deadline_s:
             self._retry_after_stop = False
             self._nav_deadline_s = None
+            after = ('mapping around G1' if self._after_stop == self._send_relocalization_view
+                     else 'the failed parking attempt')
+            self._after_stop = None
             self.last_issue = MissionIssue(FailureClass.TERMINAL, 'stop_not_confirmed', self.motion.explain())
             self._transition(MissionState.MISSION_FAILED,
-                             f'no confirmed stop after the failed parking attempt: {self.motion.explain()}')
+                             f'no confirmed stop after {after}: {self.motion.explain()}')
 
-    def _send_retry_observation(self):
+    def _send_retry_observation(self, note='stopped after the failed attempt', event='parking_retry'):
         goal, how = self._reacquisition_goal()
+        self._view_choice = how
+        if goal is self._observation_pose and not self._observation_reliable:
+            # No usable view from here, and the kept pose never gave a reliable one either.
+            detail = (f'{how}; that pose gave no reliable view of G1 '
+                      f'({self._observation_view_text()}): not returning there')
+            self.get_logger().error(f'G1 cannot be relocalized: {detail}')
+            if self._give_up_parking('g1_relocalization_failed', detail):
+                return
+            self._fail_terminal('g1_relocalization_failed', detail)
+            return
         self._observation_goal = goal
         self._observation_fallback = goal is not self._observation_pose
-        self._publish_state(f'stopped after the failed attempt; {how}', event='parking_retry')
+        self.get_logger().info(f'{note}: {how}')
+        self._publish_state(f'{note}; {how}', event=event)
         self._set_goal_tolerance(self.observation_tolerance, self._send_observation_goal)
+
+    def _send_relocalization_view(self):
+        self._send_retry_observation('stopped after mapping around G1', 'relocalization')
 
     def _send_shared_return(self):
         self._set_goal_tolerance(self._shared_goal_tolerance, self._send_return_goal)
@@ -4242,7 +4325,16 @@ class MissionManagerNode(Node):
             reobservation.update(
                 heading_status_after=quality.status, camera_range_after_m=round(camera_range, 2),
                 position_after=[round(position[0], 3), round(position[1], 3)])
-        if head is not None:
+        low, high = self.g1_reacquire_range_m
+        reliable = head is not None and not head_not_g1 and low <= camera_range <= high
+        self._last_view = (reliable, camera_range)
+        if head is not None and head_not_g1:
+            # The head region measured what stands behind G1: that is never G1's geometry.
+            self.get_logger().info(
+                f'G1 verified in depth by its torso and body axis only: torso points {torso}, '
+                f'points above G1 {above}; the head region showed the background at '
+                f'{head.range_m:.2f} m (not used); camera {camera_range:.2f} m from G1')
+        elif head is not None:
             self.get_logger().info(f'G1 verified in depth: head {head.range_m:.2f} m from the camera, '
                                    f'torso points {torso}, points above G1 {above}')
         if self.target_heading is None:
