@@ -491,10 +491,10 @@ released by Nav2 before the observation goal is sent. When Nav2 releases a goal,
 success, failure or deadline, the shared checker is restored.
 
 Nav2 success alone does not start the localization. After the explorer's handoff the turn is
-chosen only from a confirmed stop (the cancelled goal may still be moving). After the goal,
-once fresh odometry confirms the stop, the manager reads the robot pose from TF. A return to
-the observation pose must stop within the checker plus a 0.01 m / 0.02 rad allowance; a turn
-or step chosen where the robot stood must leave the camera 1.3-3.5 m from G1
+chosen only from a confirmed stop. After the goal, once fresh odometry confirms the stop, the
+manager reads the robot pose from TF. A return to the observation pose must stop within the
+checker plus a 0.01 m / 0.02 rad allowance; a turn or step chosen where the robot stood must
+leave the camera 1.3-3.5 m from G1 (also predicted before turning)
 (`g1_outside_camera_range`). Either way the camera's optical axis (`observation_camera_frame`,
 from TF, so the mount is included) must point within `observation_camera_half_view_rad` (0.60
 rad, inside the 0.70 rad half field of view of both simulators' colour camera) of the latest

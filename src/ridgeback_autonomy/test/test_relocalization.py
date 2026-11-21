@@ -131,3 +131,54 @@ def test_an_invalid_depth_relocalization_keeps_waiting_then_fails_with_its_reaso
     m._monotonic.value += m.localization_timeout_s + 1.0
     m.tick()
     assert m.state == MissionState.MISSION_FAILED and m.last_issue.code == 'g1_relocalization_failed'
+
+
+def mounted_camera(m, ahead=0.6):
+    """The camera 0.6 m ahead of the base, looking along it (the turn moves it)."""
+    tf = m.tf_buffer
+    m._camera_view = lambda: (tf.x + ahead * math.cos(tf.yaw), tf.y + ahead * math.sin(tf.yaw), tf.yaw)
+
+
+def facing_away(m, base_range):
+    t = m.target_position
+    m.tf_buffer.x, m.tf_buffer.y, m.tf_buffer.yaw = t.map_x_m - base_range, t.map_y_m, math.pi
+    mounted_camera(m)
+
+
+def test_a_turn_that_would_bring_the_camera_too_close_returns_to_the_reliable_view(manager_factory):
+    # 2026-11-21: 1.51 m from G1 before the turn, 0.94 m after it, then rejected.
+    m = exploring_manager(manager_factory)
+    kept = m._observation_pose
+    facing_away(m, 1.75)                                      # camera 2.35 m now, 1.15 m after
+    m._on_map(occupancy_map())
+    m.tick()
+    stop_before_the_view(m)
+    assert 'would leave the camera 1.15 m from it' in m._view_choice
+    assert back_at_observation(m) == pytest.approx(kept)      # no turn in place first
+    assert len(m.navigation_client.calls) == 1
+
+
+def test_a_too_close_turn_without_a_reliable_view_fails_without_moving(manager_factory):
+    m = exploring_manager(manager_factory)
+    unreliable_first_view(m)
+    facing_away(m, 1.75)
+    m._on_map(occupancy_map())
+    m.tick()
+    stop_before_the_view(m)
+    assert m.state == MissionState.MISSION_FAILED and m.last_issue.code == 'g1_relocalization_failed'
+    assert m.navigation_client.calls == []
+
+
+def test_a_turn_that_keeps_the_camera_in_range_is_made_and_aims_the_camera(manager_factory):
+    m = exploring_manager(manager_factory)
+    t = m.target_position
+    m.tf_buffer.x, m.tf_buffer.y, m.tf_buffer.yaw = t.map_x_m - 2.5, t.map_y_m - 0.8, math.pi
+    mounted_camera(m)
+    m._on_map(occupancy_map())
+    m.tick()
+    assert 'turning toward G1 in place' in (stop_before_the_view(m) or m._view_choice)
+    goal = back_at_observation(m)
+    camera = (goal[0] + 0.6 * math.cos(goal[2]), goal[1] + 0.6 * math.sin(goal[2]))
+    bearing = math.atan2(t.map_y_m - camera[1], t.map_x_m - camera[0])
+    assert abs(math.remainder(bearing - goal[2], 2 * math.pi)) < 0.01   # optical axis on G1
+    assert 1.3 <= math.dist(camera, (t.map_x_m, t.map_y_m)) <= 3.5

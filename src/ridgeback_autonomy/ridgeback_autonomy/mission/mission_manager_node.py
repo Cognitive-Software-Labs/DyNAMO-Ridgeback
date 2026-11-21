@@ -1741,10 +1741,32 @@ class MissionManagerNode(Node):
         if not low <= distance <= high:
             return origin, (f'returning to the G1 observation pose (G1 {distance:.2f} m from the '
                             f'camera, outside {low:.1f}-{high:.1f} m)')
-        # Turn the camera's optical axis, not the base, toward the G1 estimate.
-        bearing = math.atan2(target.map_y_m - view[1], target.map_x_m - view[0])
-        yaw = normalize_angle(bearing - normalize_angle(view[2] - robot[2]))
-        return (robot[0], robot[1], yaw), f'turning toward G1 in place ({distance:.2f} m away)'
+        # Turn the camera's optical axis, not the base, toward the G1 estimate. The camera is
+        # mounted ahead of the base, so the turn also moves it: judge the range from where it
+        # will stand (2026-11-21: 1.51 m before a turn left it 0.94 m from G1, then rejected).
+        yaw, camera = self._turn_toward(robot, view, target)
+        after = math.hypot(target.map_x_m - camera[0], target.map_y_m - camera[1])
+        if not low <= after <= high:
+            return origin, (f'returning to the G1 observation pose (turning toward G1 would leave '
+                            f'the camera {after:.2f} m from it, outside {low:.1f}-{high:.1f} m)')
+        return (robot[0], robot[1], yaw), (f'turning toward G1 in place ({distance:.2f} m away; '
+                                           f'{after:.2f} m after the turn)')
+
+    @staticmethod
+    def _turn_toward(robot, view, target):
+        """(base yaw, camera xy after the turn) pointing the optical axis at the target, for a
+        camera offset from the base as ``view`` shows it now (a few fixed-point refinements)."""
+        dx, dy = view[0] - robot[0], view[1] - robot[1]
+        c, s = math.cos(-robot[2]), math.sin(-robot[2])
+        offset = (c * dx - s * dy, s * dx + c * dy)                  # camera in the base frame
+        axis = normalize_angle(view[2] - robot[2])
+        camera = view[:2]
+        for _ in range(5):
+            bearing = math.atan2(target.map_y_m - camera[1], target.map_x_m - camera[0])
+            yaw = normalize_angle(bearing - axis)
+            camera = (robot[0] + math.cos(yaw) * offset[0] - math.sin(yaw) * offset[1],
+                      robot[1] + math.sin(yaw) * offset[0] + math.cos(yaw) * offset[1])
+        return yaw, camera
 
     def _step_back_before_planning(self):
         """Once per localization cycle, step straight back from G1 and relocalize before planning:
