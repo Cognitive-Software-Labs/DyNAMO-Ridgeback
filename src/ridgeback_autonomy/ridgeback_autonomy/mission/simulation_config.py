@@ -31,7 +31,8 @@ def demo_worlds(backend):
     Each holds no humanoid but the scenario's G1: parking_demo (both backends) is
     initial_test_world without its authored distant G1, removed by Gazebo's
     parking_demo.sdf and disabled by Isaac's USD layer. Gazebo's depot, the
-    Clearpath warehouse (native name warehouse), has none."""
+    Clearpath warehouse (native name warehouse), and Gazebo's robocup_hcc_arena have
+    none."""
     from ridgeback_autonomy.mission.parking_scenarios import DEMO_WORLDS
     return DEMO_WORLDS[backend]
 

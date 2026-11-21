@@ -23,7 +23,7 @@ from ridgeback_autonomy.mission import parking_scenarios  # noqa: E402
 SCENARIO_FILE = f'{ROOT}/src/ridgeback_autonomy/config/parking_scenarios.yaml'
 # Per demo world. The warehouse (depot) has a roof, so its overall view stays below it;
 # the hospital ward (parking_demo) is open above its 2.8 m walls.
-OVERVIEW_HEIGHT_M = {'parking_demo': 11.0, 'depot': 8.0}
+OVERVIEW_HEIGHT_M = {'parking_demo': 11.0, 'depot': 8.0, 'robocup_hcc_arena': 11.0}
 START = (0.0, 0.0)
 CAPTIONS = {
     'overview': 'Top-down: the robot start (lower left) and G1\'s workstation',
@@ -36,7 +36,7 @@ CAPTIONS = {
 }
 # The ward's walls stand 2.8 m high; the angled view looks down steeply enough to see
 # over them. Horizontal offset and height (m) per world.
-ISOMETRIC = {'parking_demo': (5.5, 11.0), 'depot': (5.0, 7.0)}
+ISOMETRIC = {'parking_demo': (5.5, 11.0), 'depot': (5.0, 7.0), 'robocup_hcc_arena': (5.5, 11.0)}
 TASK_MARGIN_M = 1.2
 
 

@@ -188,7 +188,8 @@ def generate_launch_description():
                 "'parking_demo' if '", LaunchConfiguration('demo_scene_enabled'), "' == 'true' else "
                 "'initial_test_world' if '", backend, "' == 'isaac' else 'depot'"]),
             description='Existing backend world to load; the parking demo loads the hospital ward '
-                        '(parking_demo), or on Gazebo the warehouse with world:=depot'),
+                        '(parking_demo), or on Gazebo the warehouse (world:=depot) or the '
+                        'RoboCup HCC arena (world:=robocup_hcc_arena)'),
         DeclareLaunchArgument('namespace', default_value='r100_0001'),
         DeclareLaunchArgument('use_sim_time', default_value='true'),
         DeclareLaunchArgument('setup_path', default_value='',

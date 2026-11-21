@@ -30,6 +30,16 @@ workstations:
   # wedges beside its flanks and was rightly rejected; and the west lane's edge, where
   # a front-left view scored below the 0.50 localization floor.
   depot: {x: -4.5, y: -0.6, yaw_deg: 180, floor_z: 0.0}
+  # Gazebo's RoboCup HCC arena (tools/gazebo/build_hcc_arena.py), a flat whose rooms
+  # open off a central hall through doorways widened to about 1.0 m clear (0.10 m each
+  # side of the 0.80 m basket-aware footprint; the robot cannot turn inside them). The
+  # robot starts in the hall at the origin, 1.2 m from anything. G1 stands in the east
+  # room behind the hall's east furniture, out of sight from the start, facing east with
+  # its worktable 0.8 m from the closed east exit; the robot enters through a doorway and
+  # meets G1 from behind. Checked against the collision mesh: G1, table and start clear
+  # it, and the parking planner finds poses on both of G1's sides (2026-11-21). The
+  # mesh's floor top is z 0.0-0.001.
+  robocup_hcc_arena: {x: 4.0, y: 0.0, yaw_deg: 0, floor_z: 0.0}
 robot_start: {x: 0.0, y: 0.0, yaw_deg: 0.0}
 scenarios:
   standard:

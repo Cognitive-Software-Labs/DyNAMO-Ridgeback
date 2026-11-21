@@ -66,7 +66,7 @@ def test_demo_loads_the_hospital_ward_by_default(backend):
 def test_the_warehouse_stays_an_explicit_gazebo_demo_world():
     assert defaults(backend='gz', demo_scene_enabled='true',
                     world='depot').launch_configurations['world'] == 'depot'
-    assert demo_worlds('gz') == ('parking_demo', 'depot')
+    assert demo_worlds('gz') == ('parking_demo', 'depot', 'robocup_hcc_arena')
     assert demo_worlds('isaac') == ('parking_demo',)
 
 
@@ -436,3 +436,73 @@ def test_rviz_frames_the_requested_world_workstation(monkeypatch):
                         lambda data, scenario, backend, world: seen.append(world) or real(data, scenario, backend, world))
     module._parking_rviz(context)
     assert seen == ['depot']
+
+
+# The RoboCup HCC arena: a Gazebo parking world (2026-11-21), checked against its collision mesh.
+
+ARENA = ROOT / 'src/ridgeback_autonomy_gz/sim/worlds'
+
+
+def arena_triangles(band=(0.03, 1.6)):
+    """The arena's collision triangles (and its closed exits) that reach the robot's height."""
+    import re
+    import struct
+    import numpy as np
+    raw = (ARENA / 'meshes/robocup_hcc_arena_collision.stl').read_bytes()
+    count = struct.unpack('<I', raw[80:84])[0]
+    rows = np.frombuffer(raw[84:84 + 50 * count], dtype=np.dtype(
+        [('n', '<3f4'), ('v', '<9f4'), ('a', '<u2')]))['v'].reshape(-1, 3, 3).astype(float)
+    keep = (rows[:, :, 2].max(1) >= band[0]) & (rows[:, :, 2].min(1) <= band[1])
+    tris = [t[:, :2] for t in rows[keep]]
+    sdf = (ARENA / 'robocup_hcc_arena.sdf').read_text()
+    for pose, size in re.findall(r'<model name="closed_exit_\d+">.*?<pose>([^<]+)</pose>.*?<size>([^<]+)</size>',
+                                 sdf, re.S):
+        x, y = map(float, pose.split()[:2])
+        sx, sy = map(float, size.split()[:2])
+        a, b, c, d = (x - sx / 2, y - sy / 2), (x + sx / 2, y - sy / 2), (x + sx / 2, y + sy / 2), (x - sx / 2, y + sy / 2)
+        tris += [np.array([a, b, c]), np.array([a, c, d])]
+    return tris
+
+
+def touches(tris, points, radius):
+    """Whether any triangle comes within ``radius`` of any point."""
+    from matplotlib.path import Path as MPath
+    import numpy as np
+    pts = np.asarray(points, float)
+    for t in tris:
+        lo, hi = t.min(0) - radius, t.max(0) + radius
+        near = pts[(pts[:, 0] >= lo[0]) & (pts[:, 0] <= hi[0]) & (pts[:, 1] >= lo[1]) & (pts[:, 1] <= hi[1])]
+        if len(near) and (MPath(t).contains_points(near, radius=radius).any()
+                          or MPath(t[::-1]).contains_points(near, radius=radius).any()):
+            return True
+    return False
+
+
+def test_the_arena_standard_scene_stands_clear_of_the_arena():
+    import math
+    import numpy as np
+    from ridgeback_autonomy.mission import parking_scenarios
+    data = parking_scenarios.load(str(ROOT / 'src/ridgeback_autonomy/config/parking_scenarios.yaml'))
+    layout = parking_scenarios.world_layout(data, 'standard', 'gz', 'robocup_hcc_arena')
+    assert layout['workstation']['floor_z'] == 0.0          # the mesh's floor top, z 0.0-0.001
+    tris = arena_triangles()
+    g1 = layout['g1']
+    assert not touches(tris, [(g1['x'], g1['y'])], 0.35)      # G1 and room around its feet
+    table = next(o for o in layout['objects'] if o['asset'] == 'table')
+    yaw = math.radians(table['yaw_deg'])
+    u, v = np.mgrid[-0.6:0.61:0.05, -0.35:0.36:0.05]          # the 1.2 x 0.7 m top, in its frame
+    pts = np.stack([table['x'] + u.ravel() * math.cos(yaw) - v.ravel() * math.sin(yaw),
+                    table['y'] + u.ravel() * math.sin(yaw) + v.ravel() * math.cos(yaw)], 1)
+    assert not touches(tris, pts, 0.10)
+    assert not touches(tris, [(0.0, 0.0)], 0.6)              # the start: the robot can turn there
+    assert touches(tris, [(g1['x'], g1['y'])], 4.5)           # sanity: the mesh is read
+
+
+def test_the_arena_is_a_gazebo_parking_world_only():
+    module = launch_module()
+    module._configure_simulation(defaults(backend='gz', demo_scene_enabled='true',
+        mission_management_enabled='true', world='robocup_hcc_arena'))
+    with pytest.raises(ValueError, match='other worlds may already contain'):
+        module._configure_simulation(defaults(backend='isaac', demo_scene_enabled='true',
+            mission_management_enabled='true', world='robocup_hcc_arena'))
+    assert (ARENA / 'robocup_hcc_arena.sdf').is_file()        # gazebo.launch's world search dir

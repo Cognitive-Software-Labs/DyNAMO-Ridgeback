@@ -42,6 +42,7 @@ argument `world` selects the world:
 |---|---|---|---|
 | `parking_demo` (hospital ward, default) | Gazebo and Isaac | (0.5, -4.5) m, facing -y | the corridor wall hides the south room; the robot enters through the doorway at x 2.7-5.3 m, behind G1's left shoulder |
 | `depot` (warehouse, `world:=depot`) | Gazebo | (-4.5, -0.6) m, facing -x | it stands behind the camera at the start; the explorer heads down this lane first and meets G1 from behind |
+| `robocup_hcc_arena` (RoboCup HCC flat, `world:=robocup_hcc_arena`) | Gazebo | (4.0, 0.0) m, facing +x | the hall's east furniture hides the east room; the robot enters through a doorway about 1.0 m clear and meets G1 from behind |
 
 `parking_demo` is `initial_test_world` without its authored distant G1: Gazebo
 loads `parking_demo.sdf`, a copy that omits that G1, and Isaac a USD layer that
@@ -52,7 +53,10 @@ objects come from the same box models in both asset catalogs. Only lighting and
 rendering differ. The floor slab tops out at 0.05 m, where G1 and the objects stand.
 Gazebo ran the warehouse until 2026-11-17, and `world:=depot` reproduces those
 runs; each run folder keeps the scenario file it ran with (schema 2 then, one
-workstation per backend).
+workstation per backend). The arena's doorways leave about 0.10 m each side of the 0.80 m
+basket-aware footprint, so Nav2 must pass them aligned and cannot turn inside them;
+its floor top is z 0.0. Only its `standard` scene was checked against the collision
+mesh (2026-11-21), and no mission has run there yet.
 
 Two earlier Gazebo workstations were dropped (2026-11-05/08; see the dated record).
 The explorer never entered an aisle behind the long shelf south of the start. North
