@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import math
 import re
 
@@ -10,9 +11,13 @@ from simulation_interfaces.msg import EntityFilters, EntityCategory, Result
 from simulation_interfaces.srv import SetEntityState, SpawnEntity
 
 from scene_provider import (
+    FABRIC_AUDIT_UPDATES,
+    FABRIC_GRACE_UPDATES,
+    FABRIC_REPAIR_ATTEMPTS,
     InvalidResource,
     RobotPlacement,
     RobotState,
+    SceneControlService,
     SceneEntities,
     SceneRequestError,
     SimFrame,
@@ -39,6 +44,10 @@ class FakeNativeScene:
         self.invalid: set[str] = set()
         self.stuck: set[str] = set()
         self.deleted: list[str] = []
+        self.fabric: set[str] = set()
+        self.fabric_stuck = False
+        self.fabric_queries: list[str] = []
+        self.fabric_removals: list[list[str]] = []
 
     def spawn(self, prim_path, resource_path, position, orientation):
         assert prim_path not in self.prims
@@ -53,8 +62,22 @@ class FakeNativeScene:
         return prim_path not in self.prims
 
     def pose(self, prim_path):
+        if prim_path not in self.prims:
+            raise RuntimeError(f'missing prim {prim_path}')
         _resource, position, orientation = self.prims[prim_path]
         return position, orientation
+
+
+    def fabric_prims_under(self, prefix):
+        self.fabric_queries.append(prefix)
+        return [path for path in self.fabric if path == prefix or path.startswith(prefix + '/')]
+
+    def remove_fabric_prims(self, paths):
+        self.fabric_removals.append(list(paths))
+        if self.fabric_stuck:
+            return []
+        self.fabric.difference_update(paths)
+        return list(paths)
 
 
 @pytest.fixture
@@ -403,3 +426,173 @@ def test_a_runner_without_a_mover_cannot_place_the_robot() -> None:
     with pytest.raises(SceneRequestError) as excinfo:
         entities.place_robot(RobotPlacement(ROBOT, 1.0, 0.0, 0.07617, 0.0), frame())
     assert code_of(excinfo) == Result.RESULT_FEATURE_UNSUPPORTED
+
+
+# ---- Fabric audit ------------------------------------------------------------
+
+def fabric_events(capfd):
+    return [json.loads(line.split(' ', 1)[1])
+            for line in capfd.readouterr().out.splitlines()
+            if line.startswith('SCENE_FABRIC_RESIDUE ')]
+
+
+def test_clean_delete_has_a_bounded_audit_window(resource, capfd):
+    native = FakeNativeScene()
+    entities = SceneEntities(native, ROBOT)
+    entities.spawn(plan('bench_a', resource))
+    entities.delete('bench_a')
+    assert entities.names() == [ROBOT]
+    for _ in range(FABRIC_GRACE_UPDATES + FABRIC_AUDIT_UPDATES + 1):
+        entities.audit(12.5)
+
+    # One batch sweep on the following update, then one scan per audit update.
+    assert len(native.fabric_queries) == 1 + FABRIC_AUDIT_UPDATES + 1
+    assert native.fabric_removals == []
+    assert entities.names() == [ROBOT]
+    assert fabric_events(capfd) == []
+
+
+def test_late_residue_is_repaired_and_verified_on_the_next_update(resource, capfd):
+    native = FakeNativeScene()
+    entities = SceneEntities(native, ROBOT)
+    entities.spawn(plan('bench_a', resource))
+    entities.delete('bench_a')
+    for _ in range(FABRIC_GRACE_UPDATES + 1):
+        entities.audit(12.5)
+    leaf = '/scene_entities/bench_a/model/collision'
+    native.fabric.add(leaf)
+    entities.audit(12.5)
+    entities.audit(12.6)
+
+    events = fabric_events(capfd)
+    assert [event['event'] for event in events] == ['found', 'repaired']
+    assert events[0]['update'] == FABRIC_GRACE_UPDATES + 2
+    assert events[1]['sim_time'] == 12.6
+    assert events[0]['entity'] == 'bench_a'
+    assert events[0]['prims'] == [leaf]
+    assert native.fabric_removals == [[leaf]]
+    assert entities.names() == [ROBOT]
+
+
+def test_persistent_residue_is_listed_with_last_pose_and_can_be_retried(resource, capfd):
+    native = FakeNativeScene()
+    entities = SceneEntities(native, ROBOT)
+    entities.spawn(plan('bench_a', resource))
+    expected = entities.states(re.compile('^bench_a$'), frame())
+    entities.delete('bench_a')
+    native.fabric = {'/scene_entities/bench_a/model'}
+    native.fabric_stuck = True
+    for _ in range(FABRIC_GRACE_UPDATES + FABRIC_REPAIR_ATTEMPTS):
+        entities.audit(12.5)
+
+    assert len(native.fabric_removals) == FABRIC_REPAIR_ATTEMPTS
+    assert entities.names() == [ROBOT, 'bench_a']
+    assert entities.states(re.compile('^bench_a$'), frame()) == expected
+    events = fabric_events(capfd)
+    assert [event['event'] for event in events] == ['found', 'persistent']
+    assert events[-1]['attempt'] == FABRIC_REPAIR_ATTEMPTS
+
+    native.fabric_stuck = False
+    entities.delete('bench_a')
+    assert entities.names() == [ROBOT, 'bench_a']
+    entities.audit(12.6)
+    assert entities.names() == [ROBOT]
+    assert [event['event'] for event in fabric_events(capfd)] == ['found', 'repaired']
+    assert native.deleted == ['/scene_entities/bench_a']
+
+
+def test_sweep_detects_an_orphan_with_no_registry_entry(capfd):
+    native = FakeNativeScene()
+    entities = SceneEntities(native, ROBOT)
+    native.fabric = {'/scene_entities', '/scene_entities/bench_x/model/leaf',
+                     '/scene_entities_other/bench_y/model'}
+    native.fabric_stuck = True
+    entities.sweep()
+    assert entities.select(re.compile('^bench_')) == ['bench_x']
+    entities.sweep()
+    assert len(native.fabric_removals) == 1
+    for _ in range(FABRIC_REPAIR_ATTEMPTS):
+        entities.audit(12.5)
+
+    assert entities.names() == [ROBOT, 'bench_x']
+    events = fabric_events(capfd)
+    assert [event['event'] for event in events] == ['found', 'persistent']
+    assert events[0]['source'] == 'sweep'
+
+
+def test_sweep_ignores_live_paths_and_removal_during_grace(resource, capfd):
+    native = FakeNativeScene()
+    entities = SceneEntities(native, ROBOT)
+    entities.spawn(plan('bench_a', resource))
+    entities.spawn(plan('bench_ab', resource))
+    entities.delete('bench_a')
+    native.fabric = {'/scene_entities/bench_a/model', '/scene_entities/bench_ab/model'}
+    entities.audit(12.5)
+    entities.sweep()
+
+    # A query reports the pending subtree until Fabric clears. It is
+    # still within normal propagation time, so no repair or finding runs.
+    assert entities.names() == [ROBOT, 'bench_ab', 'bench_a']
+    assert native.fabric_removals == []
+    native.fabric.remove('/scene_entities/bench_a/model')
+    entities.audit(12.6)
+    assert entities.names() == [ROBOT, 'bench_ab']
+    assert fabric_events(capfd) == []
+
+
+def test_respawn_during_audit_never_repairs_a_live_entity(resource):
+    native = FakeNativeScene()
+    entities = SceneEntities(native, ROBOT)
+    entities.spawn(plan('bench_a', resource))
+    entities.delete('bench_a')
+    entities.spawn(plan('bench_a', resource))
+    native.fabric.add('/scene_entities/bench_a/model')
+    for _ in range(FABRIC_GRACE_UPDATES + 2):
+        entities.audit(12.5)
+    entities.sweep()
+    assert native.fabric_removals == []
+
+
+def test_sweep_keeps_last_pose_after_audit_window(resource):
+    native = FakeNativeScene()
+    entities = SceneEntities(native, ROBOT)
+    entities.spawn(plan('bench_a', resource))
+    expected = entities.states(re.compile('^bench_a$'), frame())
+    entities.delete('bench_a')
+    for _ in range(FABRIC_GRACE_UPDATES + FABRIC_AUDIT_UPDATES + 1):
+        entities.audit(12.5)
+    native.fabric.add('/scene_entities/bench_a/model')
+    entities.sweep()
+    assert entities.states(re.compile('^bench_a$'), frame()) == expected
+
+
+def test_process_pending_audits_before_draining_once(monkeypatch):
+    order = []
+    service = object.__new__(SceneControlService)
+    service._entities = SceneEntities(FakeNativeScene(), ROBOT)
+    monkeypatch.setattr(service._entities, 'audit', lambda sim_time: order.append(sim_time))
+
+    class Queue:
+        def drain(self, update):
+            order.append(update)
+            return 0
+
+    service._queue = Queue()
+    update = frame()
+    assert service.process_pending(update) == 0
+    assert order == [update.sim_time, update]
+
+
+def test_already_absent_usd_prim_can_be_deleted_and_audited(resource):
+    native = FakeNativeScene()
+    entities = SceneEntities(native, ROBOT)
+    entities.spawn(plan('bench_a', resource))
+    path = entities.prim_path('bench_a')
+    del native.prims[path]
+    leaf = f'{path}/model/leaf'
+    native.fabric.add(leaf)
+
+    entities.delete('bench_a')
+    for _ in range(FABRIC_GRACE_UPDATES):
+        entities.audit(12.5)
+    assert native.fabric_removals == [[leaf]]

@@ -1,7 +1,7 @@
 """Standard ``simulation_interfaces`` scene control for the Isaac runner.
 
 Serves the benchmark's spawn, delete, discovery, and entity-state services
-without letting a ROS callback touch USD or PhysX:
+without letting a ROS callback touch USD, Fabric or PhysX:
 
 1. a dedicated executor thread receives each request, validates everything
    that needs no simulation state, and enqueues it;
@@ -13,11 +13,11 @@ without letting a ROS callback touch USD or PhysX:
    never run;
 5. shutdown cancels whatever is still queued and joins the executor thread.
 
-Entities are addressed by public names held in a registry. Only entities this
-provider spawned can be deleted, and each maps to its own prim under one scope,
-so a request can never name an arbitrary prim. The robot's state is the rig's
-exact ground truth; it is never spawned or deleted, but a runner that hands
-over a mover lets clients place it, level and at rest, through the rig.
+Entities are addressed by public names held in a registry. Each maps to its own
+prim under one scope. Fabric residue under that scope is also discoverable and
+can be cleaned up through the same delete service. The robot's state is the
+rig's exact ground truth; it is never spawned or deleted, but a runner that
+hands over a mover lets clients place it, level and at rest, through the rig.
 
 Nothing here imports Kit or pxr: the USD operations live in ``usd_scene.py``
 and arrive through the :class:`NativeScene` protocol.
@@ -28,6 +28,7 @@ import collections
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 import enum
+import json
 import math
 import os
 import re
@@ -62,8 +63,13 @@ SPAWN_FORMATS = ('usd',)
 USD_SUFFIXES = frozenset({'.usd', '.usda', '.usdc', '.usdz'})
 
 WORLD_FRAME_ID = 'world'
-# Every spawned entity is the prim <scope>/<name>; nothing else is deletable.
+# Spawned entities and their Fabric residue are confined to this scope.
 SPAWNED_ENTITY_SCOPE = '/scene_entities'
+
+# Kit 6.1 removes clean subtrees on the first update after USD deletion.
+FABRIC_GRACE_UPDATES = 2
+FABRIC_AUDIT_UPDATES = 10
+FABRIC_REPAIR_ATTEMPTS = 3
 
 # Kept below the common client's call budget, so the client always receives
 # an explicit answer instead of timing out on an unknown outcome.
@@ -102,6 +108,10 @@ class NativeScene(Protocol):
 
     def pose(self, prim_path: str) -> tuple[tuple[float, float, float],
                                             tuple[float, float, float, float]]: ...
+
+    def fabric_prims_under(self, prefix: str) -> list[str]: ...
+
+    def remove_fabric_prims(self, paths: list[str]) -> list[str]: ...
 
 
 # --------------------------------------------------------------------------
@@ -432,6 +442,17 @@ def compile_entity_filter(filters: Any) -> re.Pattern[str] | None:
 # Entity registry and main-loop operations
 # --------------------------------------------------------------------------
 
+@dataclass
+class _FabricAudit:
+    first_update: int
+    last_update: int
+    attempts: int = 0
+    checked_at: int = -1
+    prims: tuple[str, ...] = ()
+    persistent: bool = False
+    error: str | None = None
+
+
 class SceneEntities:
     """The entity registry and the operations the main loop runs on it.
 
@@ -446,7 +467,14 @@ class SceneEntities:
         self._native = native
         self._robot_name = robot_name
         self._scope = scope.rstrip('/')
-        self._spawned: dict[str, str] = {}
+        self._spawned: dict[str, EntityPose] = {}
+        # Keep the pose after the audit expires in case a later sweep finds residue.
+        self._deleted_poses: dict[str, EntityPose] = {}
+        self._fabric_audits: dict[str, _FabricAudit] = {}
+        self._fabric_by_entity: dict[str, list[str]] | None = None
+        self._update = 0
+        self._sim_time = 0.0
+        self._sweep_next_update = False
         # Puts the rig at (x, y, yaw) at rest; None leaves the robot fixed.
         self._move_robot = move_robot
 
@@ -459,7 +487,8 @@ class SceneEntities:
         return self._move_robot is not None
 
     def names(self) -> list[str]:
-        return [self._robot_name, *self._spawned]
+        return [self._robot_name, *self._spawned,
+                *(name for name, audit in self._fabric_audits.items() if audit.prims)]
 
     def prim_path(self, name: str) -> str:
         return f'{self._scope}/{name}'
@@ -480,13 +509,16 @@ class SceneEntities:
 
     def spawn(self, plan: SpawnPlan) -> str:
         name = self._claim_name(plan.name, plan.allow_renaming)
+        self._sweep_next_update = True
         try:
             self._native.spawn(self.prim_path(name), plan.resource_path,
                                plan.position, plan.orientation)
         except InvalidResource as exc:
             raise SceneRequestError(
                 SpawnEntity.Response.RESOURCE_PARSE_ERROR, str(exc)) from exc
-        self._spawned[name] = self.prim_path(name)
+        self._spawned[name] = EntityPose(name, plan.position, plan.orientation)
+        self._fabric_audits.pop(name, None)
+        self._deleted_poses.pop(name, None)
         return name
 
     def delete(self, name: str) -> None:
@@ -495,18 +527,119 @@ class SceneEntities:
                 Result.RESULT_OPERATION_FAILED,
                 f'entity "{name}" was not spawned through scene control and '
                 'cannot be deleted')
-        if name not in self._spawned:
+        if name in self._spawned:
+            try:
+                pose = self._spawned_pose(name)
+            except RuntimeError:
+                # A prim removed elsewhere still needs its registry entry
+                # and any Fabric residue cleaned up.
+                pose = self._spawned[name]
+            if not self._native.delete(self.prim_path(name)):
+                raise SceneRequestError(
+                    Result.RESULT_OPERATION_FAILED,
+                    f'entity "{name}" is still present after removal')
+            del self._spawned[name]
+            self._deleted_poses[name] = pose
+            first_update = self._update + FABRIC_GRACE_UPDATES
+            self._fabric_audits[name] = _FabricAudit(
+                first_update, first_update + FABRIC_AUDIT_UPDATES)
+        elif name in self._fabric_audits and self._fabric_audits[name].prims:
+            audit = self._fabric_audits[name]
+            if audit.persistent:
+                # Start a new repair sequence while keeping the name visible
+                # until the next update verifies the Fabric removal.
+                self._fabric_audits[name] = retry = _FabricAudit(
+                    self._update, self._update, prims=audit.prims)
+                self._check_fabric(name, retry, self._fabric_paths().get(name, []), 'delete')
+        else:
             raise SceneRequestError(
                 Result.RESULT_NOT_FOUND, f'entity "{name}" does not exist')
-        if not self._native.delete(self._spawned[name]):
-            raise SceneRequestError(
-                Result.RESULT_OPERATION_FAILED,
-                f'entity "{name}" is still present after removal')
-        del self._spawned[name]
+        self._sweep_next_update = True
+
+    def _fabric_paths(self) -> dict[str, list[str]]:
+        if self._fabric_by_entity is None:
+            prefix = self._scope + '/'
+            grouped: dict[str, list[str]] = collections.defaultdict(list)
+            for path in self._native.fabric_prims_under(self._scope):
+                if path.startswith(prefix):
+                    name = path[len(prefix):].split('/', 1)[0]
+                    if name != self._robot_name:
+                        grouped[name].append(path)
+            self._fabric_by_entity = grouped
+        return self._fabric_by_entity
+
+    def audit(self, sim_time: float) -> None:
+        """Run once after each Kit update, before draining scene commands."""
+        self._update += 1
+        self._sim_time = sim_time
+        self._fabric_by_entity = None
+        for name, audit in tuple(self._fabric_audits.items()):
+            if not audit.persistent and self._update >= audit.first_update:
+                self._check_fabric(name, audit, self._fabric_paths().get(name, []), 'audit')
+        if self._sweep_next_update:
+            self._sweep_next_update = False
+            self.sweep()
+
+    def sweep(self) -> None:
+        """Find orphaned prims before scene queries or after a scene change."""
+        groups = self._fabric_paths()
+        for name in dict.fromkeys((*groups, *self._fabric_audits)):
+            # The snapshot can precede other commands in this update.
+            if name in self._spawned:
+                continue
+            paths = groups.get(name, [])
+            if name not in self._fabric_audits:
+                self._fabric_audits[name] = _FabricAudit(self._update, self._update)
+            audit = self._fabric_audits[name]
+            if self._update < audit.first_update:
+                # Let normal USD propagation finish before attempting repair.
+                # A confirmation must still see any prim present in Fabric.
+                audit.prims = tuple(paths)
+            else:
+                self._check_fabric(name, audit, paths, 'sweep')
+
+    def _check_fabric(self, name: str, audit: _FabricAudit, paths: list[str],
+                      source: str) -> None:
+        if audit.checked_at == self._update:
+            return
+        audit.checked_at = self._update
+        if not paths:
+            if audit.attempts:
+                self._log_fabric('repaired', name, audit, source)
+                audit.attempts = 0
+                audit.error = None
+            audit.prims = ()
+            if self._update >= audit.last_update:
+                del self._fabric_audits[name]
+        elif audit.attempts < FABRIC_REPAIR_ATTEMPTS:
+            audit.prims = tuple(sorted(paths))
+            audit.attempts += 1
+            if audit.attempts == 1:
+                self._log_fabric('found', name, audit, source)
+            try:
+                self._native.remove_fabric_prims(list(audit.prims))
+            except Exception as exc:
+                audit.error = f'{type(exc).__name__}: {exc}'
+        elif not audit.persistent:
+            audit.prims = tuple(sorted(paths))
+            audit.persistent = True
+            self._log_fabric('persistent', name, audit, source)
+
+    def _log_fabric(self, event: str, name: str, audit: _FabricAudit, source: str) -> None:
+        record = dict(event=event, entity=name, prims=audit.prims, attempt=audit.attempts,
+                      update=self._update, sim_time=self._sim_time, source=source,
+                      level='ERROR' if event == 'persistent' else 'INFO')
+        if audit.error is not None:
+            record['error'] = audit.error
+        print('SCENE_FABRIC_RESIDUE', json.dumps(record), flush=True)
+
+    def _spawned_pose(self, name: str) -> EntityPose:
+        position, orientation = self._native.pose(self.prim_path(name))
+        return EntityPose(name, tuple(position), tuple(orientation))
 
     def place_robot(self, placement: RobotPlacement, frame: SimFrame) -> None:
         if placement.name != self._robot_name:
-            if placement.name in self._spawned:
+            if placement.name in self.names():
                 raise SceneRequestError(
                     Result.RESULT_OPERATION_FAILED,
                     f'entity "{placement.name}" is static; only the robot can be moved')
@@ -539,9 +672,14 @@ class SceneEntities:
                     linear=(robot.vx, robot.vy, 0.0),
                     angular=(0.0, 0.0, robot.wz),
                 ))
+            elif name in self._spawned:
+                poses.append(self._spawned_pose(name))
             else:
-                position, orientation = self._native.pose(self._spawned[name])
-                poses.append(EntityPose(name, tuple(position), tuple(orientation)))
+                pose = self._deleted_poses.get(name)
+                if pose is None:
+                    # An orphan discovered by a sweep may never have had a USD pose.
+                    pose = EntityPose(name, (0.0, 0.0, 0.0), yaw_quaternion(0.0))
+                poses.append(pose)
         return poses
 
 
@@ -620,6 +758,7 @@ class SceneControlService:
     def process_pending(self, frame: SimFrame) -> int:
         """Main loop: run the queued requests against this update."""
 
+        self._entities.audit(frame.sim_time)
         return self._queue.drain(frame)
 
     def shutdown(self, timeout_sec: float = 5.0) -> None:
@@ -636,8 +775,8 @@ class SceneControlService:
         response.features.spawn_formats = list(SPAWN_FORMATS)
         response.features.custom_info = (
             'Static USD entities on the Isaac stage; names are USD identifiers '
-            'and only spawned entities can be deleted. Only the robot can be '
-            'moved, level and at rest.')
+            'and deletes are limited to spawned entities and Fabric residue. '
+            'Only the robot can be moved, level and at rest.')
         return response
 
     def _answer(self, response, work: Callable[[], Any],
@@ -671,7 +810,12 @@ class SceneControlService:
     def _on_entities(self, request, response):
         def work():
             name_filter = compile_entity_filter(request.filters)
-            return self._queue.call(lambda _frame: self._entities.select(name_filter))
+
+            def select(_frame):
+                self._entities.sweep()
+                return self._entities.select(name_filter)
+
+            return self._queue.call(select)
 
         def apply(names: Iterable[str]):
             response.entities = list(names)
@@ -680,8 +824,12 @@ class SceneControlService:
     def _on_states(self, request, response):
         def work():
             name_filter = compile_entity_filter(request.filters)
-            return self._queue.call(
-                lambda frame: (frame.sim_time, self._entities.states(name_filter, frame)))
+
+            def states(frame):
+                self._entities.sweep()
+                return frame.sim_time, self._entities.states(name_filter, frame)
+
+            return self._queue.call(states)
 
         def apply(outcome):
             sim_time, poses = outcome

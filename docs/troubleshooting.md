@@ -69,6 +69,18 @@ failure. Clean once and restart the sweep. The supervisor reuses valid `run.json
 only when no recorded launch or configuration-shutdown failure disqualifies it;
 see [lifecycle provenance](target_distance_benchmarking/outputs.md#sweep-outputs).
 
+## Isaac logs persistent Fabric residue
+
+A `SCENE_FABRIC_RESIDUE` line with `event: persistent` means the adapter
+found prims from a deleted entity in Isaac's Fabric render scene after three
+repair attempts. The underlying Fabric deletion defect was reproduced with
+Isaac Sim 6.1.0-rc.26 (Kit 110.3). The provider reports the entity as present,
+which can cause `state_mismatch` or `CLEANUP_INCOMPLETE` in the benchmark.
+
+Start a fresh Isaac session. When reporting the problem, include the
+structured log line, the Isaac version, and output from the
+[Fabric reproducer](../tools/isaac/fabric_leftover_repro.py).
+
 ## Benchmark shutdown failures
 
 Use the public single-run wrapper or sweep so configuration rollback finishes

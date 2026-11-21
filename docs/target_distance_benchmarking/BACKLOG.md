@@ -64,8 +64,6 @@ persistent residue, repairs and per-instance outputs. The isolated pairs do not
 exercise those transitions. Earlier P0 stress/control/persistent-injection tests
 already have evidence; they are not wholly untested requirements.
 
-The P0 change is unmerged. Integrating it and verifying the resulting installed
-build is a separate engineering step before transferring this acceptance to main.
 A same-build, same-input Gazebo pair is required only before making controlled
 backend-causal or equivalence claims; the existing historical comparison cannot
 support those claims.

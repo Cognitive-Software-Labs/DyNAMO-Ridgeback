@@ -23,10 +23,11 @@ The preserved Isaac P0 experimental build has an
 [accepted isolated-condition repeatability scope](semantics.md#accepted-isaac-repeatability-scope)
 on NVIDIA GL in xrdp, including GUI/RViz/video and diagnostics. This is scoped
 output-repeatability acceptance, not a physical-seat/xrdp equivalence test or
-general qualification of main, accuracy, replay or throughput.
+general qualification of all Isaac workflows, accuracy, replay or throughput.
 
-Other Isaac builds/workloads, headless EGL, `1280x720`, Gazebo video recording,
-and runs without the required GUI or RViz remain outside these accepted scopes.
+Builds/workloads that differ from that evidence, headless EGL, `1280x720`,
+Gazebo video recording, and runs without the required GUI or RViz remain outside
+these accepted scopes.
 Qualify the relevant scope before extending a result claim.
 Confirm the GL path with `tools/gpu-run glxinfo -B` from the run's own
 session. Software rendering is a failure, not an environment; see
