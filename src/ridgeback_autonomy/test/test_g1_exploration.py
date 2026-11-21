@@ -826,8 +826,22 @@ def stranded(manager_factory, *, driving=True):
     m.resume_client = FakePauseClient(trigger_response(True, 'resumed'))
     m.parking_navigation_enabled = driving
     m.navigation_client = Client()
+    m.compute_path_client = Client()
     m._goal_checker_set_client = ParamClient()
     return m
+
+
+def stopped_with_a_route_home(m):
+    """The guarded return: stop evidence, fresh scans and odometry, then Nav2's route home."""
+    from test_parking_timeout_recovery import stopped
+    from test_parking_feasibility import finish
+    assert m.navigation_client.calls == []           # nothing moves before the checks
+    stopped(m)
+    request = m.compute_path_client.calls[-1][0]
+    start = m.start_pose.pose
+    assert request.use_start and (request.goal.pose.position.x, request.goal.pose.position.y) == \
+        pytest.approx((start.position.x, start.position.y))
+    finish(m.compute_path_client)
 
 
 def on_a_blocked_map(m, centre):
@@ -843,11 +857,14 @@ def test_no_feasible_pose_returns_to_the_start_and_reports_the_failure(manager_f
     on_a_blocked_map(m, centre)
     assert m.state == MissionState.RETURNING_TO_START
     assert m.parking_plan.selected is None and m.parking_plan.failure_reason == 'no_valid_candidate'
+    assert m.search_recovery['code'] == 'no_valid_candidate'
+    stopped_with_a_route_home(m)
     answer(m._goal_checker_set_client)
     start = m.start_pose.pose
     assert navigation_result(m.navigation_client) == pytest.approx((start.position.x, start.position.y, 0.25))
-    assert m.state == MissionState.MISSION_FAILED
-    assert m.last_issue.code == 'parking_failed' and 'no_valid_candidate' in m.last_issue.reason
+    assert m.state == MissionState.MISSION_FAILED                 # never MISSION_COMPLETE
+    assert m.last_issue.code == 'no_valid_candidate' and 'no_valid_candidate' in m.last_issue.reason
+    assert m.search_recovery['outcome'] == 'returned home'
     assert len(m.navigation_client.calls) == 1
 
 
@@ -856,6 +873,7 @@ def test_a_failed_return_is_reported_without_a_retry(manager_factory):
     centre = (probe.target_position.map_x_m, probe.target_position.map_y_m)
     m = stranded(manager_factory)
     on_a_blocked_map(m, centre)
+    stopped_with_a_route_home(m)
     answer(m._goal_checker_set_client)
     navigation_result(m.navigation_client, status=GoalStatus.STATUS_ABORTED)
     assert m.state == MissionState.MISSION_FAILED

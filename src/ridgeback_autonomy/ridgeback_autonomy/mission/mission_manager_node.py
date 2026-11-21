@@ -2230,10 +2230,11 @@ class MissionManagerNode(Node):
         self._transition(MissionState.PARKING_PLANNING_FAILED, reason)
 
     def _return_without_parking(self, code, reason):
-        """No safe pose exists: go back to the saved start and report it. False, for a plain
-        planning failure, when driving is off or Nav2 may still own a goal."""
+        """No safe pose exists: go back to the saved start through the guarded return
+        (``_begin_safe_return``) and report the original code. False, for a plain planning
+        failure, when driving is off or Nav2 may still own a goal."""
         if (not self.parking_navigation_enabled or self.start_pose is None
-                or self._nav_goal_generation is not None):
+                or self._nav_goal_generation is not None or self.search_recovery is not None):
             return False
         self._invalidate_path_requests()
         self._planning_deadline_s = None
@@ -2245,8 +2246,7 @@ class MissionManagerNode(Node):
         if self._parking_attempts:
             self._parking_failure = (f'no alternative after {self._parking_attempts} parking attempts, '
                                      f'directions that failed excluded: {self._parking_failure}')
-        self.get_logger().error(f'No feasible parking pose [{code}]: {reason}; returning to start')
-        self._start_return(f'no feasible parking pose: {code}')
+        self._begin_safe_return(code, reason, 'No feasible parking pose')
         return True
 
     def _recover_from_incomplete_search(self, code, reason):
@@ -2266,11 +2266,19 @@ class MissionManagerNode(Node):
             plan.failure_reason = code
             self._publish_parking_markers()
         self._parking_failure = f'{issue}: {reason}'
+        self._begin_safe_return(issue, reason, 'Parking route search incomplete')
+        return True
+
+    def _begin_safe_return(self, issue, reason, headline):
+        """The guarded return home after a failed mission (incomplete route search, no feasible
+        parking pose): confirm the stop, then fresh scans and odometry, Nav2
+        ready, the robot outside G1's protected region and a route home Nav2 plans now
+        (``_check_timeout_return``); only then the collision-monitored return. Otherwise
+        nothing moves. The mission fails under ``issue`` whether or not it returns."""
         self._parking_failure_code = issue
         self.search_recovery = {'code': issue, 'outcome': None, 'reason': reason}
-        self.get_logger().error(f'Parking route search incomplete [{issue}]: {reason}; returning '
-                                'home only if the robot is stopped, its sensors are fresh and a '
-                                'route home exists')
+        self.get_logger().error(f'{headline} [{issue}]: {reason}; returning home only if the '
+                                'robot is stopped, its sensors are fresh and a route home exists')
         if self.start_pose is None:
             self._timeout_return_refused('start pose unavailable')
         elif self._nav_goal_generation is not None:
@@ -2279,7 +2287,6 @@ class MissionManagerNode(Node):
             self._timeout_return_pending = True
             self._start_return(f'{issue}: confirming the stop and a safe route home',
                                stop_first=True)
-        return True
 
     def _timeout_return_refused(self, problem):
         """No return home after the incomplete search: nothing is commanded, nothing retried."""
@@ -2293,9 +2300,27 @@ class MissionManagerNode(Node):
                                        f'started: {problem}; remaining stopped')
         self.get_logger().error(f'Return home after {recovery["code"]} not started: {problem}; '
                                 'the robot stays stopped')
-        self._transition(MissionState.MISSION_FAILED if self.state == MissionState.RETURNING_TO_START
-                         else MissionState.PARKING_PLANNING_FAILED,
+        planning = MissionState.PARKING_PLANNING_FAILED in _ALLOWED_TRANSITIONS.get(self.state, ())
+        self._transition(MissionState.PARKING_PLANNING_FAILED if planning and self.state
+                         != MissionState.RETURNING_TO_START else MissionState.MISSION_FAILED,
                          f'{recovery["code"]}; return home not safe: {problem}; remaining stopped')
+
+    def _inside_g1_protection(self, robot):
+        """Why the robot may not take a Nav2 route home from here: its footprint is inside the
+        protected region around a known G1, which only the checked straight departure may
+        leave. None otherwise."""
+        position = self.target_position
+        if position is None:
+            return None
+        target = TargetReference(position.map_x_m, position.map_y_m, self.map_frame, 0,
+                                 position.reference, position.is_foot_midpoint, '')
+        protected = keepout_radius_m(target, self.planner_config) + self.g1_protected_margin_m
+        polygon = rotated_footprint_vertices(self.planner_config.footprint, *robot)
+        gap = float(points_to_polygon_distance([target.x], [target.y], polygon)[0])
+        if gap < protected:
+            return (f'g1_protected_region: footprint {gap:.2f} m from G1, inside the protected '
+                    f'{protected:.2f} m; only the straight departure may leave it')
+        return None
 
     def _timeout_return_sensors(self):
         """Why the scans, odometry or robot pose cannot support the return now, or None."""
@@ -2316,6 +2341,8 @@ class MissionManagerNode(Node):
         robot = None if problem else self._current_robot_pose()
         if problem is None and robot is None:
             problem = 'robot_pose_unavailable'
+        if problem is None:
+            problem = self._inside_g1_protection(robot)
         if problem:
             self._timeout_return_refused(problem)
             return

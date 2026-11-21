@@ -552,9 +552,16 @@ def test_no_alternative_direction_returns_home_and_reports_it(manager_factory, m
     m.test_ros_ns = m.tf_buffer.stamp_ns = m.test_ros_ns + 10
     localize(m, first_stamp_ns=m.test_ros_ns - 4)
     assert m.state == MissionState.RETURNING_TO_START
+    assert m.search_recovery['code'] == 'no_valid_candidate'
+    calls = len(m.navigation_client.calls)
+    from test_parking_timeout_recovery import stopped as stopped_for_return
+    stopped_for_return(m)                                      # stop, fresh scans and odometry
+    assert len(m.navigation_client.calls) == calls             # nothing before the route home
+    finish(m.compute_path_client)
     answer(m._goal_checker_set_client)
     navigation_result(m.navigation_client)
     assert m.state == MissionState.MISSION_FAILED
+    assert m.last_issue.code == 'no_valid_candidate'
     assert 'no alternative after 1 parking attempts' in m.last_issue.reason
 
 
