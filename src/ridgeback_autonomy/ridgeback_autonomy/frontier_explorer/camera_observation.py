@@ -75,6 +75,13 @@ class CameraObserver:
         camera_observation_max_range_m=3.5,
         camera_observation_half_fov_deg=30.0,
         camera_observation_repeat_radius_m=1.0,
+        # Camera frontiers: once LiDAR frontiers are gone, viewpoints toward never-seen free
+        # space, each reached by the explorer's usual goal and observed by the turns above.
+        camera_frontier_max_goals=8,
+        camera_frontier_budget_s=300.0,
+        camera_frontier_min_cells=10,
+        camera_frontier_standoffs_m=[2.0, 1.5, 1.0],
+        camera_frontier_min_turn_budget_s=15.0,
     )
 
     def __init__(self, node):
@@ -98,6 +105,15 @@ class CameraObserver:
         self.frame_max_rate = float(p('frame_max_turn_rate'))
         self.repeat_radius_m = float(p('repeat_radius_m'))
         self.min_new_area_m2 = float(p('min_new_area_m2'))
+        q = lambda n: node.get_parameter('camera_frontier_' + n).value
+        self.frontier_max_goals = int(q('max_goals'))
+        self.frontier_budget_s = float(q('budget_s'))
+        self.frontier_min_cells = int(q('min_cells'))
+        self.frontier_standoffs_m = [float(v) for v in q('standoffs_m')]
+        self.frontier_min_turn_s = float(q('min_turn_budget_s'))
+        self.frontier_tried = []       # world (x, y) of every viewpoint sent, never sent again
+        self.frontier_started = None
+        self.frontier_done = None      # why the camera frontiers ended, once they have
         if not (1 <= self.max_views <= 3 and self.budget_s >= 0 and self.dwell_frames >= 1
                 and self.spin_allowance_s > 0 and self.dwell_timeout_s > 0):
             raise ValueError('camera observation limits out of range')
@@ -132,6 +148,36 @@ class CameraObserver:
         node.get_logger().info(
             f'Camera observation turns enabled: at most {self.max_views} per stop, '
             f'{self.budget_s:.0f} s budget')
+
+    def frontier_problem(self, now):
+        """Why no further camera-frontier viewpoint may be sent, or None."""
+        if not self.enabled:
+            return 'camera observation is off'
+        if len(self.frontier_tried) >= self.frontier_max_goals:
+            return f'all {self.frontier_max_goals} camera viewpoints used'
+        if self.frontier_started is not None and now - self.frontier_started >= self.frontier_budget_s:
+            return f'camera-frontier time budget of {self.frontier_budget_s:.0f} s spent'
+        if self.budget_s - self.spent_s < self.frontier_min_turn_s:
+            return 'observation-turn budget spent'
+        return None
+
+    def seen_on(self, grid):
+        """A copy of the coverage aligned with ``grid``."""
+        with self._coverage_lock:
+            self.coverage._align(grid)
+            return self.coverage.seen.copy()
+
+    def viewpoint_gain(self, grid, x, y):
+        """Unseen cells the best single heading would show from (x, y): the observation turns'
+        own selection, so a viewpoint is only chosen where they would turn."""
+        offset = self._offset()
+        if offset is None:
+            return 0
+        with self._coverage_lock:
+            views = self.coverage.select_views(
+                grid, (x, y, 0.0), offset, max_views=1,
+                min_new_cells=max(1, int(self.min_new_area_m2 / grid.resolution ** 2)))
+        return views[0][2] if views else 0
 
     # Inputs.
 

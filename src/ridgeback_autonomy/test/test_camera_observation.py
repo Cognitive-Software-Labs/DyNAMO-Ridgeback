@@ -14,6 +14,7 @@ from rclpy.task import Future
 from std_srvs.srv import Trigger
 
 from ridgeback_interfaces.msg import TargetDetections
+from ridgeback_autonomy.frontier_explorer.params import FREE as FREE_CELL
 
 POSE = (5.0, 5.0, 0.0)
 OFFSET = (0.27, 0.0)
@@ -300,3 +301,115 @@ def test_unconfirmed_stop_focus_and_budget_skip_the_observations(explorer):
         o.spent_s = o.budget_s
         assert not o.begin(focused=False)
     assert 'budget' in o.history[-1]['reason']
+
+
+# Camera frontiers: once LiDAR frontiers are gone, viewpoints onto never-seen free space.
+
+def walled_room(size_m=10.0, res=0.05):
+    """A fully mapped 10 m room (no LiDAR frontier) with a one-cell wall around it."""
+    msg = grid_msg(size_m)
+    n = msg.info.width
+    data = np.zeros((n, n), dtype=np.int16)
+    data[0, :] = data[-1, :] = data[:, 0] = data[:, -1] = 100
+    msg.data = data.ravel().tolist()
+    return msg
+
+
+def camera_search(explorer, *, seen_x_max=5.0, **overrides):
+    """Robot at (2, 5) in a mapped room; the camera has seen only x < seen_x_max."""
+    node = explorer(**overrides)
+    room = walled_room()
+    node.costmap_callback(room)
+    node.observer.on_map(room)
+    o = node.observer
+    seen = o.seen_on(o.map)
+    xs = o.map.origin_x + (np.arange(seen.shape[1]) + 0.5) * o.map.resolution
+    seen[:, xs < seen_x_max] = True
+    o.coverage.seen = seen
+    sent, statuses = [], []
+    node.send_goal_to_nav2 = lambda target, start=None: sent.append(target) or True
+    node._publish_status = statuses.append
+    node._publish_frontier_markers = lambda *a: None
+    robot = (int(2.0 / 0.05), int(5.0 / 0.05))
+    return node, sent, statuses, robot
+
+
+def test_without_lidar_frontiers_a_viewpoint_onto_unseen_space_is_chosen(explorer):
+    node, sent, statuses, robot = camera_search(explorer)
+    node.select_new_frontier_goal(robot)
+    assert len(sent) == 1 and 'exploration_complete' not in statuses
+    x, y = sent[0]
+    assert 2.5 <= x <= 4.5                                        # 1-2 m back from the edge at 5 m
+    assert node.robot_awareness_map[node.current_goal[1], node.current_goal[0]] == FREE_CELL
+    assert node.observer.frontier_tried == [pytest.approx((x, y))]
+
+
+def test_a_viewpoint_is_never_sent_twice(explorer):
+    node, sent, statuses, robot = camera_search(explorer)
+    for _ in range(4):
+        node.current_goal = None
+        node.select_new_frontier_goal(robot)
+    tried = node.observer.frontier_tried
+    assert len(sent) == len(tried) == 1                          # one coverage edge, one viewpoint
+    assert all(math.dist(a, b) >= node.observer.repeat_radius_m
+               for i, a in enumerate(tried) for b in tried[i + 1:])
+    assert statuses[-1] == 'exploration_complete'                # then no loop back to it
+
+
+def test_complete_only_once_the_camera_has_seen_the_free_space(explorer):
+    node, sent, statuses, robot = camera_search(explorer, seen_x_max=20.0)
+    node.select_new_frontier_goal(robot)
+    assert sent == [] and statuses[-1] == 'exploration_complete'
+    assert node.observer.frontier_done == 'no useful viewpoint'
+
+
+@pytest.mark.parametrize('limit', ['goals', 'time', 'turns'])
+def test_spent_budgets_end_the_camera_frontiers(explorer, limit):
+    node, sent, statuses, robot = camera_search(explorer)
+    o = node.observer
+    if limit == 'goals':
+        o.frontier_tried = [(-50.0 - k, -50.0) for k in range(o.frontier_max_goals)]
+    elif limit == 'time':
+        o.frontier_started = -1e9
+    else:
+        o.spent_s = o.budget_s
+    node.select_new_frontier_goal(robot)
+    assert sent == [] and statuses[-1] == 'exploration_complete'
+
+
+def test_blocked_or_unknown_viewpoints_are_never_goals(explorer):
+    node, sent, statuses, robot = camera_search(explorer)
+    room = walled_room()
+    n = room.info.width
+    data = np.array(room.data, dtype=np.int16).reshape(n, n)
+    cols = (np.arange(n) + 0.5) * 0.05
+    data[:, (cols > 2.6) & (cols < 4.9)] = 70                    # too costly to stop in
+    room.data = data.ravel().tolist()
+    node.costmap_callback(room)
+    node.select_new_frontier_goal(robot)
+    assert sent == [] and statuses[-1] == 'exploration_complete'
+
+
+def test_a_camera_viewpoint_is_a_guarded_goal_a_g1_pause_cancels(explorer):
+    from std_srvs.srv import Trigger
+    node, sent, statuses, robot = camera_search(explorer)
+    del node.send_goal_to_nav2                                   # the real guarded send
+    accepted = []
+    node.nav_client.wait_for_server = lambda **kw: True
+    node.nav_client.send_goal_async = lambda goal, **kw: accepted.append(goal) or Future()
+    node.select_new_frontier_goal(robot)
+    assert len(accepted) == 1 and node.mission_guard.goal_pending
+    assert not node.mission_guard.request_pause(Trigger.Request(), Trigger.Response()).success
+    assert not node.mission_guard.allowed()                      # no further goal while paused
+
+
+def test_lidar_frontiers_come_first(explorer):
+    node, sent, statuses, robot = camera_search(explorer)
+    room = walled_room()
+    n = room.info.width
+    data = np.array(room.data, dtype=np.int16).reshape(n, n)
+    data[40:60, 150:170] = -1                                    # an unmapped corner
+    room.data = data.ravel().tolist()
+    node.costmap_callback(room)
+    node.select_new_frontier_goal(robot)
+    assert len(sent) == 1 and node.observer.frontier_tried == []

@@ -253,7 +253,8 @@ recordings are kept untracked under `artifacts/`, not in Git.
   at the second stop brought G1, 2.7 m away and 38 deg off the heading, into view:
   confirmed 0.9 s into it, then parked (rear, after right and left LiDAR vetoes) and
   returned, `MISSION_COMPLETE`. Exploration order differs between runs, so one success
-  is not a rate. `g1_not_found` was not reached live.
+  is not a rate. `g1_not_found` was not reached live. Since then, camera frontiers
+  follow exhausted LiDAR frontiers (at most 8 viewpoints in 300 s).
 - **Relocalization from a distant first view.** In that run G1 was first localized from
   4.3 m, past the 3.5 m reacquisition range; its depth check passed on the torso while
   the head region showed the background. After mapping around G1, the in-place
@@ -265,8 +266,8 @@ recordings are kept untracked under `artifacts/`, not in Git.
   otherwise `g1_relocalization_failed`, stopped
   ([observation return](architecture.md#observation-return)). In the second run both
   retries' in-place turns left the camera 0.94-0.96 m from G1 (the turn brings the
-  forward camera nearer), so each returned to the reliable 2.4 m view instead; the
-  turn's goal does not yet predict that camera range.
+  forward camera nearer), so each returned to the reliable 2.4 m view instead. The
+  camera range after the turn is now predicted first, so such a turn is skipped.
 - **Reach violation on earlier code.** A Gazebo `standard` run (`gz_standard_run2`,
   `f6ade2f`) completed with a reach of 0.607 m, outside 0.30-0.60 m: the localization
   and map-pose errors added to a plan of 0.517 m.

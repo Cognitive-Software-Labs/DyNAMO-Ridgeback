@@ -220,3 +220,26 @@ def rotation_problem(costmap, footprint, pose, turn_rad, *, margin_m=0.05, letha
             if (gap <= 0.0).any():
                 return f'footprint over unknown space at {math.degrees(turn_rad * k / steps):+.0f} deg of the turn'
     return None
+
+
+def camera_frontier_map(awareness, costmap, grid, seen, free, unknown, obstacle):
+    """The explorer's costmap awareness recast for the camera, once LiDAR frontiers are gone:
+    ``free`` where the costmap is free and the SLAM map cell was seen by a usable frame,
+    ``unknown`` where it is free but never seen, ``obstacle`` everywhere else (occupied,
+    unmapped, off the SLAM map). Its frontiers (``navigator.get_frontier_clusters``) are the
+    edges of the camera's coverage inside known free space."""
+    h, w = awareness.shape
+    rows, cols = np.mgrid[0:h, 0:w]
+    x = costmap.origin_x + (cols + 0.5) * costmap.resolution
+    y = costmap.origin_y + (rows + 0.5) * costmap.resolution
+    r, c = grid.cell_of(x, y)
+    gh, gw = grid.shape
+    inside = (r >= 0) & (r < gh) & (c >= 0) & (c < gw)
+    rr, cc = np.where(inside, r, 0), np.where(inside, c, 0)
+    value = np.where(inside, grid.data[rr, cc], -1)
+    seen_here = inside & seen[rr, cc]
+    known_free = inside & (value >= 0) & (value < 65) & (awareness == free)
+    out = np.full((h, w), obstacle, dtype=awareness.dtype)
+    out[known_free & seen_here] = free
+    out[known_free & ~seen_here] = unknown
+    return out

@@ -147,3 +147,22 @@ def test_unknown_space_in_the_sweep_refuses_but_unknown_under_the_robot_does_not
     assert 'unknown' in rotation_problem(costmap, footprint, (5.0, 5.0, 0.0), math.pi)
     edge = free_map(size_m=1.0)
     assert 'leaves the costmap' in rotation_problem(edge, footprint, (0.5, 0.5, 0.0), 1.0)
+
+
+def test_the_camera_frontier_map_keeps_unknown_and_occupied_space_out():
+    from ridgeback_autonomy.frontier_explorer.camera_coverage import camera_frontier_map
+    from ridgeback_autonomy.frontier_explorer.params import FREE, OBSTACLE, UNKNOWN
+    grid = free_map(size_m=4.0)
+    grid.data[:, 60:] = -1                                        # SLAM map unknown at x >= 3 m
+    grid.data[11, 11] = 100                                       # under costmap cell (5, 5)
+    seen = np.zeros(grid.shape, bool)
+    seen[:, :20] = True                                           # camera saw x < 1 m
+    costmap = MapView(np.zeros((40, 40), np.int16), 0.1, 0.0, 0.0)   # coarser, same origin
+    aware = np.full((40, 40), FREE, np.int8)
+    aware[30, 5] = OBSTACLE                                       # lethal in the costmap
+    out = camera_frontier_map(aware, costmap, grid, seen, FREE, UNKNOWN, OBSTACLE)
+    assert out[5, 5] == OBSTACLE                                  # occupied in the SLAM map
+    assert out[0, 0] == FREE and out[20, 8] == FREE               # seen free
+    assert (out[:, 12:28] == UNKNOWN).all()                       # free but never seen
+    assert (out[:, 30:] == OBSTACLE).all()                        # unknown to the SLAM map
+    assert out[30, 5] == OBSTACLE                                 # lethal in the costmap

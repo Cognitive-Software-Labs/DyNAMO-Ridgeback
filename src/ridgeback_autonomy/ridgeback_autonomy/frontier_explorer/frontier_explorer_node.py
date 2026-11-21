@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 from ridgeback_autonomy.frontier_explorer.mission_guard import MissionGuard
 from ridgeback_autonomy.frontier_explorer.camera_observation import CameraObserver
+from ridgeback_autonomy.frontier_explorer.camera_coverage import camera_frontier_map, map_view
 
+import math
 import time as _time
 
 import rclpy
@@ -354,6 +356,9 @@ class FrontierExplorerNode(Node):
                 self._visited_goals.clear()
                 self._abort_counts.clear()
                 best_frontier = self.find_safe_frontier(robot_pos, clusters)
+            if best_frontier is None and self._focus is None:
+                # LiDAR coverage is complete; the camera's may not be (parking mission only).
+                best_frontier = self._select_camera_viewpoint(robot_pos)
             if best_frontier is None:
                 if self._focus is not None:
                     self._publish_status('focus_exploration_complete')
@@ -381,6 +386,81 @@ class FrontierExplorerNode(Node):
         self.goal_start_time = self.get_clock().now()
         self._goal_best_distance = None
     
+    def _select_camera_viewpoint(self, robot_pos):
+        """A goal (costmap cell) from which the camera would see never-seen free space, or
+        None: the edges of the camera coverage inside known free space, clustered like
+        LiDAR frontiers, each offered as a cell 2.0/1.5/1.0 m back from it on the robot's
+        side that is LiDAR-free, passes ``is_goal_safe``, was never sent before (within
+        ``camera_observation_repeat_radius_m``) and would show at least the observation
+        turns' minimum of unseen cells. Ranked like far frontiers (distance and size, with
+        the unseen gain as size). Bounded by the goal count and time budgets."""
+        o = self.observer
+        if not o.enabled:
+            return None
+        now = _time.monotonic()
+        problem = o.frontier_problem(now)
+        grid = o.map
+        costmap = None if self.current_costmap is None else map_view(self.current_costmap)
+        if problem is None and (grid is None or costmap is None or self.robot_awareness_map is None):
+            problem = 'map or costmap unavailable'
+        if problem is not None:
+            if o.frontier_done != problem:
+                o.frontier_done = problem
+                self.get_logger().info(f'Camera frontiers finished: {problem}')
+            return None
+        seen = o.seen_on(grid)
+        key = (int(seen.sum()), grid.shape, grid.origin_x, grid.origin_y, len(o.frontier_tried),
+               robot_pos)
+        if key == getattr(self, '_camera_frontier_key', None):
+            return None                               # nothing changed since the last search
+        self._camera_frontier_key = key
+        aware = camera_frontier_map(self.robot_awareness_map, costmap, grid, seen,
+                                    FREE, UNKNOWN, OBSTACLE)
+        clusters = sorted((c for c in get_frontier_clusters(aware) if len(c) >= o.frontier_min_cells),
+                          key=len, reverse=True)[:10]
+        res = self.current_costmap.info.resolution
+        robot_xy = self.grid_to_world(robot_pos)
+        cap = 2000
+        best = None
+        for cluster in clusters:
+            cx = float(np.mean([p[0] for p in cluster]))
+            cy = float(np.mean([p[1] for p in cluster]))
+            dist = math.hypot(cx - robot_pos[0], cy - robot_pos[1])
+            ux, uy = ((robot_pos[0] - cx) / dist, (robot_pos[1] - cy) / dist) if dist > 0 else (0.0, 0.0)
+            for standoff in o.frontier_standoffs_m:
+                tx, ty = int(round(cx + ux * standoff / res)), int(round(cy + uy * standoff / res))
+                h, w = self.robot_awareness_map.shape
+                if not (0 <= tx < w and 0 <= ty < h) or self.robot_awareness_map[ty, tx] != FREE:
+                    continue                          # never a goal in unknown or occupied space
+                wx, wy = self.grid_to_world((tx, ty))
+                if any(math.hypot(wx - px, wy - py) < o.repeat_radius_m
+                       for px, py in o.frontier_tried + [robot_xy]):
+                    continue
+                if not self.is_goal_safe((tx, ty)):
+                    continue
+                gain = o.viewpoint_gain(grid, wx, wy)
+                if gain <= 0:
+                    continue
+                score = (self.distance_weight * np.exp(-dist / max(self._near_frontier_radius, 1))
+                         + self.size_weight * min(gain, cap) / cap)
+                if best is None or score > best[0]:
+                    best = (score, (tx, ty), (wx, wy), gain, len(cluster))
+                break
+        if best is None:
+            self.get_logger().info(
+                f'Camera frontiers finished: no reachable viewpoint onto unseen free space '
+                f'({len(clusters)} coverage edges checked)')
+            o.frontier_done = 'no useful viewpoint'
+            return None
+        _, target, world, gain, size = best
+        o.frontier_tried.append(world)
+        o.frontier_started = o.frontier_started or now
+        o.frontier_done = None
+        self.get_logger().info(
+            f'Camera frontier {len(o.frontier_tried)}/{o.frontier_max_goals}: viewpoint '
+            f'({world[0]:.2f}, {world[1]:.2f}) onto {gain} unseen cells (coverage edge of {size} cells)')
+        return target
+
     def _make_goal_for_cluster(self, cluster, robot_pos):
         """Return the goal position for a cluster.
 

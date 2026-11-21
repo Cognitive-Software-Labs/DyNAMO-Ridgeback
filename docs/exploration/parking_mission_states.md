@@ -118,6 +118,15 @@ ends that stop's observations, and a view without those frames is not counted an
 retried from within 1 m. All observations share a 180 s budget. While a stop is
 observed, no frontier is chosen and `exploration_complete` is not reported.
 
+Once no LiDAR frontier is left, the explorer turns to camera frontiers: the edges of the
+coverage inside known free space (costmap free and mapped), clustered by the frontier
+code. Each offers a viewpoint 2.0, 1.5 or 1.0 m back from it on the robot's side that is
+LiDAR-free, passes the frontier goal's safety check, lies at least 1 m from every earlier
+viewpoint, and would show the turns' minimum of unseen cells; the best by distance and
+unseen gain becomes an ordinary frontier goal, observed on arrival. At most 8 viewpoints
+in 300 s, and only while 15 s of turn budget remain. Only then, with no useful viewpoint
+left, does the explorer report `exploration_complete` (`g1_not_found` below).
+
 ### Search without G1
 
 The explorer repeats `exploration_complete` every tick while it has no frontier, and
