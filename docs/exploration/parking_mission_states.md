@@ -72,15 +72,17 @@ parking pose exists, so neither reads as `no_valid_candidate`, and each keeps it
 code. A search that checked every valid pose and found no safe route stays
 `bounded_search_exhausted` and, like `no_valid_candidate` and `no_free_donut_cells`,
 may map around G1 first; since 2026-11-21 all three then take the same guarded return
-below under their own code (a completed return formerly reported `parking_failed`).
+below under their own code (a completed return formerly reported `parking_failed`). So
+do a failed last attempt and a retry that cannot proceed (`parking_failed`): after a
+final leg the checked departure from G1 comes first, then a fresh stop and the checks.
 Missing post-planning motion evidence stays `motion_settlement_timeout`. A spent budget may
 still map around G1 first, as before; a timeout does not. With driving on, the
 outstanding check is cancelled and the mission enters `RETURNING_TO_START` without a
 goal. Once the stop is confirmed, it starts the shared-checker return to the start
 only when the scans and odometry are fresh with nothing within the 0.05 m stopping
-margin, both Nav2 action servers are ready, the footprint is outside G1's protected
-region (keep-out plus `g1_exploration_protected_margin_m`; otherwise
-`g1_protected_region`, since only the checked departure may leave it), and Nav2's
+margin, both Nav2 action servers are ready, the footprint is outside G1's keep-out
+(otherwise `g1_protected_region`: only the checked departure may leave it; a failed
+final leg departs first and then confirms a fresh stop), and Nav2's
 planner returns a route home within 3 s. That route only gates the start: Nav2 replans the return on its live
 costmaps and every command passes its collision monitor. Otherwise nothing moves: the
 mission ends `MISSION_FAILED` under the search's code with the reason, for example

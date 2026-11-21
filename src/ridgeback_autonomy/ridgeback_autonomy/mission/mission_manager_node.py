@@ -2345,23 +2345,26 @@ class MissionManagerNode(Node):
         self._begin_safe_return(issue, reason, 'Parking route search incomplete')
         return True
 
-    def _begin_safe_return(self, issue, reason, headline):
+    def _begin_safe_return(self, issue, reason, headline, *, cancel_owned=False):
         """The guarded return home after a failed mission (incomplete route search, no feasible
         parking pose, G1 not found): confirm the stop, then fresh scans and odometry, Nav2
         ready, the robot outside G1's protected region and a route home Nav2 plans now
         (``_check_timeout_return``); only then the collision-monitored return. Otherwise
-        nothing moves. The mission fails under ``issue`` whether or not it returns."""
+        nothing moves. The mission fails under ``issue`` whether or not it returns. With
+        ``cancel_owned`` (a failed parking leg) the leg's own goal is cancelled first and the
+        stop is confirmed only after Nav2 releases it; near G1 the checked straight departure
+        comes first (``_depart_after_stop``), then a fresh stop and these checks."""
         self._parking_failure_code = issue
         self.search_recovery = {'code': issue, 'outcome': None, 'reason': reason}
         self.get_logger().error(f'{headline} [{issue}]: {reason}; returning home only if the '
                                 'robot is stopped, its sensors are fresh and a route home exists')
         if self.start_pose is None:
             self._timeout_return_refused('start pose unavailable')
-        elif self._nav_goal_generation is not None:
+        elif self._nav_goal_generation is not None and not cancel_owned:
             self._timeout_return_refused('a navigation goal may still be executing')
         else:
             self._timeout_return_pending = True
-            self._start_return(f'{issue}: confirming the stop and a safe route home',
+            self._start_return(f'{issue}: {reason}; confirming the stop and a safe route home',
                                stop_first=True)
 
     def _timeout_return_refused(self, problem):
@@ -2382,20 +2385,21 @@ class MissionManagerNode(Node):
                          f'{recovery["code"]}; return home not safe: {problem}; remaining stopped')
 
     def _inside_g1_protection(self, robot):
-        """Why the robot may not take a Nav2 route home from here: its footprint is inside the
-        protected region around a known G1, which only the checked straight departure may
-        leave. None otherwise."""
+        """Why the robot may not take a Nav2 route home from here: its footprint is inside a
+        known G1's keep-out, where only the checked straight departure may move it (a failed
+        final leg departs first, ``_depart_after_stop``). The pre-parking pose the departure
+        ends at lies outside it (0.40 m from G1 against 0.29 m). None otherwise."""
         position = self.target_position
         if position is None:
             return None
         target = TargetReference(position.map_x_m, position.map_y_m, self.map_frame, 0,
                                  position.reference, position.is_foot_midpoint, '')
-        protected = keepout_radius_m(target, self.planner_config) + self.g1_protected_margin_m
+        keepout = keepout_radius_m(target, self.planner_config)
         polygon = rotated_footprint_vertices(self.planner_config.footprint, *robot)
         gap = float(points_to_polygon_distance([target.x], [target.y], polygon)[0])
-        if gap < protected:
-            return (f'g1_protected_region: footprint {gap:.2f} m from G1, inside the protected '
-                    f'{protected:.2f} m; only the straight departure may leave it')
+        if gap < keepout:
+            return (f'g1_protected_region: footprint {gap:.2f} m from G1, inside its '
+                    f'{keepout:.2f} m keep-out; only the straight departure may leave it')
         return None
 
     def _timeout_return_sensors(self):
@@ -3392,7 +3396,8 @@ class MissionManagerNode(Node):
                 self._nav_deadline_s = None
                 if self._depart_after_stop:
                     self._depart_after_stop = False
-                    self._start_departure(self._send_shared_return)
+                    self._start_departure(self._stop_then_check_return if self._timeout_return_pending
+                                          else self._send_shared_return)
                 elif self._timeout_return_pending:
                     self._check_timeout_return()
                 else:
@@ -3459,9 +3464,8 @@ class MissionManagerNode(Node):
             return
         if self._parking_attempts > 1:
             reason = f'parking attempt {self._parking_attempts}/{self.parking_max_attempts}: {reason}'
-        self.get_logger().error(f'Parking failed: {reason}; returning to start')
         self._parking_failure = reason
-        self._start_return(reason, stop_first=stop_first)
+        self._begin_safe_return('parking_failed', reason, 'Parking failed', cancel_owned=True)
 
     def _retry_parking(self, reason, *, stop_first):
         """Stop, then relocalize G1 for another attempt that avoids this direction. False for a
@@ -3541,6 +3545,12 @@ class MissionManagerNode(Node):
     def _send_relocalization_view(self):
         self._send_retry_observation('stopped after mapping around G1', 'relocalization')
 
+    def _stop_then_check_return(self):
+        """After the departure from G1 on a failed mission: a fresh confirmed stop, then the
+        guarded return's checks (``_check_timeout_return``)."""
+        self._return_after_stop = True
+        self._settle_before_return()
+
     def _send_shared_return(self):
         self._set_goal_tolerance(self._shared_goal_tolerance, self._send_return_goal)
 
@@ -3548,12 +3558,12 @@ class MissionManagerNode(Node):
         """A retry cannot proceed: go home and report it, as after the last attempt. False before
         any attempt, with driving off, or while Nav2 may still own a goal."""
         if (self._parking_attempts == 0 or not self.parking_navigation_enabled
-                or self.start_pose is None or self._nav_goal_generation is not None):
+                or self.start_pose is None or self._nav_goal_generation is not None
+                or self.search_recovery is not None):
             return False
         self._parking_failure = (f'parking attempt {self._parking_attempts}/{self.parking_max_attempts} '
                                  f'not retried: {code}: {reason}')
-        self.get_logger().error(f'{self._parking_failure}; returning to start')
-        self._start_return(f'retry not possible: {code}')
+        self._begin_safe_return('parking_failed', self._parking_failure, 'Parking retry not possible')
         return True
 
     def _exclude_failed_directions(self, plan):

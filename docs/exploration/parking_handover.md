@@ -238,7 +238,9 @@ recordings are kept untracked under `artifacts/`, not in Git.
   recoveries passed automated tests only; neither has been validated in a simulator or
   on the robot. Since 2026-11-21 `bounded_search_exhausted`, `no_valid_candidate` and
   `no_free_donut_cells` take the same guarded return under their own codes, and the
-  return is also refused inside G1's protected region; automated tests only.
+  return is also refused inside G1's keep-out. A failed last attempt and a retry that
+  cannot proceed take it as well (the last final leg departs first, then stops again);
+  automated tests only.
 - **Camera search and `g1_not_found`.** The explorer turns the camera toward unseen
   directions at frontier stops, and a search without frontiers or a G1 confirmation
   ends as `g1_not_found` through the guarded return
@@ -251,9 +253,13 @@ recordings are kept untracked under `artifacts/`, not in Git.
 - **Relocalization from a distant first view.** In that run G1 was first localized from
   4.3 m, past the 3.5 m reacquisition range; its depth check passed on the torso while
   the head region showed the background. After mapping around G1, the in-place
-  reacquisition 2.4 m away stopped 0.043 m from its pose (limit 0.040 m), so the robot
-  returned to the 4.3 m pose, where every head-depth check failed:
-  `target_localization_timeout`, stopped there. Not yet changed.
+  reacquisition 2.4 m away stopped 0.043 m from its pose (limit 0.040 m): its goal had
+  been taken from a robot still moving at 0.5 m/s. The robot returned to the 4.3 m pose,
+  where every head-depth check failed (`target_localization_timeout`). Since then the
+  view is chosen from a confirmed stop, an in-place view is judged by the camera's view
+  of G1, and only a reliable view (head verified, 1.3-3.5 m) is ever driven back to;
+  otherwise `g1_relocalization_failed`, stopped
+  ([observation return](architecture.md#observation-return)).
 - **Reach violation on earlier code.** A Gazebo `standard` run (`gz_standard_run2`,
   `f6ade2f`) completed with a reach of 0.607 m, outside 0.30-0.60 m: the localization
   and map-pose errors added to a plan of 0.517 m.

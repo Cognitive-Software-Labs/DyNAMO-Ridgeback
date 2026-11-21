@@ -196,8 +196,8 @@ def test_obstacle_on_route_cancels_the_leg_and_returns_only_after_a_confirmed_st
     release(handle)
     m.tick()
     assert len(m.navigation_client.calls) == calls    # not resumed, no return before the stop
-    hold_still(m)
-    m.tick()
+    from test_parking_mission_navigation import guarded_return
+    guarded_return(m)
     answer(m._goal_checker_set_client)
     assert navigation_result(m.navigation_client) == pytest.approx((1.0, 2.0, 0.25))
     assert m.state == MissionState.MISSION_FAILED     # controlled failure, reported
@@ -225,7 +225,8 @@ def test_unconfirmed_stop_after_a_veto_fails_without_driving(manager_factory, mo
     m._monotonic.value += m.motion_settlement_timeout_s + 1.0
     m.tick()
     assert m.state == MissionState.MISSION_FAILED
-    assert m.last_issue.code == 'stop_not_confirmed'
+    assert m.last_issue.code == 'parking_failed' and 'stop not confirmed' in m.last_issue.reason
+    assert m.search_recovery['outcome'].startswith('not started: stop not confirmed')
     assert len(m.navigation_client.calls) == calls
 
 

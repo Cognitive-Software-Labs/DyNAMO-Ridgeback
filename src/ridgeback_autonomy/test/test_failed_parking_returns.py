@@ -57,3 +57,76 @@ def test_an_unconfirmed_stop_keeps_the_failed_parking_return_from_starting(manag
     m._monotonic.value += m.motion_settlement_timeout_s + 1.0
     m.tick()
     refused_with(m, 'bounded_search_exhausted', 'stop not confirmed')
+
+
+# The remaining failed-parking returns: a retry that cannot proceed, and the last attempt.
+
+def test_a_retry_that_cannot_relocalize_returns_only_through_the_guarded_return(manager_factory, monkeypatch):
+    from test_parking_mission_navigation import back_at_observation, guarded_return, hold_still, vetoed
+    from test_parking_mission_navigation import stopped as released_and_stopped
+    m, handle, _, _ = vetoed(manager_factory, monkeypatch)
+    released_and_stopped(m, handle)
+    back_at_observation(m)
+    hold_still(m)
+    m.tick()
+    m._monotonic.value += m.localization_timeout_s + 1.0
+    m.tick()
+    assert m.state == MissionState.RETURNING_TO_START
+    assert m.search_recovery['code'] == 'parking_failed'
+    assert 'target_localization_timeout' in m._parking_failure
+    sent = len(m.navigation_client.calls)
+    guarded_return(m)
+    answer(m._goal_checker_set_client)
+    navigation_result(m.navigation_client)
+    assert len(m.navigation_client.calls) == sent + 1
+    assert m.state == MissionState.MISSION_FAILED and m.last_issue.code == 'parking_failed'
+
+
+def test_a_retry_that_cannot_relocalize_stays_stopped_without_a_route_home(manager_factory, monkeypatch):
+    from test_parking_mission_navigation import back_at_observation, hold_still, vetoed
+    from test_parking_mission_navigation import stopped as released_and_stopped
+    from test_parking_clearance import feed
+    from action_msgs.msg import GoalStatus
+    m, handle, _, _ = vetoed(manager_factory, monkeypatch)
+    released_and_stopped(m, handle)
+    back_at_observation(m)
+    hold_still(m)
+    m.tick()
+    m._monotonic.value += m.localization_timeout_s + 1.0
+    m.tick()
+    hold_still(m)
+    m.test_ros_ns += 50_000_000
+    feed(m)
+    m.tick()
+    sent = len(m.navigation_client.calls)
+    finish(m.compute_path_client, status=GoalStatus.STATUS_ABORTED, error=304)
+    assert m.state == MissionState.MISSION_FAILED and m.last_issue.code == 'parking_failed'
+    assert 'home_route_unavailable' in m.last_issue.reason and 'remaining stopped' in m.last_issue.reason
+    m._monotonic.value += 30.0
+    m.tick()
+    assert len(m.navigation_client.calls) == sent                # nothing commanded, not retried
+
+
+def test_the_last_final_leg_departs_stops_again_and_stays_stopped_without_a_route_home(
+        manager_factory, monkeypatch):
+    from action_msgs.msg import GoalStatus
+    from test_parking_departure import depart, final_leg_failed, stopped_near_g1
+    from test_parking_mission_navigation import hold_still
+    from test_parking_clearance import feed
+    m, handle, pre, _ = final_leg_failed(manager_factory, monkeypatch, attempts=1)
+    assert m.state == MissionState.RETURNING_TO_START and m.search_recovery['code'] == 'parking_failed'
+    stopped_near_g1(m, handle)
+    depart(m, pre)                                               # the checked straight departure
+    routes = len(m.compute_path_client.calls)
+    m.tick()
+    assert len(m.compute_path_client.calls) == routes           # a fresh stop comes first
+    hold_still(m)
+    m.test_ros_ns += 50_000_000
+    feed(m)
+    m.tick()
+    assert len(m.compute_path_client.calls) == routes + 1
+    sent = len(m.navigation_client.calls)
+    finish(m.compute_path_client, status=GoalStatus.STATUS_ABORTED, error=304)
+    assert m.state == MissionState.MISSION_FAILED and m.last_issue.code == 'parking_failed'
+    assert 'home_route_unavailable' in m.last_issue.reason
+    assert len(m.navigation_client.calls) == sent                # nothing after the departure

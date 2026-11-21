@@ -143,16 +143,33 @@ def test_full_mission_parks_waits_and_returns_to_start(manager_factory, monkeypa
         'preparking', 'parking', 'departure', 'start'}
 
 
+def guarded_return(m):
+    """The guarded return after a failed parking: a fresh confirmed stop, fresh scans and
+    odometry, then Nav2's route home; only then the return goal is sent."""
+    from test_parking_clearance import feed
+    sent = len(m.navigation_client.calls)
+    hold_still(m)
+    m.test_ros_ns += 50_000_000
+    feed(m)
+    m.tick()
+    assert len(m.navigation_client.calls) == sent              # nothing before the route home
+    request = m.compute_path_client.calls[-1][0]
+    assert request.use_start and request.goal.pose.position.x == pytest.approx(1.0)
+    finish(m.compute_path_client)
+
+
 def test_failed_leg_returns_to_start_and_reports_failure(manager_factory, monkeypatch):
     m, _ = feasible(manager_factory, monkeypatch)
     answer(m._goal_checker_set_client)
     navigation_result(m.navigation_client, status=GoalStatus.STATUS_ABORTED, error=104)
     assert m.state == MissionState.RETURNING_TO_START
+    guarded_return(m)
     answer(m._goal_checker_set_client)
     navigation_result(m.navigation_client)
-    assert m.state == MissionState.MISSION_FAILED
+    assert m.state == MissionState.MISSION_FAILED                 # never MISSION_COMPLETE
     assert m.last_issue.code == 'parking_failed'
     assert m.last_issue.reason.startswith('preparking_navigation_failed')
+    assert m.search_recovery['outcome'] == 'returned home'
 
 
 def test_final_pose_blocked_after_preparking_is_not_driven(manager_factory, monkeypatch):
@@ -173,6 +190,7 @@ def test_missing_goal_checker_service_never_parks_loosely(manager_factory, monke
     m._begin_parking_navigation()
     assert m.state == MissionState.RETURNING_TO_START
     assert m._parking_failure == 'goal_checker_tolerance_not_applied'
+    guarded_return(m)
     navigation_result(m.navigation_client)   # return proceeds with the tighter checker
     assert m.state == MissionState.MISSION_FAILED
 
@@ -363,8 +381,7 @@ def test_cancelled_leg_returns_only_after_terminal_result_and_a_fresh_stop(
     assert navigation_payload(published)['goal_owned'] is False
     m.tick()
     assert len(params.calls) == 1   # the stop must be observed after the release
-    hold_still(m)
-    m.tick()
+    guarded_return(m)
     answer(params)
     assert navigation_result(nav) == pytest.approx((1.0, 2.0, 0.25))   # then a new goal
     assert m.state == MissionState.MISSION_FAILED and m.last_issue.code == 'parking_failed'

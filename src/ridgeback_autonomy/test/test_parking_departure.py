@@ -271,6 +271,8 @@ def test_a_failed_last_final_leg_departs_before_the_return(manager_factory, monk
     assert m.state == MissionState.RETURNING_TO_START
     stopped_near_g1(m, handle)
     depart(m, pre)
+    from test_parking_mission_navigation import guarded_return
+    guarded_return(m)                                        # stopped again, outside G1's region
     answer(m._goal_checker_set_client)                       # the shared checker
     assert navigation_result(m.navigation_client) == pytest.approx((1.0, 2.0, 0.25))
     assert m.state == MissionState.MISSION_FAILED and m.last_issue.code == 'parking_failed'
