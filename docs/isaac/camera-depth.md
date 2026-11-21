@@ -519,6 +519,7 @@ When modifying the camera:
 
 ## Archived evidence
 
+- [Accepted isolated-condition output repeatability and residual RGB/depth differences](../../archive/engineering/2026-11-21-isaac-condition-repeatability.md)
 - [Isaac Sim 6.1 migration](../../archive/engineering/2026-09-13-isaac-6.1-migration.md)
 - [Renderer cache and frame-freshness investigation](../../archive/engineering/2026-11-05-isaac-render-cache-diagnosis.md)
 - [Cache policy verification and residual probes](../../archive/engineering/2026-11-05-isaac-cache-policy-and-residual-probes.md)

@@ -1,11 +1,17 @@
 # BENCHMARKING — Geometry reruns
 
-Status: **planned, not started; blocked on dependencies.** The
+Status: **broader accuracy/throughput/isolation reruns remain open.** The
 [benchmarking backlog](../target_distance_benchmarking/BACKLOG.md#camera-geometry-benchmark-recertification)
 owns the open item; this plan owns the rerun order and preconditions. Every
 benchmark result recorded before the scene recertification predates the
 current camera model, the floor-standing assets and the `edge640_*` scenes, so
 none of it may be quoted as current.
+
+The [accepted isolated-condition Isaac pairs](../target_distance_benchmarking/semantics.md#accepted-isaac-repeatability-scope)
+provide newer-geometry repeatability evidence for the three included estimators.
+They do not complete this plan's accuracy refresh, model-throughput control,
+recipe comparison or occlusion attribution. Pointcloud was excluded; the packaged
+four-estimator baseline below applies only if that broader scope is reopened.
 
 ## Preconditions
 
@@ -18,6 +24,8 @@ none of it may be quoted as current.
 
 Restoring dependencies changes the shared install. Coordinate with any session
 working on the dependency checkout before running `--apply` and rebuilding.
+The table records conditions when planned, not a fresh failure diagnosis;
+recheck dependencies and the intended installed build before a future run.
 
 ## Before any run
 
@@ -55,10 +63,12 @@ in their owning pages, and record the run in a dated archive record.
 
 - `benchmark_sweep_projective_parameters.yaml` (15 configs, about 7 h): rerun
   only when projective ranging is tuned again.
-- A fresh live capture for layered replay: a separate capture workflow, after
-  step 1.
+- Layered replay qualification: accepted isolated-condition captures are now
+  available, but their offline parity and candidate-cache validation remain in
+  the [replay backlog](../target_distance_benchmarking/BACKLOG.md#layered-replay-validation).
 - The Isaac four-cell matrix that `monocular_depth_error.md` lists as its reopen
-  step: Isaac is not a qualified execution environment yet.
+  step: isolated repeatability acceptance does not establish that throughput
+  comparison or general Isaac execution-environment equivalence.
 
 ## Completion
 

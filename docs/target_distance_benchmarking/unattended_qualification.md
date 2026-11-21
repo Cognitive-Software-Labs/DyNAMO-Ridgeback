@@ -10,6 +10,12 @@ automatically close the [qualification backlog](BACKLOG.md).
 
 ## Isaac-only repeatability
 
+The [accepted isolated-condition workflow](semantics.md#accepted-isaac-repeatability-scope)
+used a separate condition-first harness: eight fresh sessions, one condition
+per session. It did not exercise this helper's persistent four-condition route
+or its heartbeat registration. Acceptance of that collection does not imply
+offline replay parity; the new datasets have not completed the offline phase.
+
 `prepare-isaac BUNDLE` prepares two fresh Isaac sessions and only the Isaac
 readiness check. No Gazebo check, run or imported result is included. Each
 session runs all four mask/depth conditions and the full 109-trial scenario
@@ -351,6 +357,7 @@ receive another allocation on launch.
 
 ## Archived evidence
 
+- [Accepted isolated-condition pairs, coverage audit and unreplayed datasets](../../archive/engineering/2026-11-21-isaac-condition-repeatability.md)
 - [Full-matrix Isaac repeatability pair, 2026-11-06](../../archive/engineering/2026-11-06-isaac-full-repeatability.md)
 - [Sampled capture and live-scan parity, 2026-11-03](../../archive/engineering/sampled_capture_live_scan_parity_20261103.md)
 - [Qualification campaign stopped by systemd-oomd, 2026-11-03](../../archive/engineering/2026-11-03-qualification-oom.md)

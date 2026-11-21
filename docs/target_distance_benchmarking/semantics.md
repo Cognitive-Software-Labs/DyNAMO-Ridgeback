@@ -74,11 +74,33 @@ What a Gazebo-to-Isaac comparison may claim:
   differences matter when they materially change those benchmark outputs.
   Repeats must span fresh sessions: repeats inside one session can see
   byte-identical RGB and show no spread on a scene that differs between
-  sessions. The full-matrix pair under Archived evidence measured monocular
-  differences up to 1.376 m, against at most 4.3 mm for stereo mask estimators.
-  A later investigation attributes the mask-estimator differences in that
-  pair to stale scene geometry. Those are contaminated-run observations, not
-  measurements of intrinsic renderer or monocular-model variation.
+  sessions. The older full-matrix pair under Archived evidence was affected
+  by stale scene geometry; its large mask-estimator differences do not measure
+  intrinsic renderer or monocular-model variation.
+
+### Accepted Isaac repeatability scope
+
+The owner accepted the observed repeatability of the preserved P0 Fabric-audit
+build plus render/readiness changes as sufficient for the tested workflow:
+box/silhouette × monocular/ideal-stereo, each condition first in two fresh
+sessions, full scenes, 640×480, furnished lab, deterministic PathTracing with
+AA 0, default models, GUI/RViz/video and diagnostics enabled on NVIDIA GL.
+The dated isolated-condition record under Archived evidence owns the results,
+provenance, residual cabinet-association case and historical Gazebo comparison.
+
+This acceptance concerns benchmark outputs for that build and workload. It
+does not require RGB bit identity or establish a universal numerical equivalence
+margin. Two repetitions provide paired differences, not a population variance
+estimate. Accuracy and correct target association remain separate questions.
+The Fabric-audit change is unmerged into the main checkout; acceptance of its
+preserved experimental build does not qualify an arbitrary main installation.
+
+Switching all four conditions within a persistent session, replay parity of the
+new captures, and matched-build Gazebo comparisons need their own evidence
+before extending those claims. The [qualification gaps](BACKLOG.md#isaac-qualification-beyond-isolated-repeatability)
+and [execution-environment scope](running_benchmarks.md#qualified-execution-environments)
+keep those boundaries explicit. Small sampled-RGB differences alone do not
+reopen the accepted isolated-repeatability objective.
 
 ### Background props
 
@@ -308,6 +330,7 @@ Historical scenario/status transitions are retained in the Archived evidence sec
 
 ## Archived evidence
 
+- [Accepted isolated-condition Isaac repeatability and historical Gazebo comparison](../../archive/engineering/2026-11-21-isaac-condition-repeatability.md)
 - [full-matrix Isaac repeatability pair](../../archive/engineering/2026-11-06-isaac-full-repeatability.md)
 - [monocular readiness and two-scene Isaac repeatability](../../archive/engineering/2026-11-05-monocular-readiness-and-isaac-repeatability.md)
 - [benchmark history](../../archive/engineering/benchmark_evolution.md)

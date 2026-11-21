@@ -24,8 +24,9 @@ are excluded from ordinary repository search and the generated knowledge graph.
 
 ## Benchmarking and execution
 
+- [Accepted isolated-condition Isaac repeatability](2026-11-21-isaac-condition-repeatability.md) — eight fresh sessions, means/maxima and historical Gazebo comparison, observed Fabric repair, excluded crash and explicit experiment-coverage audit.
 - [Monocular readiness and Isaac output repeatability](2026-11-05-monocular-readiness-and-isaac-repeatability.md) — two fresh sessions of the previously divergent scenes, cold-start context coverage and per-instance output differences.
-- [Full-matrix Isaac repeatability pair](2026-11-06-isaac-full-repeatability.md) — two fresh sessions of all four conditions, per-target output differences, session-level RGB states and the near-surface threshold jumps behind the monocular tail.
+- [Full-matrix Isaac repeatability pair](2026-11-06-isaac-full-repeatability.md) — older four-condition sessions, per-target differences and RGB/depth states; later attributed to stale scene geometry, so its large mask tails are contaminated-run evidence.
 - [Saved hardware-bag diagnostic and review](2026-11-05-hardware-bag-diagnostic.md) — completed 48-bag processing, detector misses, numerical-return limitations and the boundary between offline follow-up and re-recording.
 - [Qualification campaign stopped by systemd-oomd](2026-11-03-qualification-oom.md) — retained memory peaks, ten-minute host history, incomplete workload attribution and preserved partial results.
 - [Remote versus physical-seat validation](2026-09-07-seat-validation.md) — identical error on both displays; accepted as the execution-environment qualification.

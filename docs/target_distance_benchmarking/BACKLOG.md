@@ -20,12 +20,15 @@ model, representative storage, and scaling evidence remain incomplete. The
 The [sampled monocular capture plan](../plans/BENCHMARKING_sampled_monocular_capture.md)
 defines the current handoff for collecting bounded stereo/monocular samples
 during the 16 live qualification runs, with matching live references for later replay.
+The [accepted isolated-condition pairs](semantics.md#accepted-isaac-repeatability-scope)
+also supply fresh full-scene captures with passing collection checks; offline
+box/real-SlimSAM parity on those datasets is still unperformed.
 
 **Remaining work.**
 
-- Capture a fresh live sensor dataset with exact RGB, depth, detections,
-  calibration, and transforms. Verify event identity, empty detections,
-  explicit missing evidence, and absence of skipped trials.
+- Select and freeze the live sensor dataset for each replay claim, including
+  exact RGB, depth, detections, calibration, and transforms. Retain the passing
+  collection checks, event identity, empty detections and explicit missing evidence.
 - Compare live and offline box/current-SlimSAM measurements over the same
   captured events: numeric results, outcomes, miss reasons, and association.
 - Materialize a candidate checkpoint or changed segmentation parameter from
@@ -46,6 +49,34 @@ this assignment.
 results, candidate comparison, storage/resource measurements, scaling, and
 remaining limitations in a dated evidence record. Update maintained references
 with demonstrated facts and remove this item only when the listed gates pass.
+
+## Isaac qualification beyond isolated repeatability
+
+**Status.** The [isolated-condition workflow](semantics.md#accepted-isaac-repeatability-scope)
+is accepted for its preserved experimental build. It closes that repeatability
+question; small RGB differences and the earlier proposed numerical alert limits
+are not new blockers for it.
+
+**Remaining scope.** Before claiming repeatability for persistent multi-condition
+sweeps, execute the [P0 handoff's original A5](../plans/handoffs/BENCHMARKING_isaac_fabric_leftover_p0_claude.md#7-acceptance-tests):
+two fresh sessions, each switching through all four conditions. Check cross-condition history, scene state,
+persistent residue, repairs and per-instance outputs. The isolated pairs do not
+exercise those transitions. Earlier P0 stress/control/persistent-injection tests
+already have evidence; they are not wholly untested requirements.
+
+The P0 change is unmerged. Integrating it and verifying the resulting installed
+build is a separate engineering step before transferring this acceptance to main.
+A same-build, same-input Gazebo pair is required only before making controlled
+backend-causal or equivalence claims; the existing historical comparison cannot
+support those claims.
+
+**Completion criteria.** For each proposed scope extension, preserve the exact
+integrated build and matched inputs, execute its missing comparison, report
+coverage/outcomes beside numeric differences, and record the owner's conclusion.
+Replay,
+[shutdown](#benchmark-shutdown-qualification), and
+[geometry-dependent comparisons](#camera-geometry-benchmark-recertification)
+retain their own completion criteria in this backlog.
 
 ## Hardware-bag experiment qualification
 
@@ -72,16 +103,19 @@ camera pose, intrinsics, LiDAR pose and object geometry, and rendered depth
 captures in both backends match the audit's masks.
 [Scene certification](semantics.md#scene-certification) owns the method.
 
-**Gap.** Every benchmark result recorded before the 2026-10-29 scene
-recertification predates the floor-standing assets and the replaced
-`edge640_*` scenes, and none has been rerun on the current geometry.
+**Gap.** Benchmark results recorded before the 2026-10-29 scene recertification
+predate the floor-standing assets and replaced `edge640_*` scenes. The accepted
+isolated-condition captures provide repeatability evidence on the newer geometry,
+but do not replace older accuracy results or complete the controlled isolation,
+occlusion-attribution and model-throughput comparisons.
 [BENCHMARKING — Geometry reruns](../plans/BENCHMARKING_geometry_reruns.md)
 owns the order and preconditions.
 
 **Completion criteria.** Rerun every benchmark whose inputs or measured
 behavior depend on camera or LiDAR geometry or asset seating, in a
 [qualified execution environment](running_benchmarks.md#qualified-execution-environments),
-before quoting its numbers.
+before quoting its numbers as current. Pointcloud was excluded from the
+repeatability campaign; its rerun is conditional on reopening that scope.
 
 **Context.** [Camera stack](../target_localization/camera_stack.md) and
 [shared robot geometry](../robot/geometry.md).
@@ -183,6 +217,7 @@ owned leftovers separately from saved measurements.
 
 ## Archived evidence
 
+- [Isolated-condition repeatability, acceptance and coverage audit](../../archive/engineering/2026-11-21-isaac-condition-repeatability.md)
 - [Gazebo and Isaac backend qualification](../../archive/engineering/2026-10-26-benchmark-gazebo-isaac-qualification.md)
 - [Scene recertification for the current camera](../../archive/engineering/2026-10-29-scene-recertification.md)
 - [Layered replay implementation and preliminary storage evidence](../../archive/engineering/layered_replay_implementation_validation.md)

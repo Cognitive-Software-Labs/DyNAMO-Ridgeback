@@ -19,8 +19,15 @@ reported, and replay tuning may use captures from either. The evidence predates
 the current camera model and covers the example scenes; the owner accepted it
 as sufficient.
 
-Not qualified: Isaac, headless EGL, `1280x720`, video recording, and runs
-without the Gazebo GUI or RViz. Qualify those before quoting them.
+The preserved Isaac P0 experimental build has an
+[accepted isolated-condition repeatability scope](semantics.md#accepted-isaac-repeatability-scope)
+on NVIDIA GL in xrdp, including GUI/RViz/video and diagnostics. This is scoped
+output-repeatability acceptance, not a physical-seat/xrdp equivalence test or
+general qualification of main, accuracy, replay or throughput.
+
+Other Isaac builds/workloads, headless EGL, `1280x720`, Gazebo video recording,
+and runs without the required GUI or RViz remain outside these accepted scopes.
+Qualify the relevant scope before extending a result claim.
 Confirm the GL path with `tools/gpu-run glxinfo -B` from the run's own
 session. Software rendering is a failure, not an environment; see
 [troubleshooting](../troubleshooting.md#camera-rate-collapses-under-software-rendering).
