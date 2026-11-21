@@ -254,7 +254,11 @@ recordings are kept untracked under `artifacts/`, not in Git.
   confirmed 0.9 s into it, then parked (rear, after right and left LiDAR vetoes) and
   returned, `MISSION_COMPLETE`. Exploration order differs between runs, so one success
   is not a rate. `g1_not_found` was not reached live. Since then, camera frontiers
-  follow exhausted LiDAR frontiers (at most 8 viewpoints in 300 s).
+  follow exhausted LiDAR frontiers (at most 8 viewpoints in 300 s). A third run (on
+  `65fc726`) also reached `MISSION_COMPLETE`: G1 first appeared 0.6 s into an
+  observation turn (2.3 m), and after the right-side veto the in-place turn that would
+  have left the camera 0.93 m from G1 was skipped for the reliable view; rear parked
+  (0.022 m). Camera frontiers were not triggered (G1 found first): automated tests only.
 - **Relocalization from a distant first view.** In that run G1 was first localized from
   4.3 m, past the 3.5 m reacquisition range; its depth check passed on the torso while
   the head region showed the background. After mapping around G1, the in-place
