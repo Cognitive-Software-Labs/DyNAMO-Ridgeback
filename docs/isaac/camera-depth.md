@@ -287,6 +287,9 @@ requested mode. Other renderer/simulation combinations retain their existing
 settings. This reduces renderer history dependence; it does not guarantee
 bit-identical live images.
 
+GUI presentation arguments are appended to these startup flags so windowed
+launches retain the cache/AA policy.
+
 Changing these controls changes the benchmark inputs and requires
 fresh Isaac captures. Keep renderer repeatability, capture coverage, monocular
 inference repeatability, and deliberately noisy LiDAR comparisons separate.

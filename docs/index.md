@@ -108,6 +108,9 @@ troubleshooting, planning, and historical documentation.
   which profile, which of the four ways to start it
 - [Benchmark semantics](target_distance_benchmarking/semantics.md) — scenarios, events,
   observations, instances, and miss reasons
+- [Isaac repeatability fixes and evidence](target_distance_benchmarking/isaac_repeatability.md)
+  — rendering, readiness and scene-cleanup fixes, their demonstrated benefits,
+  test reports and remaining limits
 - [Benchmark outputs](target_distance_benchmarking/outputs.md) — run and sweep artifacts,
   provenance, rename rules, and module ownership
 - [Replay profiles](target_distance_benchmarking/profiles.md) — the legacy measurement dataset

@@ -88,6 +88,8 @@ camera-less robot profile for measuring frontier exploration. It is a separate w
 
 ## Where to go next
 
+- [Isaac repeatability fixes and evidence](isaac_repeatability.md) — what changed,
+  why it was needed, demonstrated benefits and limits, and links to the test reports
 - [open benchmarking work](BACKLOG.md) — remaining validation, tooling, and scenario work
 - [running benchmarks](running_benchmarks.md) — which question, which profile,
   and which of the four ways to start it

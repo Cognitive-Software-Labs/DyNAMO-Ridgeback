@@ -20,6 +20,7 @@ Historical controls are not current performance baselines.
 | [Experimental wheel-contact drive](mecanum-drive.md) | Isolated physical-drive harness, assumptions and qualification gates |
 | [LiDAR pipeline](lidar-pipeline.md) | Scan assembly, ROS contract and qualification procedure |
 | [Camera depth](camera-depth.md) | D455 modes, ROS contract, validation and troubleshooting |
+| [Benchmark repeatability fixes](../target_distance_benchmarking/isaac_repeatability.md) | Renderer, monocular startup and scene-cleanup rationale; test evidence and limits |
 | [Exploration evaluation](../exploration/evaluation.md) | Coverage, navigation outcomes, and run procedure |
 | [Ground-truth maps](../../src/ridgeback_autonomy/sim/ground_truth_maps/README.md) | Map generation and provenance |
 | [Rollback](rollback.md) | Retained environments, shared-driver recovery and verification |
