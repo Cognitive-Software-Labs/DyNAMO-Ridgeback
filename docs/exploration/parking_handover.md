@@ -249,7 +249,11 @@ recordings are kept untracked under `artifacts/`, not in Git.
   2026-11-20 hospital run, the selection would have turned toward G1 (2.7-3.5 m,
   15-22 deg off-axis) at two stops; that is not a detection guarantee. One live
   `standard` run on 2026-11-21 performed 17 turns (all completed; 86 s); none faced G1,
-  which was confirmed while driving, 4.3 m away. `g1_not_found` was not reached live.
+  which was confirmed while driving, 4.3 m away. In a second (on `c6a1c7b`) the turn
+  at the second stop brought G1, 2.7 m away and 38 deg off the heading, into view:
+  confirmed 0.9 s into it, then parked (rear, after right and left LiDAR vetoes) and
+  returned, `MISSION_COMPLETE`. Exploration order differs between runs, so one success
+  is not a rate. `g1_not_found` was not reached live.
 - **Relocalization from a distant first view.** In that run G1 was first localized from
   4.3 m, past the 3.5 m reacquisition range; its depth check passed on the torso while
   the head region showed the background. After mapping around G1, the in-place
@@ -259,7 +263,10 @@ recordings are kept untracked under `artifacts/`, not in Git.
   view is chosen from a confirmed stop, an in-place view is judged by the camera's view
   of G1, and only a reliable view (head verified, 1.3-3.5 m) is ever driven back to;
   otherwise `g1_relocalization_failed`, stopped
-  ([observation return](architecture.md#observation-return)).
+  ([observation return](architecture.md#observation-return)). In the second run both
+  retries' in-place turns left the camera 0.94-0.96 m from G1 (the turn brings the
+  forward camera nearer), so each returned to the reliable 2.4 m view instead; the
+  turn's goal does not yet predict that camera range.
 - **Reach violation on earlier code.** A Gazebo `standard` run (`gz_standard_run2`,
   `f6ade2f`) completed with a reach of 0.607 m, outside 0.30-0.60 m: the localization
   and map-pose errors added to a plan of 0.517 m.
