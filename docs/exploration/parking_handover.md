@@ -236,8 +236,24 @@ recordings are kept untracked under `artifacts/`, not in Git.
   Nav2 plans a route home; otherwise it stays stopped
   ([incomplete route search](parking_mission_states.md#incomplete-route-search)). Both
   recoveries passed automated tests only; neither has been validated in a simulator or
-  on the robot. `bounded_search_exhausted` and `no_valid_candidate` keep their earlier
-  immediate return.
+  on the robot. Since 2026-11-21 `bounded_search_exhausted`, `no_valid_candidate` and
+  `no_free_donut_cells` take the same guarded return under their own codes, and the
+  return is also refused inside G1's protected region; automated tests only.
+- **Camera search and `g1_not_found`.** The explorer turns the camera toward unseen
+  directions at frontier stops, and a search without frontiers or a G1 confirmation
+  ends as `g1_not_found` through the guarded return
+  ([camera observation](parking_mission_states.md#camera-observation-at-frontier-stops),
+  [search without G1](parking_mission_states.md#search-without-g1)). Replaying the
+  2026-11-20 hospital run, the selection would have turned toward G1 (2.7-3.5 m,
+  15-22 deg off-axis) at two stops; that is not a detection guarantee. One live
+  `standard` run on 2026-11-21 performed 17 turns (all completed; 86 s); none faced G1,
+  which was confirmed while driving, 4.3 m away. `g1_not_found` was not reached live.
+- **Relocalization from a distant first view.** In that run G1 was first localized from
+  4.3 m, past the 3.5 m reacquisition range; its depth check passed on the torso while
+  the head region showed the background. After mapping around G1, the in-place
+  reacquisition 2.4 m away stopped 0.043 m from its pose (limit 0.040 m), so the robot
+  returned to the 4.3 m pose, where every head-depth check failed:
+  `target_localization_timeout`, stopped there. Not yet changed.
 - **Reach violation on earlier code.** A Gazebo `standard` run (`gz_standard_run2`,
   `f6ade2f`) completed with a reach of 0.607 m, outside 0.30-0.60 m: the localization
   and map-pose errors added to a plan of 0.517 m.

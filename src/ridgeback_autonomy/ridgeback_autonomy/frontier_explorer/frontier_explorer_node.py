@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 from ridgeback_autonomy.frontier_explorer.mission_guard import MissionGuard
+from ridgeback_autonomy.frontier_explorer.camera_observation import CameraObserver
 
 import time as _time
 
@@ -138,6 +139,8 @@ class FrontierExplorerNode(Node):
         self.goal_start_time = None
         self._current_goal_handle = None
         self.mission_guard = MissionGuard(self)
+        # Parking mission only: look around at frontier stops for G1 (off by default).
+        self.observer = CameraObserver(self)
         # Startup and retry timing (wall clock so it's immune to sim-time jumps)
         self._start_wall_time = _time.time()
         self._retry_after_wall_time = 0.0
@@ -224,6 +227,9 @@ class FrontierExplorerNode(Node):
     
     def exploration_callback(self):
         """Main exploration loop."""
+        with self.mission_guard.lock:
+            if self.observer.active and self.mission_guard.paused:
+                self.observer.on_paused()
         if not self.mission_guard.allowed():
             return
         if self.current_costmap is None or self.robot_awareness_map is None:
@@ -242,6 +248,11 @@ class FrontierExplorerNode(Node):
             # Get current robot position
             robot_pos = self.get_robot_position()
             
+            with self.mission_guard.lock:
+                if self.observer.active:
+                    # Observation turns at the last stop first; no new frontier meanwhile.
+                    self.observer.poll()
+                    return
             # Check if we need to select a new goal
             if self.current_goal is None:
                 self.select_new_frontier_goal(robot_pos)
@@ -686,6 +697,7 @@ class FrontierExplorerNode(Node):
             if self.current_goal is not None:
                 self._visited_goals.append(self.current_goal)
                 self._clear_goal_failures(self.current_goal)
+            self.observer.begin(focused=self._focus is not None)
         else:
             self.get_logger().warn(f'Goal aborted/cancelled (status={status}), selecting new frontier.')
             self._retry_after_wall_time = _time.time() + self._abort_retry_delay

@@ -108,16 +108,16 @@ validation gates before motion is enabled.
 
 ## Exploration and diagnostics
 
-`frontier_explorer_node` reads the Nav2 global costmap, chooses frontiers, and
-sends `NavigateToPose` goals. It is the only supported explorer; its sources
-live under `src/ridgeback_autonomy/ridgeback_autonomy/frontier_explorer/`.
-Each goal faces from the robot towards the goal (`navigator.facing_quaternion`),
-so the forward camera also looks into the frontier, and Nav2's goal checker
-accepts any heading (`yaw_goal_tolerance: 3.15`), so the base never has to turn
-on the spot to finish a goal beside a wall. The parking mission sets its own
-tight checker for each parking leg, observation turn and step back (below); only
-its return to the start uses the shared checker, which no longer requires the
-start heading.
+`frontier_explorer_node` reads the Nav2 global costmap, chooses frontiers, and sends
+`NavigateToPose` goals. It is the only supported explorer; its sources live under
+`src/ridgeback_autonomy/ridgeback_autonomy/frontier_explorer/`. Each goal faces from the
+robot towards the goal (`navigator.facing_quaternion`), but Nav2's goal checker accepts
+any heading (`yaw_goal_tolerance: 3.15`), so the base never turns on the spot to finish a
+goal beside a wall and its arrival heading is not controlled. The parking mission sets its
+own tight checker for each parking leg, observation turn and step back (below); only its
+return to the start uses the shared checker. Its search also turns the camera at frontier
+stops ([camera
+observation](parking_mission_states.md#camera-observation-at-frontier-stops)).
 
 ### Navigation ownership handoff
 

@@ -20,7 +20,10 @@ def generate_launch_description():
         DeclareLaunchArgument('use_sim_time', default_value='true'),
         *[DeclareLaunchArgument(k, default_value=v) for k,v in {
             'localization_required':'false', 'startup_paused':'false', 'health_timeout':'3.0',
-            'localization_progress_timeout':'15.0', 'cancellation_timeout':'5.0'}.items()],
+            'localization_progress_timeout':'15.0', 'cancellation_timeout':'5.0',
+            # G1-search observation turns at frontier stops: the parking mission only.
+            'camera_observation_enabled':'false',
+            'camera_observation_odometry_topic':'platform/odom/filtered'}.items()],
 
         Node(
             package='ridgeback_autonomy',
@@ -31,7 +34,8 @@ def generate_launch_description():
             parameters=[
                 frontier_explorer_params_file,
                 {'use_sim_time': use_sim_time, **{k: LaunchConfiguration(k) for k in (
-                    'localization_required', 'startup_paused', 'health_timeout', 'localization_progress_timeout', 'cancellation_timeout')}},
+                    'localization_required', 'startup_paused', 'health_timeout', 'localization_progress_timeout', 'cancellation_timeout',
+                    'camera_observation_enabled', 'camera_observation_odometry_topic')}},
             ],
             remappings=[
                 ('/tf', 'tf'),

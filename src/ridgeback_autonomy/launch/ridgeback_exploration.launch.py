@@ -517,6 +517,13 @@ def generate_launch_description():
             choices=['true', 'false'],
             description='Allow frontier goals to command motion; hardware '
                         'defaults false and requires explicit operator opt-in'),
+        DeclareLaunchArgument('camera_observation_enabled', default_value='false',
+                              choices=['true', 'false'],
+                              description='Turn the camera toward unseen directions at frontier '
+                                          'stops (the parking mission\'s G1 search)'),
+        DeclareLaunchArgument('camera_observation_odometry_topic',
+                              default_value='platform/odom/filtered',
+                              description='Odometry that confirms the stop before an observation turn'),
         DeclareLaunchArgument('exploration_startup_paused', default_value='false',
                               choices=['true', 'false'],
                               description='Start MissionGuard latched until mission/resume'),
@@ -623,6 +630,9 @@ def generate_launch_description():
                         'health_timeout': LaunchConfiguration('health_timeout'),
                         'localization_progress_timeout': LaunchConfiguration('progress_timeout'),
                         'cancellation_timeout': LaunchConfiguration('cancellation_timeout'),
+                        'camera_observation_enabled': LaunchConfiguration('camera_observation_enabled'),
+                        'camera_observation_odometry_topic': LaunchConfiguration(
+                            'camera_observation_odometry_topic'),
                     }.items(),
                     condition=launch.conditions.IfCondition(
                         autonomous_motion_enabled),

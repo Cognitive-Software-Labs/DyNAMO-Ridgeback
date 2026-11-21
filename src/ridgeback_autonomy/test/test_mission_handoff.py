@@ -159,6 +159,8 @@ def test_any_terminal_result_settles_goal_during_pause(guard_factory, status):
         _abort_retry_delay=1.0,
         _retry_after_wall_time=0.0,
         get_logger=lambda: logger,
+        _focus=None,
+        observer=SimpleNamespace(begin=lambda **_: False),   # camera observation off
     )
     result = Future()
     result.set_result(SimpleNamespace(status=status))

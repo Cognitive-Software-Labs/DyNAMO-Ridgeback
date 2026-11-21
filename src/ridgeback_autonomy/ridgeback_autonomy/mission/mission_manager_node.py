@@ -12,7 +12,6 @@ robot to the start pose, as the original mission did. The guarded
 
 from __future__ import annotations
 
-import ast
 from collections import OrderedDict, deque
 from copy import deepcopy
 from dataclasses import dataclass, replace
@@ -89,8 +88,9 @@ from ridgeback_autonomy.mission.parking_planner import (
     undecided_parking_positions,
     validate_inputs,
 )
-from ridgeback_autonomy.mission.parking_geometry import (
-    normalize_angle, parking_footprint, preparking_pose, rotated_footprint_vertices,
+from ridgeback_autonomy.mission.parking_geometry import (  # noqa: F401 (load_nav2_footprint re-exported)
+    load_nav2_footprint, normalize_angle, parking_footprint, preparking_pose,
+    rotated_footprint_vertices,
 )
 from ridgeback_autonomy.mission.parking_visualization import (
     clear_markers, legend_overlay, plan_markers,
@@ -164,6 +164,10 @@ _OBSERVATION_STOP_ALLOWANCE = (0.01, 0.02)
 # Localization noise allowed on G1's gap when a step back may not bring the robot nearer G1.
 _STEP_BACK_GAP_TOLERANCE_M = 0.02
 
+# Longest gap between the explorer's repeated "exploration_complete" reports (s) that still
+# counts as one continuous report; it repeats them every 0.5 s while it stays without a goal.
+_SEARCH_COMPLETE_GAP_S = 2.0
+
 # Planning failures that more mapping around G1 can resolve.
 _EXPLORABLE_PLANNING_FAILURES = ('no_free_donut_cells', 'no_valid_candidate',
                                  'bounded_search_exhausted', 'route_budget_exhausted')
@@ -225,6 +229,7 @@ _ALLOWED_TRANSITIONS = {
     MissionState.STOPPING_EXPLORATION: {
         MissionState.SETTLING_MOTION,
         MissionState.RETURNING_TO_OBSERVATION,
+        MissionState.RETURNING_TO_START,
         MissionState.MISSION_FAILED,
         MissionState.MISSION_CANCELED,
     },
@@ -413,6 +418,9 @@ class MissionManagerNode(Node):
         self.declare_parameter('first_view_turn_min_deg', 10.0)
         self.declare_parameter('exploration_resume_service', 'mission/resume')
         self.declare_parameter('explorer_status_topic', 'explore/status')
+        # The search ends without G1 once the explorer has reported no frontier (its
+        # observation turns at the last stop done) continuously for this long.
+        self.declare_parameter('search_exhausted_confirm_s', 10.0)
         self.declare_parameter('odom_frame', 'odom')
         self.declare_parameter('odometry_topic', 'platform/odom/filtered')
         self.declare_parameter('motion_linear_limit_mps', 0.005)
@@ -742,6 +750,12 @@ class MissionManagerNode(Node):
         self._g1_exploration_deadline_s = None
         self._g1_explorer_resumed = False
         self._g1_frontiers_exhausted = False
+        self.search_exhausted_confirm_s = float(
+            self.get_parameter('search_exhausted_confirm_s').value)
+        if not math.isfinite(self.search_exhausted_confirm_s) or self.search_exhausted_confirm_s <= 0:
+            raise ValueError('search_exhausted_confirm_s must be finite and positive')
+        self._search_complete_since_s = self._search_complete_last_s = None
+        self._search_exhausted = None
         self._g1_exploration_started_s = None
         self.g1_exploration_result = None
         self.exploration_status_subscription = self.create_subscription(
@@ -1016,6 +1030,9 @@ class MissionManagerNode(Node):
                 return
             if self.state == MissionState.WAITING_FOR_START_POSE:
                 self._try_capture_start_pose()
+                return
+            if self.state == MissionState.SEARCH_G1:
+                self._poll_search_exhaustion(now_s)
                 return
             if self.state == MissionState.STOPPING_EXPLORATION:
                 if self._handoff_deadline_s is not None and now_s >= self._handoff_deadline_s:
@@ -1338,6 +1355,8 @@ class MissionManagerNode(Node):
             self._observation_check_pending = False
             self._g1_exploration_deadline_s = None
             self._g1_explorer_resumed = self._g1_frontiers_exhausted = False
+            self._search_complete_since_s = self._search_complete_last_s = None
+            self._search_exhausted = None
             self._g1_exploration_started_s = None
             self.g1_exploration_result = None
             self._parking_failure = None
@@ -1607,6 +1626,9 @@ class MissionManagerNode(Node):
             self._guard_failed('localization transition', reason)
             return
         self._clear_handoff_state()
+        if self._search_exhausted is not None:
+            self._end_search_without_g1()
+            return
         if self._g1_explored and self._observation_pose is not None:
             # G1 must be in view again for the fresh localization: turn toward it where
             # the robot stands, falling back once to the pose it was first localized from.
@@ -2271,7 +2293,7 @@ class MissionManagerNode(Node):
 
     def _begin_safe_return(self, issue, reason, headline):
         """The guarded return home after a failed mission (incomplete route search, no feasible
-        parking pose): confirm the stop, then fresh scans and odometry, Nav2
+        parking pose, G1 not found): confirm the stop, then fresh scans and odometry, Nav2
         ready, the robot outside G1's protected region and a route home Nav2 plans now
         (``_check_timeout_return``); only then the collision-monitored return. Otherwise
         nothing moves. The mission fails under ``issue`` whether or not it returns."""
@@ -3931,11 +3953,54 @@ class MissionManagerNode(Node):
             self._g1_explorer_resumed = True
 
     def _on_exploration_status(self, msg: String) -> None:
-        """The explorer has no reachable frontier left in the focus region around G1."""
+        """The explorer has no reachable frontier left: around G1 when focused, else anywhere
+        (repeated each explorer tick while it stays so)."""
         with self._lock:
+            if msg.data == 'exploration_complete' and self.state == MissionState.SEARCH_G1:
+                now_s = self._monotonic()
+                if (self._search_complete_last_s is None
+                        or now_s - self._search_complete_last_s > _SEARCH_COMPLETE_GAP_S):
+                    self._search_complete_since_s = now_s
+                self._search_complete_last_s = now_s
             if (msg.data == 'focus_exploration_complete' and self._g1_explorer_resumed
                     and self.state == MissionState.EXPLORING_AROUND_G1):
                 self._g1_frontiers_exhausted = True
+
+    def _poll_search_exhaustion(self, now_s):
+        """End the search without G1 once the explorer has stayed without a frontier for
+        ``search_exhausted_confirm_s`` and no detection vote is pending. The explorer reports
+        that only between goals with no observation turn left, and repeats it every tick, so
+        a gap means it found more to do."""
+        since, last = self._search_complete_since_s, self._search_complete_last_s
+        if since is None:
+            return
+        if now_s - last > _SEARCH_COMPLETE_GAP_S:
+            self._search_complete_since_s = self._search_complete_last_s = None
+            return
+        if now_s - since < self.search_exhausted_confirm_s:
+            return
+        if any(self.detection_adapter.vote_window):
+            return   # a G1 confirmation may still complete
+        self._search_exhausted = (f'explorer reported no frontier left for {now_s - since:.0f} s, '
+                                  'observation turns done, and G1 was never confirmed')
+        if self._transition(MissionState.STOPPING_EXPLORATION,
+                            f'g1_not_found: {self._search_exhausted}; pausing explorer'):
+            self._begin_exploration_handoff()
+
+    def _end_search_without_g1(self):
+        """The explorer is paused and owns no goal: fail with ``g1_not_found``, returning home
+        only through the guarded return; with driving off, stay stopped."""
+        reason = self._search_exhausted
+        self._parking_failure = f'g1_not_found: {reason}'
+        self._parking_failure_code = 'g1_not_found'
+        self.get_logger().error(f'G1 not found: {reason}')
+        if not self.parking_navigation_enabled:
+            self.last_issue = MissionIssue(FailureClass.TERMINAL, 'g1_not_found',
+                                           f'{reason}; driving disabled, remaining stopped')
+            self._transition(MissionState.MISSION_FAILED,
+                             f'g1_not_found: {reason}; driving disabled, remaining stopped')
+            return
+        self._begin_safe_return('g1_not_found', reason, 'G1 search ended without G1')
 
     def _poll_g1_exploration(self, now_s):
         coverage = self._g1_coverage()
@@ -4232,18 +4297,6 @@ class MissionManagerNode(Node):
 
 def _yaw(q) -> float:
     return math.atan2(2.0 * (q.w * q.z + q.x * q.y), 1.0 - 2.0 * (q.y * q.y + q.z * q.z))
-
-
-def load_nav2_footprint(nav2_params_path: str) -> list[tuple[float, float]]:
-    """The global costmap footprint, as the original mission loaded it (padding not applied)."""
-
-    with open(nav2_params_path, encoding='utf-8') as config_file:
-        config = yaml.safe_load(config_file)
-    footprint = config['global_costmap']['global_costmap']['ros__parameters']['footprint']
-    points = [(float(p[0]), float(p[1])) for p in ast.literal_eval(str(footprint))]
-    if len(points) < 3 or not all(math.isfinite(v) for p in points for v in p):
-        raise ValueError('Nav2 footprint must contain at least 3 finite points')
-    return points
 
 
 def main(args=None) -> None:

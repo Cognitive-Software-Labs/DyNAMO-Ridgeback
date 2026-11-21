@@ -22,7 +22,7 @@ mission manager unless noted.
 | State | Purpose | Left when | Configured limit | Gazebo, measured | Isaac, measured |
 |---|---|---|---|---|---|
 | `WAITING_FOR_START_POSE` | Save the start pose before anything moves | a valid map-to-base transform | startup gates, `startup_timeout_s` 300 s each (launch) | not logged per state | not logged per state |
-| `SEARCH_G1` | The frontier explorer searches; detections are voted | G1 confirmed (3 of 5 frames at 0.50) | none in the mission; the experiment runner stops a run at 900-1800 s | 155 (8-946), 18 visits | 524 (149-898), 2 visits |
+| `SEARCH_G1` | The frontier explorer searches, turning the camera at frontier stops; detections are voted | G1 confirmed (3 of 5 frames at 0.50), or the search ends without G1 (below) | `search_exhausted_confirm_s` 10 s of `exploration_complete`; the experiment runner stops a run at 900-1800 s | 155 (8-946), 18 visits | 524 (149-898), 2 visits |
 | `STOPPING_EXPLORATION` | Take Nav2 ownership from the explorer | the explorer's pause is confirmed | `handoff_timeout_s` 10 s | 0.0 | 0.0 |
 | `RETURNING_TO_OBSERVATION` | Turn toward G1, step back (also once before planning when the robot stands inside G1's keep-out or G1's heading is unknown from closer than 1.5 m; that step is LiDAR-checked like the parking legs), or return to the observation pose before a (re)localization | goal reached, then motion settles; for the step before planning also a veto, abort or deadline, then a confirmed stop | `parking_navigation_timeout_s` 90 s; `g1_reobservation_timeout_s` 60 s for the step before planning | 4.0 (0.1-93.8), 17 visits | 5.5 (5.4-8.1), 3 visits |
 | `SETTLING_MOTION` | Wait for 2 s of stationary odometry | the robot is still | `motion_settlement_timeout_s` 10 s | 3.1 (2.7-4.0) | 5.3 (5.2-5.5) |
@@ -70,15 +70,18 @@ A route search cut short, by the 10 s batch deadline or a 3 s request deadline
 with poses still untested (`route_budget_exhausted`), says nothing about whether a
 parking pose exists, so neither reads as `no_valid_candidate`, and each keeps its own
 code. A search that checked every valid pose and found no safe route stays
-`bounded_search_exhausted` and, like `no_valid_candidate`, keeps its existing handling:
-it may map around G1, then returns to the start at once, without the checks below.
+`bounded_search_exhausted` and, like `no_valid_candidate` and `no_free_donut_cells`,
+may map around G1 first; since 2026-11-21 all three then take the same guarded return
+below under their own code (a completed return formerly reported `parking_failed`).
 Missing post-planning motion evidence stays `motion_settlement_timeout`. A spent budget may
 still map around G1 first, as before; a timeout does not. With driving on, the
 outstanding check is cancelled and the mission enters `RETURNING_TO_START` without a
 goal. Once the stop is confirmed, it starts the shared-checker return to the start
 only when the scans and odometry are fresh with nothing within the 0.05 m stopping
-margin, both Nav2 action servers are ready, and Nav2's planner returns a route home
-within 3 s. That route only gates the start: Nav2 replans the return on its live
+margin, both Nav2 action servers are ready, the footprint is outside G1's protected
+region (keep-out plus `g1_exploration_protected_margin_m`; otherwise
+`g1_protected_region`, since only the checked departure may leave it), and Nav2's
+planner returns a route home within 3 s. That route only gates the start: Nav2 replans the return on its live
 costmaps and every command passes its collision monitor. Otherwise nothing moves: the
 mission ends `MISSION_FAILED` under the search's code with the reason, for example
 `stop not confirmed`, `lidar_stale` or `home_route_unavailable`, and is not retried. A
@@ -86,6 +89,43 @@ completed return also ends `MISSION_FAILED` under that code, and a failed one
 `return_navigation_failed` naming it; `search_recovery` in the mission state records
 the code and outcome. With driving off, nothing moves and the failure stays
 `PARKING_PLANNING_FAILED`.
+
+### Camera observation at frontier stops
+
+Frontiers follow LiDAR coverage, which says nothing about where the 80 degree camera
+has looked. For the parking mission only (`camera_observation_enabled`, set by
+`ridgeback_mission.launch.py`; off for every other explorer user), the explorer
+keeps a coverage grid on the SLAM map (`frontier_explorer/camera_coverage.py`). A
+detector frame (the detector publishes one per processed image) marks the map-known
+cells within 30 degrees of the camera axis and 1.3-3.5 m away with an unbroken line of
+sight; a ray stops at the first occupied cell, which is seen, and at unknown cells.
+Frames taken while the camera turns faster than 0.35 rad/s, or without a camera pose
+at their stamp, mark nothing.
+
+After a successful frontier goal (not while exploring around a localized G1), the
+explorer confirms a 0.5 s stop on the mission's odometry, then picks at most three
+headings, each adding at least 1 m^2 of unseen visible cells, and turns to them in one
+signed sweep or one crossing (`frontier_explorer/camera_observation.py`). Before each
+turn the swept footprint, basket included, must keep 0.05 m from lethal cells of the
+global costmap and stay on known cells. The turn is a Nav2 `Spin` (15 s allowance),
+which checks the local costmap itself and whose command passes the collision monitor;
+MissionGuard owns it exactly like a frontier goal, so the mission's pause on a G1
+confirmation cancels it. At each heading the explorer waits up to 3 s for five frames
+taken there after the turn. A refused, rejected, aborted, cancelled or overdue turn
+ends that stop's observations, and a view without those frames is not counted and not
+retried from within 1 m. All observations share a 180 s budget. While a stop is
+observed, no frontier is chosen and `exploration_complete` is not reported.
+
+### Search without G1
+
+The explorer repeats `exploration_complete` every tick while it has no frontier, and
+never while a stop's observation turns are pending. Once that report has held for
+`search_exhausted_confirm_s` (10 s, gaps of at most 2 s) and no detection vote is
+pending, the mission pauses the explorer through the usual handoff
+(`STOPPING_EXPLORATION`), then fails as `g1_not_found` through the same guarded return:
+home only once stopped with fresh sensors and a route home, otherwise stopped where it
+is. It never reads as `MISSION_COMPLETE`. With driving off it ends `MISSION_FAILED`
+stopped.
 
 ## Whole missions
 

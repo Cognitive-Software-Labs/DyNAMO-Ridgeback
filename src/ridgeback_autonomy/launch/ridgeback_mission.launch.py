@@ -297,6 +297,10 @@ def generate_launch_description():
                     "'true' if '", LaunchConfiguration('demo_scene_enabled'),
                     "' == 'true' and '", exploration_enabled, "' == 'true' else 'false'"]),
                 'localization_required': LaunchConfiguration('localization_required'),
+                # The G1 search turns the camera toward unseen directions at frontier stops,
+                # confirming each stop on the mission's own odometry.
+                'camera_observation_enabled': mission_enabled,
+                'camera_observation_odometry_topic': LaunchConfiguration('odometry_topic'),
             }.items(),
         ),
 

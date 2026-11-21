@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import ast
 import math
 from collections.abc import Iterable, Sequence
+
+import yaml
 
 
 def normalize_angle(angle_rad: float) -> float:
@@ -133,3 +136,15 @@ def parking_footprint(nav2_footprint, attachments=BASKET_CORNERS_BASE):
     whatever outline Nav2 is given.
     """
     return tuple(convex_hull(list(nav2_footprint) + list(attachments)))
+
+
+def load_nav2_footprint(nav2_params_path: str) -> list[tuple[float, float]]:
+    """The global costmap footprint, as the original mission loaded it (padding not applied)."""
+
+    with open(nav2_params_path, encoding='utf-8') as config_file:
+        config = yaml.safe_load(config_file)
+    footprint = config['global_costmap']['global_costmap']['ros__parameters']['footprint']
+    points = [(float(p[0]), float(p[1])) for p in ast.literal_eval(str(footprint))]
+    if len(points) < 3 or not all(math.isfinite(v) for p in points for v in p):
+        raise ValueError('Nav2 footprint must contain at least 3 finite points')
+    return points
